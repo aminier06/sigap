@@ -672,23 +672,34 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
 
         <div class="form-usuario">
           <h3>➕ Crear nuevo usuario</h3>
+
+          <!-- Fila 1: Datos personales -->
           <div class="grid g-3">
-            <div class="campo"><label>Nombre completo</label><input type="text" id="nuNombre" placeholder="Juan Pérez" /></div>
-            <div class="campo"><label>Correo electrónico</label><input type="email" id="nuEmail" placeholder="usuario@minerd.gob.do" /></div>
+            <div class="campo">
+              <label>Nombre completo</label>
+              <input type="text" id="nuNombre" placeholder="Juan Pérez" />
+            </div>
+            <div class="campo">
+              <label>Correo electrónico</label>
+              <input type="email" id="nuEmail" placeholder="usuario@minerd.gob.do" />
+            </div>
             <div class="campo">
               <label>Contraseña inicial</label>
               <div style="display:flex;gap:8px;align-items:center;">
-                <input type="text" id="nuClave" placeholder="Genere o escriba la contraseña" style="flex:1;font-family:monospace;font-weight:700;letter-spacing:1px;" />
+                <input type="text" id="nuClave" placeholder="Clic en Generar →"
+                  style="flex:1;font-family:monospace;font-weight:700;letter-spacing:1px;" />
                 <button type="button" class="btn-secundario btn-sm" onclick="generarClave()" style="white-space:nowrap;">🔑 Generar</button>
                 <button type="button" class="btn-secundario btn-sm" onclick="copiarClave()" style="white-space:nowrap;" id="btnCopiarClave">📋 Copiar</button>
               </div>
               <div id="avisoClave" style="font-size:12px;color:#617384;margin-top:4px;">Genere una contraseña automática o escríbala manualmente.</div>
             </div>
           </div>
+
+          <!-- Fila 2: Rol y nivel -->
           <div class="grid g-3" style="margin-top:14px;">
             <div class="campo">
               <label>Rol</label>
-              <select id="nuRol">
+              <select id="nuRol" onchange="toggleDemarcacion()">
                 <option value="">Seleccione</option>
                 <option value="Técnico/a Nacional">Técnico/a Nacional</option>
                 <option value="Técnico/a Regional">Técnico/a Regional</option>
@@ -706,6 +717,48 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
               </select>
             </div>
           </div>
+
+          <!-- Fila 3: Demarcación (aparece según el rol) -->
+          <div id="bloqueRegional" class="grid g-3 oculto" style="margin-top:14px;">
+            <div class="campo">
+              <label>Regional asignada</label>
+              <select id="nuRegional" onchange="toggleDistrito()">
+                <option value="">Seleccione regional</option>
+                <option>01 – Barahona</option><option>02 – San Juan de la Maguana</option>
+                <option>03 – Azua</option><option>04 – San Cristóbal</option>
+                <option>05 – Santo Domingo</option><option>06 – San Pedro de Macorís</option>
+                <option>07 – La Romana</option><option>08 – La Vega</option>
+                <option>09 – Moca</option><option>10 – Santiago</option>
+                <option>11 – Mao</option><option>12 – Nagua</option>
+                <option>13 – San Francisco de Macorís</option><option>14 – Hato Mayor</option>
+                <option>15 – Higüey</option><option>16 – Cotuí</option>
+                <option>17 – Bonao</option><option>18 – Baní</option>
+                <option>Distrito Nacional</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="bloqueDistrito" class="grid g-3 oculto" style="margin-top:14px;">
+            <div class="campo">
+              <label>Distrito asignado</label>
+              <input type="text" id="nuDistrito" placeholder="Ej. 0501" />
+            </div>
+          </div>
+
+          <div id="bloqueCentro" class="grid g-3 oculto" style="margin-top:14px;">
+            <div class="campo">
+              <label>Código del centro</label>
+              <input type="text" id="nuCodigoCentro" placeholder="Ej. 02334"
+                oninput="buscarCentroUsuario(this.value)" />
+              <div id="estadoCentroUsuario" style="font-size:12px;color:#617384;margin-top:3px;"></div>
+            </div>
+            <div class="campo" style="grid-column:span 2">
+              <label>Centro educativo</label>
+              <input type="text" id="nuNombreCentro" disabled
+                style="background:#f0f7ff;font-weight:600;" placeholder="Se completa automáticamente" />
+            </div>
+          </div>
+
           <div class="acciones">
             <button class="btn-primario" id="btnCrearUsuario" onclick="crearUsuario()">Crear usuario</button>
           </div>
@@ -1235,13 +1288,65 @@ function seleccionarTodasSugerencias(){document.querySelectorAll('.sugerencia-ch
 function limpiarSeleccionSugerencias(){document.querySelectorAll('.sugerencia-check').forEach(c=>c.checked=false);}
 
 // ── ADMIN: USUARIOS ───────────────────────────────────────────────────────────
+
+// ── DEMARCACIÓN AL CREAR USUARIO ─────────────────────────────────────────────
+function toggleDemarcacion() {
+  const rol = document.getElementById('nuRol').value;
+  const bloqueReg  = document.getElementById('bloqueRegional');
+  const bloqueDist = document.getElementById('bloqueDistrito');
+  const bloqueCent = document.getElementById('bloqueCentro');
+
+  // Ocultar todo primero
+  bloqueReg.classList.add('oculto');
+  bloqueDist.classList.add('oculto');
+  bloqueCent.classList.add('oculto');
+
+  if (rol === 'Técnico/a Regional') {
+    bloqueReg.classList.remove('oculto');
+  } else if (rol === 'Técnico/a Distrital') {
+    bloqueReg.classList.remove('oculto');
+    bloqueDist.classList.remove('oculto');
+  } else if (rol === 'Coordinador/a Pedagógico/a' || rol === 'Director/a de Centro') {
+    bloqueReg.classList.remove('oculto');
+    bloqueDist.classList.remove('oculto');
+    bloqueCent.classList.remove('oculto');
+  }
+}
+
+let buscarCentroUsuarioTimeout = null;
+async function buscarCentroUsuario(codigo) {
+  const estado = document.getElementById('estadoCentroUsuario');
+  codigo = codigo.trim();
+  if (codigo.length < 4) { estado.textContent = ''; document.getElementById('nuNombreCentro').value = ''; return; }
+  clearTimeout(buscarCentroUsuarioTimeout);
+  buscarCentroUsuarioTimeout = setTimeout(async () => {
+    estado.textContent = 'Buscando…';
+    const { data } = await sb.from('centros').select('*').eq('codigo', codigo).maybeSingle();
+    if (!data) {
+      estado.textContent = '⚠️ Código no encontrado.';
+      estado.style.color = '#b45309';
+      document.getElementById('nuNombreCentro').value = '';
+    } else {
+      document.getElementById('nuNombreCentro').value = data.nombre;
+      estado.textContent = '✅ Centro encontrado.';
+      estado.style.color = '#2a6b1a';
+    }
+  }, 400);
+}
+
+
 async function crearUsuario() {
-  const nombre = document.getElementById('nuNombre').value.trim();
-  const email  = document.getElementById('nuEmail').value.trim();
-  const clave  = document.getElementById('nuClave').value;
-  const rol    = document.getElementById('nuRol').value;
-  const nivel  = document.getElementById('nuNivel').value;
-  if (!nombre||!email||!clave||!rol) { mostrarNotif('Complete todos los campos.', true); return; }
+  const nombre       = document.getElementById('nuNombre').value.trim();
+  const email        = document.getElementById('nuEmail').value.trim();
+  const clave        = document.getElementById('nuClave').value;
+  const rol          = document.getElementById('nuRol').value;
+  const nivel        = document.getElementById('nuNivel').value;
+  const regional     = document.getElementById('nuRegional')?.value || '';
+  const distrito     = document.getElementById('nuDistrito')?.value.trim() || '';
+  const codigoCentro = document.getElementById('nuCodigoCentro')?.value.trim() || '';
+  const nombreCentro = document.getElementById('nuNombreCentro')?.value || '';
+  if (!nombre||!email||!clave||!rol) { mostrarNotif('Complete todos los campos requeridos.', true); return; }
+  if (!clave || clave.length < 8) { mostrarNotif('La contraseña debe tener al menos 8 caracteres.', true); return; }
   const btn = document.getElementById('btnCrearUsuario');
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Creando…';
 
@@ -1255,10 +1360,10 @@ async function crearUsuario() {
     });
     if (e2) { mostrarNotif('Error: ' + e2.message, true); btn.disabled=false; btn.textContent='Crear usuario'; return; }
     const uid = d2.user?.id;
-    if (uid) await sb.from('perfiles').upsert({ id: uid, nombre, rol, nivel, activo: true });
+    if (uid) await sb.from('perfiles').upsert({ id: uid, nombre, rol, nivel, regional, distrito, codigo_centro: codigoCentro, nombre_centro: nombreCentro, activo: true });
   } else {
     const uid = data.user?.id;
-    if (uid) await sb.from('perfiles').upsert({ id: uid, nombre, rol, nivel, activo: true });
+    if (uid) await sb.from('perfiles').upsert({ id: uid, nombre, rol, nivel, regional, distrito, codigo_centro: codigoCentro, nombre_centro: nombreCentro, activo: true });
   }
 
   mostrarNotif('Usuario creado correctamente.');
@@ -1266,6 +1371,14 @@ async function crearUsuario() {
   document.getElementById('nuEmail').value='';
   document.getElementById('nuClave').value='';
   document.getElementById('nuRol').value='';
+  document.getElementById('nuNivel').value='usuario';
+  document.getElementById('nuRegional').value='';
+  document.getElementById('nuDistrito').value='';
+  document.getElementById('nuCodigoCentro').value='';
+  document.getElementById('nuNombreCentro').value='';
+  document.getElementById('avisoClave').textContent='Genere una contraseña automática o escríbala manualmente.';
+  document.getElementById('avisoClave').style.color='#617384';
+  toggleDemarcacion();
   btn.disabled=false; btn.textContent='Crear usuario';
   cargarUsuarios();
 }
