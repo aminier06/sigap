@@ -907,13 +907,16 @@ async function crearUsuario() {
   const { data, error } = await sb.auth.admin.createUser({ email, password: clave, email_confirm: true });
   if (error) {
     // Si no tiene permisos de admin, usar signUp normal
-    const { data: d2, error: e2 } = await sb.auth.signUp({ email, password: clave });
+    const { data: d2, error: e2 } = await sb.auth.signUp({
+      email, password: clave,
+      options: { data: { nombre, rol, nivel } }
+    });
     if (e2) { mostrarNotif('Error: ' + e2.message, true); btn.disabled=false; btn.textContent='Crear usuario'; return; }
     const uid = d2.user?.id;
-    if (uid) await sb.from('perfiles').insert({ id: uid, nombre, rol, nivel, activo: true });
+    if (uid) await sb.from('perfiles').upsert({ id: uid, nombre, rol, nivel, activo: true });
   } else {
     const uid = data.user?.id;
-    if (uid) await sb.from('perfiles').insert({ id: uid, nombre, rol, nivel, activo: true });
+    if (uid) await sb.from('perfiles').upsert({ id: uid, nombre, rol, nivel, activo: true });
   }
 
   mostrarNotif('Usuario creado correctamente.');
