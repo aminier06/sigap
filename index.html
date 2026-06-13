@@ -4,7 +4,47 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SIGAP — Acompañamiento Pedagógico</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+// ── EDITAR USUARIO ────────────────────────────────────────────────────────────
+function abrirModalEditar(u) {
+  document.getElementById('editUserId').value = u.id;
+  document.getElementById('editNombre').value = u.nombre || '';
+  document.getElementById('editRol').value = u.rol || '';
+  document.getElementById('editNivel').value = u.nivel || 'usuario';
+  document.getElementById('modalEditarUsuario').style.display = 'flex';
+}
+
+function cerrarModalEditar() {
+  document.getElementById('modalEditarUsuario').style.display = 'none';
+}
+
+async function guardarEdicionUsuario() {
+  const id     = document.getElementById('editUserId').value;
+  const nombre = document.getElementById('editNombre').value.trim();
+  const rol    = document.getElementById('editRol').value;
+  const nivel  = document.getElementById('editNivel').value;
+  if (!nombre) { mostrarNotif('El nombre no puede estar vacío.', true); return; }
+
+  const btn = document.getElementById('btnGuardarEdicion');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Guardando…';
+
+  const { error } = await sb.from('perfiles').update({ nombre, rol, nivel }).eq('id', id);
+  if (error) {
+    mostrarNotif('Error al guardar: ' + error.message, true);
+  } else {
+    mostrarNotif('Usuario actualizado correctamente.');
+    cerrarModalEditar();
+    cargarUsuarios();
+  }
+  btn.disabled = false; btn.textContent = 'Guardar cambios';
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('modalEditarUsuario').addEventListener('click', function(e) {
+  if (e.target === this) cerrarModalEditar();
+});
+
+</script>
   <style>
     :root {
       --azul:#1a6fb5; --azul-osc:#0d4a7a; --azul-claro:#e8f3fb;
@@ -939,7 +979,8 @@ async function cargarUsuarios() {
       <td>${u.rol||'—'}</td>
       <td><span class="badge ${u.nivel==='admin'?'badge-azul':'badge-amarillo'}">${u.nivel==='admin'?'Admin':'Usuario'}</span></td>
       <td><span class="badge ${u.activo!==false?'badge-verde':'badge-rojo'}">${u.activo!==false?'Activo':'Inactivo'}</span></td>
-      <td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn-secundario btn-sm" onclick='abrirModalEditar(${JSON.stringify(u)})'>✏️ Editar</button>
         ${u.activo!==false
           ? `<button class="btn-peligro btn-sm" onclick="toggleUsuario('${u.id}',false)">Desactivar</button>`
           : `<button class="btn-secundario btn-sm" onclick="toggleUsuario('${u.id}',true)">Activar</button>`}
@@ -985,6 +1026,84 @@ sb.auth.onAuthStateChange(async (event, session) => {
     mostrarApp();
   }
 });
+
+// ── EDITAR USUARIO ────────────────────────────────────────────────────────────
+function abrirModalEditar(u) {
+  document.getElementById('editUserId').value = u.id;
+  document.getElementById('editNombre').value = u.nombre || '';
+  document.getElementById('editRol').value = u.rol || '';
+  document.getElementById('editNivel').value = u.nivel || 'usuario';
+  document.getElementById('modalEditarUsuario').style.display = 'flex';
+}
+
+function cerrarModalEditar() {
+  document.getElementById('modalEditarUsuario').style.display = 'none';
+}
+
+async function guardarEdicionUsuario() {
+  const id     = document.getElementById('editUserId').value;
+  const nombre = document.getElementById('editNombre').value.trim();
+  const rol    = document.getElementById('editRol').value;
+  const nivel  = document.getElementById('editNivel').value;
+  if (!nombre) { mostrarNotif('El nombre no puede estar vacío.', true); return; }
+
+  const btn = document.getElementById('btnGuardarEdicion');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Guardando…';
+
+  const { error } = await sb.from('perfiles').update({ nombre, rol, nivel }).eq('id', id);
+  if (error) {
+    mostrarNotif('Error al guardar: ' + error.message, true);
+  } else {
+    mostrarNotif('Usuario actualizado correctamente.');
+    cerrarModalEditar();
+    cargarUsuarios();
+  }
+  btn.disabled = false; btn.textContent = 'Guardar cambios';
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('modalEditarUsuario').addEventListener('click', function(e) {
+  if (e.target === this) cerrarModalEditar();
+});
+
 </script>
+
+<!-- MODAL EDITAR USUARIO -->
+<div id="modalEditarUsuario" style="display:none;" class="modal-overlay">
+  <div class="modal">
+    <h3>✏️ Editar usuario</h3>
+    <p>Modifique los datos del usuario y guarde los cambios.</p>
+    <input type="hidden" id="editUserId" />
+    <div class="grid g-2" style="margin-bottom:14px;">
+      <div class="campo" style="grid-column:span 2">
+        <label>Nombre completo</label>
+        <input type="text" id="editNombre" />
+      </div>
+      <div class="campo">
+        <label>Rol</label>
+        <select id="editRol">
+          <option value="Técnico/a Nacional">Técnico/a Nacional</option>
+          <option value="Técnico/a Regional">Técnico/a Regional</option>
+          <option value="Técnico/a Distrital">Técnico/a Distrital</option>
+          <option value="Coordinador/a Pedagógico/a">Coordinador/a Pedagógico/a</option>
+          <option value="Director/a de Centro">Director/a de Centro</option>
+          <option value="Administrador/a">Administrador/a</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>Nivel de acceso</label>
+        <select id="editNivel">
+          <option value="usuario">Usuario</option>
+          <option value="admin">Administrador</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn-secundario" onclick="cerrarModalEditar()">Cancelar</button>
+      <button class="btn-primario" id="btnGuardarEdicion" onclick="guardarEdicionUsuario()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
