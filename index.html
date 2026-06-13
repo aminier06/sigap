@@ -296,26 +296,45 @@
               <div class="grid g-3">
                 <div class="campo"><label>Nombre del acompañante</label><input type="text" id="nombreAcompanante" name="nombreAcompanante" disabled /></div>
                 <div class="campo"><label>Rol</label><input type="text" id="rolAcompanante" name="rolAcompanante" disabled /></div>
+              </div>
+
+              <div class="subtitulo fila-linea">Datos del centro educativo</div>
+              <div class="grid g-4">
                 <div class="campo">
-                  <label for="regional">Regional</label>
-                  <select id="regional" name="regional">
-                    <option value="">Seleccione</option>
-                    <option>01 – Barahona</option><option>02 – San Juan de la Maguana</option><option>03 – Azua</option>
-                    <option>04 – San Cristóbal</option><option>05 – Santo Domingo</option><option>06 – San Pedro de Macorís</option>
-                    <option>07 – La Romana</option><option>08 – La Vega</option><option>09 – Moca</option>
-                    <option>10 – Santiago</option><option>11 – Mao</option><option>12 – Nagua</option>
-                    <option>13 – San Francisco de Macorís</option><option>14 – Hato Mayor</option><option>15 – Higüey</option>
-                    <option>16 – Cotuí</option><option>17 – Bonao</option><option>18 – Baní</option>
-                    <option>Distrito Nacional</option>
-                  </select>
+                  <label for="codigoCentro">Código del centro</label>
+                  <input type="text" id="codigoCentro" name="codigoCentro"
+                    placeholder="Ej. 02334"
+                    oninput="buscarCentro(this.value)"
+                    autocomplete="off"
+                    maxlength="10"
+                    style="font-size:16px;font-weight:700;letter-spacing:1px;" />
+                  <div id="estadoBusquedaCentro" style="font-size:12px;min-height:16px;margin-top:3px;color:#617384;"></div>
+                </div>
+                <div class="campo" style="grid-column:span 3">
+                  <label for="centroEducativo">Centro educativo</label>
+                  <input type="text" id="centroEducativo" name="centroEducativo" disabled
+                    placeholder="Se completa automáticamente al ingresar el código"
+                    style="background:#f0f7ff;font-weight:600;" />
                 </div>
               </div>
               <div class="grid g-3 fila-linea">
-                <div class="campo"><label for="distrito">Distrito educativo</label><input type="text" id="distrito" name="distrito" placeholder="Ej. 15-04" /></div>
-                <div class="campo" style="grid-column:span 2"><label for="centroEducativo">Centro educativo</label><input type="text" id="centroEducativo" name="centroEducativo" /></div>
+                <div class="campo">
+                  <label for="regional">Regional</label>
+                  <input type="text" id="regional" name="regional" disabled
+                    placeholder="Autocompletado" style="background:#f0f7ff;" />
+                </div>
+                <div class="campo">
+                  <label for="distrito">Distrito educativo</label>
+                  <input type="text" id="distrito" name="distrito" disabled
+                    placeholder="Autocompletado" style="background:#f0f7ff;" />
+                </div>
+                <div class="campo">
+                  <label for="sectorCentro">Sector</label>
+                  <input type="text" id="sectorCentro" name="sectorCentro" disabled
+                    placeholder="Autocompletado" style="background:#f0f7ff;" />
+                </div>
               </div>
               <div class="grid g-2 fila-linea">
-                <div class="campo"><label for="codigoCentro">Código del centro</label><input type="text" id="codigoCentro" name="codigoCentro" /></div>
                 <div class="campo"><label>Zona</label><div class="opciones"><label class="opcion"><input type="radio" name="zona" value="Urbana"> Urbana</label><label class="opcion"><input type="radio" name="zona" value="Rural"> Rural</label></div></div>
               </div>
 
@@ -635,6 +654,40 @@ async function guardarBorrador() {
   btn.disabled = false; btn.textContent = '💾 Guardar borrador';
 }
 
+// ── AUTOCOMPLETAR CENTRO ──────────────────────────────────────────────────────
+let buscarTimeout = null;
+async function buscarCentro(codigo) {
+  const estado = document.getElementById('estadoBusquedaCentro');
+  const limpiar = () => {
+    ['centroEducativo','regional','distrito','sectorCentro'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+  };
+
+  codigo = codigo.trim();
+  if (codigo.length < 4) { estado.textContent = ''; limpiar(); return; }
+
+  clearTimeout(buscarTimeout);
+  buscarTimeout = setTimeout(async () => {
+    estado.textContent = 'Buscando…';
+    estado.style.color = '#617384';
+    const { data, error } = await sb.from('centros').select('*').eq('codigo', codigo).maybeSingle();
+    if (error || !data) {
+      estado.textContent = '⚠️ Código no encontrado en el sistema.';
+      estado.style.color = '#b45309';
+      limpiar();
+      return;
+    }
+    document.getElementById('centroEducativo').value = data.nombre;
+    document.getElementById('regional').value = data.regional_codigo + ' – ' + data.regional_nombre;
+    document.getElementById('distrito').value = data.distrito_codigo + ' – ' + data.distrito_nombre;
+    document.getElementById('sectorCentro').value = data.sector;
+    estado.textContent = '✅ Centro encontrado.';
+    estado.style.color = '#2a6b1a';
+  }, 400);
+}
+
 async function guardarRegistro(estado) {
   const v = id => (document.getElementById(id)||{}).value || '';
   const r = name => { const el = document.querySelector('input[name="'+name+'"]:checked'); return el?el.value:''; };
@@ -657,6 +710,7 @@ async function guardarRegistro(estado) {
     distrito: v('distrito'),
     centro_educativo: v('centroEducativo'),
     codigo_centro: v('codigoCentro'),
+    sector: v('sectorCentro'),
     zona: r('zona'),
     nombre_docente: v('nombreDocente'),
     cedula_docente: v('cedulaDocente'),
