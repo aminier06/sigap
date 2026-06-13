@@ -5,6 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SIGAP — Acompañamiento Pedagógico</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+
+// ── GENERADOR DE CONTRASEÑA ───────────────────────────────────────────────────
+function generarClave() {
+  const num = Math.floor(100 + Math.random() * 900);
+  const especiales = ['*', '#', '@', '!'];
+  const esp = especiales[Math.floor(Math.random() * especiales.length)];
+  const clave = 'Sigap' + num + esp;
+  document.getElementById('nuClave').value = clave;
+  document.getElementById('avisoClave').innerHTML =
+    '⚠️ <strong>Anote esta contraseña</strong> antes de crear el usuario. Se la deberá entregar al docente o técnico.';
+  document.getElementById('avisoClave').style.color = '#8a5d00';
+}
+
+function copiarClave() {
+  const clave = document.getElementById('nuClave').value;
+  if (!clave) { mostrarNotif('Primero genere una contraseña.', true); return; }
+  navigator.clipboard.writeText(clave).then(() => {
+    mostrarNotif('Contraseña copiada al portapapeles.');
+    document.getElementById('btnCopiarClave').textContent = '✅ Copiada';
+    setTimeout(() => document.getElementById('btnCopiarClave').textContent = '📋 Copiar', 2000);
+  });
+}
+
 // ── EDITAR USUARIO ────────────────────────────────────────────────────────────
 function abrirModalEditar(u) {
   document.getElementById('editUserId').value = u.id;
@@ -652,7 +675,15 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
           <div class="grid g-3">
             <div class="campo"><label>Nombre completo</label><input type="text" id="nuNombre" placeholder="Juan Pérez" /></div>
             <div class="campo"><label>Correo electrónico</label><input type="email" id="nuEmail" placeholder="usuario@minerd.gob.do" /></div>
-            <div class="campo"><label>Contraseña inicial</label><input type="password" id="nuClave" placeholder="Mínimo 8 caracteres" /></div>
+            <div class="campo">
+              <label>Contraseña inicial</label>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input type="text" id="nuClave" placeholder="Genere o escriba la contraseña" style="flex:1;font-family:monospace;font-weight:700;letter-spacing:1px;" />
+                <button type="button" class="btn-secundario btn-sm" onclick="generarClave()" style="white-space:nowrap;">🔑 Generar</button>
+                <button type="button" class="btn-secundario btn-sm" onclick="copiarClave()" style="white-space:nowrap;" id="btnCopiarClave">📋 Copiar</button>
+              </div>
+              <div id="avisoClave" style="font-size:12px;color:#617384;margin-top:4px;">Genere una contraseña automática o escríbala manualmente.</div>
+            </div>
           </div>
           <div class="grid g-3" style="margin-top:14px;">
             <div class="campo">
@@ -1303,6 +1334,29 @@ sb.auth.onAuthStateChange(async (event, session) => {
     mostrarApp();
   }
 });
+
+
+// ── GENERADOR DE CONTRASEÑA ───────────────────────────────────────────────────
+function generarClave() {
+  const num = Math.floor(100 + Math.random() * 900);
+  const especiales = ['*', '#', '@', '!'];
+  const esp = especiales[Math.floor(Math.random() * especiales.length)];
+  const clave = 'Sigap' + num + esp;
+  document.getElementById('nuClave').value = clave;
+  document.getElementById('avisoClave').innerHTML =
+    '⚠️ <strong>Anote esta contraseña</strong> antes de crear el usuario. Se la deberá entregar al docente o técnico.';
+  document.getElementById('avisoClave').style.color = '#8a5d00';
+}
+
+function copiarClave() {
+  const clave = document.getElementById('nuClave').value;
+  if (!clave) { mostrarNotif('Primero genere una contraseña.', true); return; }
+  navigator.clipboard.writeText(clave).then(() => {
+    mostrarNotif('Contraseña copiada al portapapeles.');
+    document.getElementById('btnCopiarClave').textContent = '✅ Copiada';
+    setTimeout(() => document.getElementById('btnCopiarClave').textContent = '📋 Copiar', 2000);
+  });
+}
 
 // ── EDITAR USUARIO ────────────────────────────────────────────────────────────
 function abrirModalEditar(u) {
