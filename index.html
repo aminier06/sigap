@@ -28,6 +28,196 @@ function copiarClave() {
   });
 }
 
+
+// ── CARGA MASIVA DE USUARIOS ──────────────────────────────────────────────────
+let usuariosPendientes = [];
+
+async function previsualizarCarga(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  // Dynamically load SheetJS
+  if (!window.XLSX) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+
+  const data = await file.arrayBuffer();
+  const wb   = XLSX.read(data, { type: 'array' });
+
+  // Find the "Usuarios" sheet
+  const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('usuario')) || wb.SheetNames[0];
+  const ws   = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+  // Header row is row index 2 (row 3 in Excel), data starts at index 9 (row 10)
+  const dataRows = rows.slice(9).filter(r => r[0] || r[1]); // skip empty rows
+
+  const rolesValidos = [
+    'Técnico/a Nacional','Técnico/a Regional','Técnico/a Distrital',
+    'Coordinador/a Pedagógico/a','Director/a de Centro','Administrador/a'
+  ];
+
+  usuariosPendientes = [];
+  const errores = [];
+
+  dataRows.forEach((row, i) => {
+    const u = {
+      nombre:        String(row[0] || '').trim(),
+      email:         String(row[1] || '').trim().toLowerCase(),
+      rol:           String(row[2] || '').trim(),
+      nivel:         String(row[3] || '').trim().toLowerCase() === 'admin' ? 'admin' : 'usuario',
+      regional:      String(row[4] || '').trim(),
+      distrito:      String(row[5] || '').trim(),
+      codigoCentro:  String(row[6] || '').trim(),
+      nombreCentro:  String(row[7] || '').trim(),
+      activo:        String(row[8] || '').trim().toUpperCase() !== 'NO',
+      fila: i + 10,
+      errores: [],
+      valido: true,
+    };
+
+    if (!u.nombre)  u.errores.push('Nombre vacío');
+    if (!u.email || !u.email.includes('@')) u.errores.push('Correo inválido');
+    if (!rolesValidos.includes(u.rol)) u.errores.push('Rol inválido');
+    if (u.errores.length) u.valido = false;
+
+    usuariosPendientes.push(u);
+  });
+
+  // Render preview
+  const validos   = usuariosPendientes.filter(u => u.valido).length;
+  const invalidos = usuariosPendientes.filter(u => !u.valido).length;
+
+  document.getElementById('previewConteo').textContent =
+    `${usuariosPendientes.length} usuarios encontrados — ${validos} válidos, ${invalidos} con errores`;
+
+  const cuerpo = document.getElementById('cuerpoPreviewCarga');
+  cuerpo.innerHTML = usuariosPendientes.map((u, i) => `
+    <tr>
+      <td style="text-align:center;color:#8fa5bb;font-size:12px;">${u.fila}</td>
+      <td>${u.nombre || '<em style="color:#b42318">Vacío</em>'}</td>
+      <td style="font-size:12px;">${u.email || '<em style="color:#b42318">Vacío</em>'}</td>
+      <td style="font-size:12px;">${u.rol || '<em style="color:#b42318">Inválido</em>'}</td>
+      <td><span class="badge ${u.nivel==='admin'?'badge-azul':'badge-amarillo'}">${u.nivel}</span></td>
+      <td style="font-size:11px;">${u.regional||'—'}</td>
+      <td style="font-size:11px;">${u.distrito||'—'}</td>
+      <td>
+        ${u.valido
+          ? '<span class="badge badge-verde">✓ Válido</span>'
+          : `<span class="badge badge-rojo" title="${u.errores.join(', ')}">⚠ ${u.errores.join(', ')}</span>`}
+      </td>
+    </tr>`).join('');
+
+  document.getElementById('resumenCarga').innerHTML = validos > 0
+    ? `<span style="color:#2a6b1a;font-weight:700;">✅ ${validos} usuarios listos para crear.</span>`
+    + (invalidos > 0 ? ` <span style="color:#b45309;"> ⚠️ ${invalidos} filas con errores serán omitidas.</span>` : '')
+    : `<span style="color:#b42318;font-weight:700;">⚠️ No hay usuarios válidos para importar. Revise el archivo.</span>`;
+
+  document.getElementById('btnEjecutarCarga').disabled = validos === 0;
+  document.getElementById('previewCarga').style.display = 'block';
+  document.getElementById('progresoCarga').style.display = 'none';
+  document.getElementById('resultadoCarga').style.display = 'none';
+}
+
+async function ejecutarCargaMasiva() {
+  const validos = usuariosPendientes.filter(u => u.valido);
+  if (!validos.length) return;
+
+  document.getElementById('previewCarga').style.display = 'none';
+  document.getElementById('progresoCarga').style.display = 'block';
+  document.getElementById('resultadoCarga').style.display = 'none';
+
+  const log     = document.getElementById('logCarga');
+  const barra   = document.getElementById('barraProgreso');
+  const texto   = document.getElementById('textoProgreso');
+  log.innerHTML = '';
+
+  let creados = 0, fallidos = 0;
+
+  for (let i = 0; i < validos.length; i++) {
+    const u = validos[i];
+    const pct = Math.round(((i) / validos.length) * 100);
+    barra.style.width = pct + '%';
+    texto.textContent = `Creando usuario ${i + 1} de ${validos.length}: ${u.nombre}…`;
+
+    // Generate password
+    const num = Math.floor(100 + Math.random() * 900);
+    const esp = ['*','#','@','!'][Math.floor(Math.random() * 4)];
+    const clave = 'Sigap' + num + esp;
+
+    try {
+      const { data, error } = await sb.auth.signUp({
+        email: u.email,
+        password: clave,
+        options: { data: { nombre: u.nombre, rol: u.rol, nivel: u.nivel } }
+      });
+
+      if (error) throw new Error(error.message);
+
+      const uid = data.user?.id;
+      if (uid) {
+        await sb.from('perfiles').upsert({
+          id: uid, nombre: u.nombre, rol: u.rol, nivel: u.nivel,
+          regional: u.regional, distrito: u.distrito,
+          codigo_centro: u.codigoCentro, nombre_centro: u.nombreCentro,
+          activo: u.activo
+        });
+      }
+
+      creados++;
+      log.innerHTML += `<span style="color:#2a6b1a;">✓ ${u.nombre} (${u.email}) — Clave: <strong>${clave}</strong></span>\n`;
+    } catch(e) {
+      fallidos++;
+      log.innerHTML += `<span style="color:#b42318;">✗ ${u.nombre} (${u.email}) — ${e.message}</span>\n`;
+    }
+
+    log.scrollTop = log.scrollHeight;
+    await new Promise(r => setTimeout(r, 300)); // small delay to avoid rate limits
+  }
+
+  barra.style.width = '100%';
+  texto.textContent = `Proceso completado.`;
+
+  document.getElementById('resultadoCarga').style.display = 'block';
+  document.getElementById('resultadoCarga').innerHTML = `
+    <div style="background:${creados>0?'#d8ead0':'#fee2e2'};border:1px solid ${creados>0?'#a3c99a':'#f4c2bd'};border-radius:12px;padding:18px;">
+      <div style="font-size:16px;font-weight:800;color:${creados>0?'#17324d':'#b42318'};margin-bottom:8px;">
+        ${creados>0?'✅':'⚠️'} Carga completada
+      </div>
+      <div style="font-size:14px;color:#2d4a63;">
+        <strong>${creados}</strong> usuarios creados correctamente.<br>
+        ${fallidos>0?`<strong style="color:#b42318;">${fallidos}</strong> usuarios fallaron (ver log arriba).`:''}
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:#617384;">
+        ⚠️ <strong>Importante:</strong> Guarde el log de contraseñas antes de cerrar esta página. Las contraseñas no se pueden recuperar posteriormente.
+      </div>
+      <div class="acciones" style="margin-top:14px;">
+        <button class="btn-primario" onclick="copiarLog()">📋 Copiar log de contraseñas</button>
+        <button class="btn-secundario" onclick="cancelarCarga(); cargarUsuarios();">Ver usuarios registrados</button>
+      </div>
+    </div>`;
+
+  cargarUsuarios();
+}
+
+function copiarLog() {
+  const log = document.getElementById('logCarga').innerText;
+  navigator.clipboard.writeText(log).then(() => mostrarNotif('Log copiado al portapapeles.'));
+}
+
+function cancelarCarga() {
+  usuariosPendientes = [];
+  document.getElementById('archivoCarga').value = '';
+  document.getElementById('previewCarga').style.display    = 'none';
+  document.getElementById('progresoCarga').style.display   = 'none';
+  document.getElementById('resultadoCarga').style.display  = 'none';
+}
+
 // ── EDITAR USUARIO ────────────────────────────────────────────────────────────
 function abrirModalEditar(u) {
   document.getElementById('editUserId').value = u.id;
@@ -792,6 +982,68 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
           </div>
         </div>
 
+        <!-- CARGA MASIVA -->
+        <div class="form-usuario" id="bloqueCargaMasiva">
+          <h3>📤 Carga masiva de usuarios</h3>
+          <p style="font-size:13px;color:#617384;margin-bottom:16px;">
+            Descargue la plantilla, complétela y cárguela aquí. El sistema creará todos los usuarios automáticamente.
+          </p>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;">
+            <div>
+              <a href="plantilla_usuarios_sigap.xlsx" download>
+                <button type="button" class="btn-secundario">📥 Descargar plantilla</button>
+              </a>
+            </div>
+            <div style="flex:1;min-width:260px;">
+              <label style="font-size:13px;font-weight:700;color:#243b53;display:block;margin-bottom:6px;">
+                Seleccionar archivo Excel (.xlsx)
+              </label>
+              <input type="file" id="archivoCarga" accept=".xlsx"
+                style="display:block;width:100%;font-size:13px;padding:8px;border:1.5px dashed #c5d9ec;border-radius:10px;background:#f8fbfe;cursor:pointer;"
+                onchange="previsualizarCarga(this)" />
+            </div>
+          </div>
+
+          <!-- Preview -->
+          <div id="previewCarga" style="display:none;margin-top:20px;">
+            <div style="font-size:14px;font-weight:800;color:var(--azul-osc);margin-bottom:10px;">
+              Vista previa — <span id="previewConteo"></span>
+            </div>
+            <div class="tabla-wrap-outer" style="max-height:320px;overflow-y:auto;border:1px solid #dce9f5;border-radius:12px;">
+              <table class="tabla-registros" style="box-shadow:none;">
+                <thead>
+                  <tr>
+                    <th>#</th><th>Nombre</th><th>Correo</th><th>Rol</th>
+                    <th>Nivel</th><th>Regional</th><th>Distrito</th><th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="cuerpoPreviewCarga"></tbody>
+              </table>
+            </div>
+            <div id="resumenCarga" style="margin-top:12px;font-size:13px;"></div>
+            <div class="acciones" style="margin-top:14px;">
+              <button class="btn-primario" id="btnEjecutarCarga" onclick="ejecutarCargaMasiva()">
+                ✅ Crear todos los usuarios válidos
+              </button>
+              <button class="btn-secundario" onclick="cancelarCarga()">Cancelar</button>
+            </div>
+          </div>
+
+          <!-- Progreso -->
+          <div id="progresoCarga" style="display:none;margin-top:20px;">
+            <div style="font-size:14px;font-weight:700;color:var(--azul-osc);margin-bottom:10px;" id="textoProgreso">
+              Creando usuarios…
+            </div>
+            <div style="background:#edf3f8;border-radius:999px;height:16px;overflow:hidden;">
+              <div id="barraProgreso" style="height:100%;background:linear-gradient(90deg,var(--azul),#2a8ad4);border-radius:999px;transition:width .3s;width:0%;"></div>
+            </div>
+            <div id="logCarga" style="margin-top:14px;max-height:200px;overflow-y:auto;font-size:12px;font-family:monospace;background:#f0f5fa;border-radius:10px;padding:12px;line-height:1.8;"></div>
+          </div>
+
+          <!-- Resultado final -->
+          <div id="resultadoCarga" style="display:none;margin-top:20px;"></div>
+        </div>
+
         <div class="seccion-titulo">Usuarios registrados</div>
         <div class="tabla-wrap-outer">
           <table class="tabla-registros">
@@ -1527,6 +1779,196 @@ function copiarClave() {
     document.getElementById('btnCopiarClave').textContent = '✅ Copiada';
     setTimeout(() => document.getElementById('btnCopiarClave').textContent = '📋 Copiar', 2000);
   });
+}
+
+
+// ── CARGA MASIVA DE USUARIOS ──────────────────────────────────────────────────
+let usuariosPendientes = [];
+
+async function previsualizarCarga(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  // Dynamically load SheetJS
+  if (!window.XLSX) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+
+  const data = await file.arrayBuffer();
+  const wb   = XLSX.read(data, { type: 'array' });
+
+  // Find the "Usuarios" sheet
+  const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('usuario')) || wb.SheetNames[0];
+  const ws   = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+  // Header row is row index 2 (row 3 in Excel), data starts at index 9 (row 10)
+  const dataRows = rows.slice(9).filter(r => r[0] || r[1]); // skip empty rows
+
+  const rolesValidos = [
+    'Técnico/a Nacional','Técnico/a Regional','Técnico/a Distrital',
+    'Coordinador/a Pedagógico/a','Director/a de Centro','Administrador/a'
+  ];
+
+  usuariosPendientes = [];
+  const errores = [];
+
+  dataRows.forEach((row, i) => {
+    const u = {
+      nombre:        String(row[0] || '').trim(),
+      email:         String(row[1] || '').trim().toLowerCase(),
+      rol:           String(row[2] || '').trim(),
+      nivel:         String(row[3] || '').trim().toLowerCase() === 'admin' ? 'admin' : 'usuario',
+      regional:      String(row[4] || '').trim(),
+      distrito:      String(row[5] || '').trim(),
+      codigoCentro:  String(row[6] || '').trim(),
+      nombreCentro:  String(row[7] || '').trim(),
+      activo:        String(row[8] || '').trim().toUpperCase() !== 'NO',
+      fila: i + 10,
+      errores: [],
+      valido: true,
+    };
+
+    if (!u.nombre)  u.errores.push('Nombre vacío');
+    if (!u.email || !u.email.includes('@')) u.errores.push('Correo inválido');
+    if (!rolesValidos.includes(u.rol)) u.errores.push('Rol inválido');
+    if (u.errores.length) u.valido = false;
+
+    usuariosPendientes.push(u);
+  });
+
+  // Render preview
+  const validos   = usuariosPendientes.filter(u => u.valido).length;
+  const invalidos = usuariosPendientes.filter(u => !u.valido).length;
+
+  document.getElementById('previewConteo').textContent =
+    `${usuariosPendientes.length} usuarios encontrados — ${validos} válidos, ${invalidos} con errores`;
+
+  const cuerpo = document.getElementById('cuerpoPreviewCarga');
+  cuerpo.innerHTML = usuariosPendientes.map((u, i) => `
+    <tr>
+      <td style="text-align:center;color:#8fa5bb;font-size:12px;">${u.fila}</td>
+      <td>${u.nombre || '<em style="color:#b42318">Vacío</em>'}</td>
+      <td style="font-size:12px;">${u.email || '<em style="color:#b42318">Vacío</em>'}</td>
+      <td style="font-size:12px;">${u.rol || '<em style="color:#b42318">Inválido</em>'}</td>
+      <td><span class="badge ${u.nivel==='admin'?'badge-azul':'badge-amarillo'}">${u.nivel}</span></td>
+      <td style="font-size:11px;">${u.regional||'—'}</td>
+      <td style="font-size:11px;">${u.distrito||'—'}</td>
+      <td>
+        ${u.valido
+          ? '<span class="badge badge-verde">✓ Válido</span>'
+          : `<span class="badge badge-rojo" title="${u.errores.join(', ')}">⚠ ${u.errores.join(', ')}</span>`}
+      </td>
+    </tr>`).join('');
+
+  document.getElementById('resumenCarga').innerHTML = validos > 0
+    ? `<span style="color:#2a6b1a;font-weight:700;">✅ ${validos} usuarios listos para crear.</span>`
+    + (invalidos > 0 ? ` <span style="color:#b45309;"> ⚠️ ${invalidos} filas con errores serán omitidas.</span>` : '')
+    : `<span style="color:#b42318;font-weight:700;">⚠️ No hay usuarios válidos para importar. Revise el archivo.</span>`;
+
+  document.getElementById('btnEjecutarCarga').disabled = validos === 0;
+  document.getElementById('previewCarga').style.display = 'block';
+  document.getElementById('progresoCarga').style.display = 'none';
+  document.getElementById('resultadoCarga').style.display = 'none';
+}
+
+async function ejecutarCargaMasiva() {
+  const validos = usuariosPendientes.filter(u => u.valido);
+  if (!validos.length) return;
+
+  document.getElementById('previewCarga').style.display = 'none';
+  document.getElementById('progresoCarga').style.display = 'block';
+  document.getElementById('resultadoCarga').style.display = 'none';
+
+  const log     = document.getElementById('logCarga');
+  const barra   = document.getElementById('barraProgreso');
+  const texto   = document.getElementById('textoProgreso');
+  log.innerHTML = '';
+
+  let creados = 0, fallidos = 0;
+
+  for (let i = 0; i < validos.length; i++) {
+    const u = validos[i];
+    const pct = Math.round(((i) / validos.length) * 100);
+    barra.style.width = pct + '%';
+    texto.textContent = `Creando usuario ${i + 1} de ${validos.length}: ${u.nombre}…`;
+
+    // Generate password
+    const num = Math.floor(100 + Math.random() * 900);
+    const esp = ['*','#','@','!'][Math.floor(Math.random() * 4)];
+    const clave = 'Sigap' + num + esp;
+
+    try {
+      const { data, error } = await sb.auth.signUp({
+        email: u.email,
+        password: clave,
+        options: { data: { nombre: u.nombre, rol: u.rol, nivel: u.nivel } }
+      });
+
+      if (error) throw new Error(error.message);
+
+      const uid = data.user?.id;
+      if (uid) {
+        await sb.from('perfiles').upsert({
+          id: uid, nombre: u.nombre, rol: u.rol, nivel: u.nivel,
+          regional: u.regional, distrito: u.distrito,
+          codigo_centro: u.codigoCentro, nombre_centro: u.nombreCentro,
+          activo: u.activo
+        });
+      }
+
+      creados++;
+      log.innerHTML += `<span style="color:#2a6b1a;">✓ ${u.nombre} (${u.email}) — Clave: <strong>${clave}</strong></span>\n`;
+    } catch(e) {
+      fallidos++;
+      log.innerHTML += `<span style="color:#b42318;">✗ ${u.nombre} (${u.email}) — ${e.message}</span>\n`;
+    }
+
+    log.scrollTop = log.scrollHeight;
+    await new Promise(r => setTimeout(r, 300)); // small delay to avoid rate limits
+  }
+
+  barra.style.width = '100%';
+  texto.textContent = `Proceso completado.`;
+
+  document.getElementById('resultadoCarga').style.display = 'block';
+  document.getElementById('resultadoCarga').innerHTML = `
+    <div style="background:${creados>0?'#d8ead0':'#fee2e2'};border:1px solid ${creados>0?'#a3c99a':'#f4c2bd'};border-radius:12px;padding:18px;">
+      <div style="font-size:16px;font-weight:800;color:${creados>0?'#17324d':'#b42318'};margin-bottom:8px;">
+        ${creados>0?'✅':'⚠️'} Carga completada
+      </div>
+      <div style="font-size:14px;color:#2d4a63;">
+        <strong>${creados}</strong> usuarios creados correctamente.<br>
+        ${fallidos>0?`<strong style="color:#b42318;">${fallidos}</strong> usuarios fallaron (ver log arriba).`:''}
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:#617384;">
+        ⚠️ <strong>Importante:</strong> Guarde el log de contraseñas antes de cerrar esta página. Las contraseñas no se pueden recuperar posteriormente.
+      </div>
+      <div class="acciones" style="margin-top:14px;">
+        <button class="btn-primario" onclick="copiarLog()">📋 Copiar log de contraseñas</button>
+        <button class="btn-secundario" onclick="cancelarCarga(); cargarUsuarios();">Ver usuarios registrados</button>
+      </div>
+    </div>`;
+
+  cargarUsuarios();
+}
+
+function copiarLog() {
+  const log = document.getElementById('logCarga').innerText;
+  navigator.clipboard.writeText(log).then(() => mostrarNotif('Log copiado al portapapeles.'));
+}
+
+function cancelarCarga() {
+  usuariosPendientes = [];
+  document.getElementById('archivoCarga').value = '';
+  document.getElementById('previewCarga').style.display    = 'none';
+  document.getElementById('progresoCarga').style.display   = 'none';
+  document.getElementById('resultadoCarga').style.display  = 'none';
 }
 
 // ── EDITAR USUARIO ────────────────────────────────────────────────────────────
