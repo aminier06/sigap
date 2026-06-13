@@ -695,7 +695,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
         <p class="dashboard-sub">Acompañamientos registrados por todos los usuarios.</p>
         <div class="tabla-wrap-outer">
           <table class="tabla-registros">
-            <thead><tr><th>Fecha</th><th>Acompañante</th><th>Tipo</th><th>Docente</th><th>Centro</th><th>Área</th><th>Estado</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Acompañante</th><th>Rol</th><th>Tipo</th><th>Docente</th><th>Centro</th><th>Área</th><th>Estado</th></tr></thead>
             <tbody id="cuerpoAdminRegistros"><tr><td colspan="7" style="text-align:center;color:#8fa5bb;padding:24px;">Cargando…</td></tr></tbody>
           </table>
         </div>
@@ -934,10 +934,8 @@ function limpiarFiltros() {
 
 // ── MIS REGISTROS ─────────────────────────────────────────────────────────────
 async function cargarMisRegistros() {
-  const esAdmin = perfilActual?.nivel === 'admin';
-  let query = sb.from('acompañamientos').select('*').order('created_at', { ascending: false });
-  if (!esAdmin) query = query.eq('usuario_id', usuarioActual.id);
-  const { data } = await query;
+  // Mis registros: siempre solo los del usuario actual
+  const { data } = await sb.from('acompañamientos').select('*').eq('usuario_id', usuarioActual.id).order('created_at', { ascending: false });
   const registros = data || [];
   const cuerpo = document.getElementById('cuerpoMisRegistros');
   if (registros.length === 0) {
@@ -1268,13 +1266,19 @@ async function toggleUsuario(id, activo) {
 }
 
 async function cargarTodosRegistros() {
-  const { data } = await sb.from('acompañamientos').select('*, perfiles(nombre)').order('created_at', { ascending: false });
+  // Todos los registros: admin ve todos, usuario ve solo los suyos
+  const esAdmin = perfilActual?.nivel === 'admin';
+  let query = sb.from('acompañamientos').select('*').order('created_at', { ascending: false });
+  if (!esAdmin) query = query.eq('usuario_id', usuarioActual.id);
+  const { data, error } = await query;
   const cuerpo = document.getElementById('cuerpoAdminRegistros');
-  if (!data || data.length === 0) { cuerpo.innerHTML='<tr><td colspan="7" style="text-align:center;color:#8fa5bb;padding:24px;">No hay registros.</td></tr>'; return; }
+  if (error) { cuerpo.innerHTML='<tr><td colspan="8" style="text-align:center;color:#b42318;padding:24px;">Error al cargar: '+error.message+'</td></tr>'; return; }
+  if (!data || data.length === 0) { cuerpo.innerHTML='<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">No hay registros.</td></tr>'; return; }
   cuerpo.innerHTML = data.map(r => `
     <tr>
       <td>${r.fecha||'—'}</td>
-      <td>${r.perfiles?.nombre||r.nombre_acompanante||'—'}</td>
+      <td>${r.nombre_acompanante||'—'}</td>
+      <td>${r.rol_acompanante||'—'}</td>
       <td>${r.tipo_acompanamiento||'—'}</td>
       <td>${r.nombre_docente||'—'}</td>
       <td>${r.centro_educativo||'—'}</td>
