@@ -379,6 +379,24 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
               <label>Regional</label>
               <select id="filtroRegional" onchange="cargarDashboard()">
                 <option value="">Todas las regionales</option>
+                    <option>01 - Barahona</option>
+                    <option>02 - San Juan de la Maguana</option>
+                    <option>03 - Azua</option>
+                    <option>04 - San Cristobal</option>
+                    <option>05 - San Pedro de Macoris</option>
+                    <option>06 - La Vega</option>
+                    <option>07 - San Francisco de Macoris</option>
+                    <option>08 - Santiago</option>
+                    <option>09 - Mao</option>
+                    <option>10 - Santo Domingo</option>
+                    <option>11 - Puerto Plata</option>
+                    <option>12 - Higuey</option>
+                    <option>13 - Monte Cristi</option>
+                    <option>14 - Nagua</option>
+                    <option>15 - Santo Domingo</option>
+                    <option>16 - Cotui</option>
+                    <option>17 - Monte Plata</option>
+                    <option>18 - Baoruco</option>
               </select>
             </div>
             <div class="campo">
@@ -722,18 +740,26 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
           <div id="bloqueRegional" class="grid g-3 oculto" style="margin-top:14px;">
             <div class="campo">
               <label>Regional asignada</label>
-              <select id="nuRegional" onchange="toggleDistrito()">
+              <select id="nuRegional" onchange="cargarDistritosUsuario()">
                 <option value="">Seleccione regional</option>
-                <option>01 – Barahona</option><option>02 – San Juan de la Maguana</option>
-                <option>03 – Azua</option><option>04 – San Cristóbal</option>
-                <option>05 – Santo Domingo</option><option>06 – San Pedro de Macorís</option>
-                <option>07 – La Romana</option><option>08 – La Vega</option>
-                <option>09 – Moca</option><option>10 – Santiago</option>
-                <option>11 – Mao</option><option>12 – Nagua</option>
-                <option>13 – San Francisco de Macorís</option><option>14 – Hato Mayor</option>
-                <option>15 – Higüey</option><option>16 – Cotuí</option>
-                <option>17 – Bonao</option><option>18 – Baní</option>
-                <option>Distrito Nacional</option>
+                <option>01 - Barahona</option>
+                <option>02 - San Juan de la Maguana</option>
+                <option>03 - Azua</option>
+                <option>04 - San Cristobal</option>
+                <option>05 - San Pedro de Macoris</option>
+                <option>06 - La Vega</option>
+                <option>07 - San Francisco de Macoris</option>
+                <option>08 - Santiago</option>
+                <option>09 - Mao</option>
+                <option>10 - Santo Domingo</option>
+                <option>11 - Puerto Plata</option>
+                <option>12 - Higuey</option>
+                <option>13 - Monte Cristi</option>
+                <option>14 - Nagua</option>
+                <option>15 - Santo Domingo</option>
+                <option>16 - Cotui</option>
+                <option>17 - Monte Plata</option>
+                <option>18 - Baoruco</option>
               </select>
             </div>
           </div>
@@ -741,7 +767,9 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
           <div id="bloqueDistrito" class="grid g-3 oculto" style="margin-top:14px;">
             <div class="campo">
               <label>Distrito asignado</label>
-              <input type="text" id="nuDistrito" placeholder="Ej. 0501" />
+              <select id="nuDistrito">
+                <option value="">Seleccione primero una regional</option>
+              </select>
             </div>
           </div>
 
@@ -930,7 +958,7 @@ async function cargarDashboard() {
   document.getElementById('statMes').textContent       = todosRegistros.filter(r => r.fecha && r.fecha.startsWith(mesActual)).length;
 
   // Poblar filtros dinámicos (solo la primera vez)
-  poblarFiltrosDinamicos(todosRegistros);
+  poblarDistritosDashboard(todosRegistros);
 
   // Gráficas
   renderBarras('graficaAreas',    contarPor(todosRegistros, 'area_acompanada'));
@@ -996,18 +1024,31 @@ function renderRegionales(datos) {
     </div>`).join('');
 }
 
-function poblarFiltrosDinamicos(registros) {
-  const regionales = [...new Set(registros.map(r => r.regional).filter(Boolean))].sort();
-  const distritos  = [...new Set(registros.map(r => r.distrito).filter(Boolean))].sort();
+function poblarDistritosDashboard(registros) {
+  // Populate distrito filter dynamically based on selected regional
   const selReg  = document.getElementById('filtroRegional');
   const selDist = document.getElementById('filtroDistrito');
-  if (selReg && selReg.options.length <= 1) {
-    regionales.forEach(r => { const o = new Option(r,r); selReg.appendChild(o); });
-  }
-  if (selDist && selDist.options.length <= 1) {
-    distritos.forEach(d => { const o = new Option(d,d); selDist.appendChild(o); });
+  const reg = selReg?.value;
+  const currentDist = selDist?.value;
+  if (selDist) {
+    selDist.innerHTML = '<option value="">Todos los distritos</option>';
+    const fuente = reg && DISTRITOS_POR_REGIONAL[reg]
+      ? DISTRITOS_POR_REGIONAL[reg]
+      : [...new Set(registros.map(r => r.distrito).filter(Boolean))].sort();
+    fuente.forEach(d => { const o = new Option(d,d); if(d===currentDist) o.selected=true; selDist.appendChild(o); });
   }
 }
+
+// When regional filter changes, reload distritos then dashboard
+document.addEventListener('DOMContentLoaded', () => {
+  const selReg = document.getElementById('filtroRegional');
+  if (selReg) {
+    selReg.addEventListener('change', () => {
+      poblarDistritosDashboard([]);
+      cargarDashboard();
+    });
+  }
+});
 
 function limpiarFiltros() {
   ['filtroMes','filtroRegional','filtroDistrito','filtroArea','filtroTipo','filtroEstado']
@@ -1288,6 +1329,23 @@ function seleccionarTodasSugerencias(){document.querySelectorAll('.sugerencia-ch
 function limpiarSeleccionSugerencias(){document.querySelectorAll('.sugerencia-check').forEach(c=>c.checked=false);}
 
 // ── ADMIN: USUARIOS ───────────────────────────────────────────────────────────
+
+
+// ── DATOS DE REGIONALES Y DISTRITOS ──────────────────────────────────────────
+const DISTRITOS_POR_REGIONAL = {"01 - Barahona": ["0101 - Pedernales", "0102 - Enriquillo", "0103 - Barahona", "0104 - Cabral", "0105 - Vicente Noble"], "02 - San Juan de la Maguana": ["0201 - Comendador", "0202 - Pedro Santana", "0203 - Las Matas de Farfan", "0204 - El Cercado", "0205 - San Juan Este", "0206 - San Juan Oeste", "0207 - Hondo Valle"], "03 - Azua": ["0301 - Azua", "0302 - Padre de las Casas", "0303 - San Jose de Ocoa", "0304 - Bani", "0305 - Nizao"], "04 - San Cristobal": ["0401 - Cambita Garabitos", "0402 - San Cristobal Norte", "0403 - San Cristobal Sur", "0404 - Villa Altagracia", "0405 - Yaguate", "0406 - Haina", "0407 - San Gregorio de Nigua"], "05 - San Pedro de Macoris": ["0501 - San Pedro de Macoris Este", "0502 - San Pedro de Macoris Oeste", "0503 - La Romana", "0504 - Hato Mayor", "0505 - Sabana de la Mar", "0506 - Consuelo", "0507 - San Jose de los Llanos", "0508 - Quisqueya", "0509 - El Valle", "0510 - Guaymate", "0511 - Villa Hermosa"], "06 - La Vega": ["0601 - Jose Contreras", "0602 - Constanza", "0603 - Jarabacoa", "0604 - La Vega Oeste", "0605 - La Vega Este", "0606 - Moca", "0607 - Gaspar Hernandez", "0608 - Jamao al Norte", "0609 - San Victor", "0610 - Jima Abajo"], "07 - San Francisco de Macoris": ["0701 - Tenares", "0702 - Salcedo", "0703 - Castillo", "0704 - Villa Riva", "0705 - San Francisco de Macoris Sur-e", "0706 - San Francisco de Macoris Nor-o", "0707 - Villa Tapia"], "08 - Santiago": ["0801 - San Jose de las Matas", "0802 - Janico", "0803 - Santiago Sur-este", "0804 - Santiago Noroeste", "0805 - Santiago Centro-oeste", "0806 - Santiago Noreste", "0807 - Villa Bisono (navarrete)", "0808 - Licey al Medio", "0809 - Tamboril", "0810 - Villa Gonzalez"], "09 - Mao": ["0901 - Mao", "0902 - Esperanza", "0903 - San Ignacio de Sabaneta", "0904 - Moncion", "0905 - Laguna Salada", "0906 - Villa los Almacigos"], "10 - Santo Domingo": ["1001 - Villa Mella", "1002 - Sabana Perdida", "1003 - Santo Domingo Noreste", "1004 - Santo Domingo Oriental", "1005 - Boca Chica", "1006 - Mendoza", "1007 - San Antonio de Guerra"], "11 - Puerto Plata": ["1101 - Sosua", "1102 - Puerto Plata", "1103 - Imbert", "1104 - Luperon", "1105 - Altamira", "1106 - El Mamey", "1107 - Villa Isabela"], "12 - Higuey": ["1201 - Higuey", "1202 - San Rafael del Yuma", "1203 - El Seibo", "1204 - Miches"], "13 - Monte Cristi": ["1301 - Monte Cristi", "1302 - Guayubin", "1303 - Villa Vasquez", "1304 - Dajabon", "1305 - Loma de Cabrera", "1306 - Restauracion"], "14 - Nagua": ["1401 - Nagua", "1402 - Cabrera", "1403 - Rio San Juan", "1404 - Samana", "1405 - Sanchez", "1406 - El Factor", "1407 - Las Terrenas"], "15 - Santo Domingo": ["1501 - Los Alcarrizos", "1502 - Santo Domingo Centro", "1503 - Santo Domingo Surcentral", "1504 - Santo Domingo Noroeste", "1505 - Herrera", "1506 - Pedro Brand"], "16 - Cotui": ["1601 - Cotui", "1602 - Fantino", "1603 - Cevicos", "1604 - Bonao Suroeste", "1605 - Piedra Blanca", "1606 - Bonao Nordeste", "1607 - Villa la Mata"], "17 - Monte Plata": ["1701 - Yamasa", "1702 - Monte Plata", "1703 - Bayaguana", "1704 - Sabana Grande de Boya", "1705 - Peralvillo"], "18 - Baoruco": ["1801 - Neiba", "1802 - Tamayo", "1803 - Villa Jaragua", "1804 - Jimani", "1805 - Duverge"]};
+
+function cargarDistritosUsuario() {
+  const reg = document.getElementById('nuRegional').value;
+  const sel = document.getElementById('nuDistrito');
+  sel.innerHTML = '<option value="">Seleccione distrito</option>';
+  if (reg && DISTRITOS_POR_REGIONAL[reg]) {
+    DISTRITOS_POR_REGIONAL[reg].forEach(d => {
+      const o = document.createElement('option');
+      o.value = d; o.textContent = d;
+      sel.appendChild(o);
+    });
+  }
+}
 
 // ── DEMARCACIÓN AL CREAR USUARIO ─────────────────────────────────────────────
 function toggleDemarcacion() {
