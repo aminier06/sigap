@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SIGAP — Acompañamiento Pedagógico</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --azul:#1a6fb5; --azul-osc:#0d4a7a; --azul-claro:#e8f3fb;
+      --verde:#d8ead0; --verde-claro:#eef7ea; --crema:#f4f0d8;
+      --borde:#c5d9ec; --texto:#1c2b3a; --gris-bg:#f0f5fa;
+      --rojo:#b42318; --sombra:0 6px 20px rgba(0,0,0,.09);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:var(--gris-bg);color:var(--texto);min-height:100vh;}
+
+    /* LOGIN */
+    #pantallaLogin{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(140deg,#0d4a7a 0%,#1a6fb5 55%,#2a8ad4 100%);}
+    .login-card{background:#fff;border-radius:20px;padding:44px 40px 40px;width:100%;max-width:420px;box-shadow:0 20px 50px rgba(0,0,0,.22);}
+    .login-logo{text-align:center;margin-bottom:28px;}
+    .login-logo .sigla{font-size:38px;font-weight:900;color:var(--azul-osc);letter-spacing:2px;}
+    .login-logo .nombre{font-size:11px;font-weight:700;color:#5b7a9a;letter-spacing:1.2px;text-transform:uppercase;margin-top:4px;}
+    .login-card h2{font-size:20px;font-weight:800;color:var(--azul-osc);margin-bottom:6px;}
+    .login-card p.sub{font-size:13px;color:#617384;margin-bottom:26px;}
+    .campo-login{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+    .campo-login label{font-size:13px;font-weight:700;color:#243b53;}
+    .campo-login input{border:1.5px solid #c9d9e7;border-radius:10px;padding:12px 14px;font-size:14px;outline:none;transition:border-color .18s;}
+    .campo-login input:focus{border-color:var(--azul);box-shadow:0 0 0 3px rgba(26,111,181,.12);}
+    .btn-login{width:100%;background:var(--azul);color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:800;cursor:pointer;transition:background .18s;}
+    .btn-login:hover{background:var(--azul-osc);}
+    .btn-login:disabled{background:#aac4de;cursor:not-allowed;}
+    .error-login{color:var(--rojo);font-size:13px;font-weight:700;text-align:center;margin-top:10px;min-height:18px;}
+    .login-pie{text-align:center;font-size:11px;color:#8fa5bb;margin-top:28px;}
+
+    /* APP */
+    #appPrincipal{display:none;min-height:100vh;}
+    .topbar{background:linear-gradient(90deg,var(--azul-osc),var(--azul));color:#fff;padding:0 28px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,.18);}
+    .topbar-left{display:flex;align-items:center;gap:14px;}
+    .topbar-sigla{font-size:20px;font-weight:900;letter-spacing:1.5px;}
+    .topbar-nombre{font-size:11px;opacity:.75;letter-spacing:.8px;text-transform:uppercase;}
+    .topbar-right{display:flex;align-items:center;gap:16px;}
+    .usuario-info{text-align:right;}
+    .usuario-nombre{font-size:14px;font-weight:700;}
+    .usuario-rol{font-size:11px;opacity:.75;}
+    .btn-salir{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;}
+    .btn-salir:hover{background:rgba(255,255,255,.25);}
+
+    .app-layout{display:flex;min-height:calc(100vh - 58px);}
+    .sidebar{width:240px;background:#fff;border-right:1px solid #dce9f5;flex-shrink:0;padding:20px 0;}
+    .menu-grupo{margin-bottom:6px;}
+    .menu-etiqueta{font-size:10px;font-weight:800;color:#8fa5bb;letter-spacing:1.2px;text-transform:uppercase;padding:8px 20px 4px;}
+    .menu-item{display:flex;align-items:center;gap:10px;padding:11px 20px;font-size:14px;font-weight:600;color:#2d4a63;cursor:pointer;border-left:3px solid transparent;transition:all .15s;}
+    .menu-item:hover{background:var(--azul-claro);color:var(--azul-osc);}
+    .menu-item.activo{background:var(--azul-claro);color:var(--azul-osc);border-left-color:var(--azul);font-weight:800;}
+    .menu-icono{font-size:16px;width:20px;text-align:center;}
+    .menu-item.admin-only{display:none;}
+
+    .contenido{flex:1;overflow-y:auto;padding:28px 32px 48px;}
+    .panel{display:none;}
+    .panel.activo{display:block;}
+
+    /* DASHBOARD */
+    .dashboard-titulo{font-size:24px;font-weight:900;color:var(--azul-osc);margin-bottom:4px;}
+    .dashboard-sub{font-size:14px;color:#617384;margin-bottom:24px;}
+    .cards-resumen{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px;}
+    .card-stat{background:#fff;border:1px solid #dce9f5;border-radius:14px;padding:20px 18px;box-shadow:var(--sombra);}
+    .card-stat .numero{font-size:36px;font-weight:900;color:var(--azul-osc);line-height:1;}
+    .card-stat .etiqueta{font-size:13px;color:#617384;margin-top:6px;font-weight:600;}
+    .card-stat .icono{font-size:24px;margin-bottom:10px;}
+    .seccion-titulo{font-size:16px;font-weight:800;color:var(--azul-osc);margin-bottom:14px;}
+
+    /* TABLAS */
+    .tabla-wrap-outer{overflow-x:auto;}
+    .tabla-registros{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:var(--sombra);}
+    .tabla-registros th{background:var(--crema);padding:12px 14px;font-size:13px;font-weight:800;color:var(--azul-osc);text-align:left;border-bottom:1px solid #dce9f5;}
+    .tabla-registros td{padding:11px 14px;font-size:13px;border-bottom:1px solid #edf3f8;color:var(--texto);}
+    .tabla-registros tr:last-child td{border-bottom:none;}
+    .tabla-registros tr:hover td{background:#f7fbfe;}
+    .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;}
+    .badge-verde{background:#d8ead0;color:#2a6b1a;}
+    .badge-amarillo{background:#fef3c7;color:#8a5d00;}
+    .badge-azul{background:#dff0fb;color:#0d4a7a;}
+    .badge-rojo{background:#fee2e2;color:#b42318;}
+
+    /* BOTONES */
+    .btn-primario{background:var(--azul);color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:14px;font-weight:800;cursor:pointer;transition:background .15s;}
+    .btn-primario:hover{background:var(--azul-osc);}
+    .btn-primario:disabled{background:#aac4de;cursor:not-allowed;}
+    .btn-secundario{background:#fff;color:var(--azul-osc);border:1.5px solid var(--borde);border-radius:10px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;}
+    .btn-secundario:hover{background:var(--azul-claro);border-color:var(--azul);}
+    .btn-peligro{background:#fff;color:var(--rojo);border:1.5px solid #f4c2bd;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer;}
+    .btn-peligro:hover{background:#fff5f5;}
+    .btn-sm{padding:6px 12px;font-size:12px;}
+    .acciones{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;}
+
+    /* FORM ACOMPAÑAMIENTO */
+    .form-titulo{font-size:22px;font-weight:900;color:var(--azul-osc);margin-bottom:4px;}
+    .form-sub{font-size:13px;color:#617384;margin-bottom:22px;}
+    .bloque{border:1px solid #dbe7f0;border-radius:14px;overflow:hidden;margin-bottom:20px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.05);}
+    .bloque-titulo{background:#e8f4fb;color:var(--azul-osc);padding:13px 18px;font-size:16px;font-weight:800;border-bottom:1px solid #d5e8f5;}
+    .bloque-cuerpo{padding:18px;}
+    .subtitulo{margin:4px 0 14px;padding:10px 12px;background:var(--verde);border-radius:10px;font-size:14px;font-weight:800;}
+    .grid{display:grid;gap:14px;}
+    .g-2{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .g-3{grid-template-columns:repeat(3,minmax(0,1fr));}
+    .g-4{grid-template-columns:repeat(4,minmax(0,1fr));}
+    .campo{display:flex;flex-direction:column;gap:6px;}
+    .campo label,.grupo-label{font-size:13px;font-weight:700;color:#243b53;}
+    input[type="text"],input[type="date"],input[type="time"],input[type="number"],input[type="email"],input[type="password"],select,textarea{width:100%;border:1px solid #c9d9e7;border-radius:10px;padding:10px 12px;font-size:14px;outline:none;background:#fff;}
+    input:disabled,select:disabled{background:#eef2f6;color:#6b7280;}
+    textarea{resize:vertical;min-height:110px;line-height:1.5;}
+    input:focus,select:focus,textarea:focus{border-color:var(--azul);box-shadow:0 0 0 3px rgba(26,111,181,.12);}
+    .opciones{display:flex;flex-wrap:wrap;gap:8px 14px;padding-top:4px;}
+    .opcion,.grado-box{display:inline-flex;align-items:center;gap:7px;background:#f8fbfd;border:1px solid #d9e7f2;border-radius:999px;padding:7px 12px;font-size:13px;cursor:pointer;transition:all .15s;}
+    .opcion:has(input:checked),.grado-box:has(input:checked){background:#dff0fb;border-color:var(--azul);color:var(--azul-osc);font-weight:700;}
+    .opcion input,.grado-box input{accent-color:var(--azul);}
+    .selector-grados{display:flex;flex-wrap:wrap;gap:8px;padding-top:4px;}
+    .oculto{display:none!important;}
+    .fila-linea{margin-top:12px;padding-top:12px;border-top:1px dashed #d7e4ee;}
+    .nota-escala{background:#f7fbff;border:1px dashed #b8d7ec;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.55;}
+
+    /* TABLA INDICADORES */
+    .tabla-wrap{overflow-x:auto;border:1px solid #dbe7f0;border-radius:12px;}
+    table.indicadores{width:100%;border-collapse:collapse;min-width:1000px;}
+    table.indicadores th,table.indicadores td{border:1px solid var(--borde);padding:9px 8px;font-size:13px;vertical-align:top;}
+    table.indicadores thead th{background:var(--crema);text-align:center;font-weight:800;}
+    .fila-seccion td{background:#d8ead0;font-weight:800;color:#17324d;}
+    .fila-subseccion td{background:var(--verde-claro);font-weight:700;}
+    .col-codigo{width:52px;text-align:center;font-weight:700;}
+    .col-indicador{min-width:340px;}
+    .col-valor{width:44px;text-align:center;}
+    .col-obs{min-width:200px;}
+    .col-obs textarea{min-height:68px;}
+    .valoracion{display:flex;justify-content:center;cursor:pointer;}
+    .valoracion input{accent-color:var(--azul);width:18px;height:18px;cursor:pointer;}
+
+    /* RESUMEN */
+    .resumen-automatico,.sugerencias-acuerdos{margin-top:16px;border:1px solid #d7e7f2;border-radius:12px;background:#f8fbfe;padding:16px;}
+    .resumen-automatico h3,.sugerencias-acuerdos h3{margin:0 0 12px;font-size:15px;color:var(--azul-osc);}
+    .chips-resumen{display:flex;flex-wrap:wrap;gap:8px;}
+    .chip-resumen{background:#e8f4fb;border:1px solid #cfe3f2;color:#0f4d74;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:700;}
+    .porcentajes-niveles{margin-top:14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;}
+    .porcentaje-box{border:1px solid #cfe3f2;background:#fff;border-radius:12px;padding:12px;text-align:center;}
+    .porcentaje-box .nivel{font-size:12px;font-weight:800;color:#0f4d74;margin-bottom:5px;}
+    .porcentaje-box .valor{font-size:22px;font-weight:900;color:var(--azul-osc);}
+    .porcentaje-box .detalle{margin-top:4px;font-size:11px;color:#617384;}
+    .sugerencias-acuerdos p{margin:0 0 12px;font-size:13px;color:#5b6b7d;}
+    .lista-sugerencias{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+    .sugerencia-item{display:flex;gap:10px;align-items:flex-start;border:1px solid #d9e7f2;border-radius:12px;padding:10px;background:#fff;}
+    .sugerencia-codigo{font-weight:800;color:var(--azul-osc);margin-bottom:3px;font-size:12px;}
+    .sugerencia-texto{font-size:13px;line-height:1.45;}
+    .sugerencia-vacia{padding:10px;border:1px dashed #cfe3f2;border-radius:12px;font-size:13px;color:#617384;background:#fbfdff;}
+    .acciones-sugerencias{display:flex;flex-wrap:wrap;gap:8px;}
+
+    /* FIRMAS */
+    .firmas{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:24px;}
+    .firma{text-align:center;}
+    .linea{height:1px;background:#333;margin-bottom:6px;}
+
+    /* ADMIN USUARIOS */
+    .form-usuario{background:#fff;border:1px solid #dce9f5;border-radius:14px;padding:24px;margin-bottom:24px;box-shadow:var(--sombra);}
+    .form-usuario h3{font-size:16px;font-weight:800;color:var(--azul-osc);margin-bottom:16px;}
+
+    /* PRONTO */
+    .pronto-card{background:#fff;border:1.5px dashed #cfe3f2;border-radius:16px;padding:40px;text-align:center;margin-top:10px;}
+    .pronto-card .ico{font-size:48px;margin-bottom:14px;}
+    .pronto-card h3{font-size:18px;font-weight:800;color:var(--azul-osc);margin-bottom:8px;}
+    .pronto-card p{font-size:14px;color:#617384;max-width:480px;margin:0 auto;}
+
+    /* CARGANDO */
+    .spinner{display:inline-block;width:18px;height:18px;border:3px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    .cargando-overlay{position:fixed;inset:0;background:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;z-index:500;font-size:15px;font-weight:700;color:var(--azul-osc);gap:12px;}
+
+    /* NOTIFICACIÓN */
+    #notificacion{position:fixed;bottom:28px;right:28px;background:var(--azul-osc);color:#fff;padding:14px 22px;border-radius:12px;font-size:14px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transform:translateY(10px);transition:all .3s;pointer-events:none;z-index:999;}
+    #notificacion.visible{opacity:1;transform:translateY(0);}
+    #notificacion.error{background:var(--rojo);}
+
+    /* MODAL */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:800;display:flex;align-items:center;justify-content:center;}
+    .modal{background:#fff;border-radius:16px;padding:32px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+    .modal h3{font-size:18px;font-weight:800;color:var(--azul-osc);margin-bottom:12px;}
+    .modal p{font-size:14px;color:#617384;margin-bottom:20px;line-height:1.55;}
+    .modal-acciones{display:flex;gap:10px;justify-content:flex-end;}
+
+    @media(max-width:900px){
+      .sidebar{display:none;}
+      .contenido{padding:18px 16px 36px;}
+      .cards-resumen{grid-template-columns:repeat(2,1fr);}
+      .g-4{grid-template-columns:repeat(2,1fr);}
+      .firmas{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="pantallaLogin">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="sigla">SIGAP</div>
+      <div class="nombre">Sistema de Gestión de Acompañamiento Pedagógico</div>
+    </div>
+    <h2>Iniciar sesión</h2>
+    <p class="sub">Ingrese sus credenciales para acceder a la plataforma.</p>
+    <div class="campo-login">
+      <label for="loginEmail">Correo electrónico</label>
+      <input type="email" id="loginEmail" placeholder="usuario@minerd.gob.do" autocomplete="username" />
+    </div>
+    <div class="campo-login">
+      <label for="loginClave">Contraseña</label>
+      <input type="password" id="loginClave" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <button class="btn-login" id="btnLogin" onclick="iniciarSesion()">Entrar</button>
+    <div class="error-login" id="errorLogin"></div>
+    <div class="login-pie">MINERD · Dirección de Educación Primaria<br>Para soporte técnico, contacte a su coordinador regional.</div>
+  </div>
+</div>
+
+<!-- APP PRINCIPAL -->
+<div id="appPrincipal">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div>
+        <div class="topbar-sigla">SIGAP</div>
+        <div class="topbar-nombre">Acompañamiento Pedagógico</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="usuario-info">
+        <div class="usuario-nombre" id="topNombre"></div>
+        <div class="usuario-rol" id="topRol"></div>
+      </div>
+      <button class="btn-salir" onclick="cerrarSesion()">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <div class="app-layout">
+    <nav class="sidebar">
+      <div class="menu-grupo">
+        <div class="menu-etiqueta">Principal</div>
+        <div class="menu-item activo" onclick="mostrarPanel('dashboard',this)"><span class="menu-icono">🏠</span> Panel principal</div>
+      </div>
+      <div class="menu-grupo">
+        <div class="menu-etiqueta">Acompañamiento</div>
+        <div class="menu-item" onclick="mostrarPanel('formDocente',this)"><span class="menu-icono">📋</span> Acomp. a Docentes</div>
+        <div class="menu-item" onclick="mostrarPanel('formCoord',this)"><span class="menu-icono">📝</span> Acomp. a Coordinadores</div>
+      </div>
+      <div class="menu-grupo">
+        <div class="menu-etiqueta">Consultas</div>
+        <div class="menu-item" onclick="mostrarPanel('registros',this)"><span class="menu-icono">📊</span> Mis registros</div>
+      </div>
+      <div class="menu-grupo admin-only" id="menuAdmin">
+        <div class="menu-etiqueta">Administración</div>
+        <div class="menu-item" onclick="mostrarPanel('adminUsuarios',this)"><span class="menu-icono">👥</span> Gestionar usuarios</div>
+        <div class="menu-item" onclick="mostrarPanel('adminRegistros',this)"><span class="menu-icono">🗄️</span> Todos los registros</div>
+      </div>
+    </nav>
+
+    <main class="contenido">
+
+      <!-- DASHBOARD -->
+      <div id="panel-dashboard" class="panel activo">
+        <div class="dashboard-titulo" id="bienvenidaTitulo">Bienvenido/a</div>
+        <p class="dashboard-sub">Resumen de sus acompañamientos registrados.</p>
+        <div class="cards-resumen">
+          <div class="card-stat"><div class="icono">📋</div><div class="numero" id="statTotal">—</div><div class="etiqueta">Acompañamientos a docentes</div></div>
+          <div class="card-stat"><div class="icono">🏫</div><div class="numero" id="statCentros">—</div><div class="etiqueta">Centros visitados</div></div>
+          <div class="card-stat"><div class="icono">📅</div><div class="numero" id="statMes">—</div><div class="etiqueta">Este mes</div></div>
+          <div class="card-stat"><div class="icono">✅</div><div class="numero" id="statEnviados">—</div><div class="etiqueta">Enviados</div></div>
+        </div>
+        <div class="seccion-titulo">Acompañamientos recientes</div>
+        <div class="tabla-wrap-outer">
+          <table class="tabla-registros">
+            <thead><tr><th>Fecha</th><th>Tipo</th><th>Docente</th><th>Área</th><th>Grado</th><th>Estado</th></tr></thead>
+            <tbody id="cuerpoTablaRecientes"><tr><td colspan="6" style="text-align:center;color:#8fa5bb;padding:24px;">Cargando…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="acciones">
+          <button class="btn-primario" onclick="mostrarPanel('formDocente',document.querySelector('[onclick*=formDocente]'))">+ Nuevo acompañamiento</button>
+        </div>
+      </div>
+
+      <!-- FORM DOCENTE -->
+      <div id="panel-formDocente" class="panel">
+        <div class="form-titulo">Instrumento de Acompañamiento al Docente</div>
+        <p class="form-sub">Nivel Primario — Ministerio de Educación (MINERD)</p>
+        <form id="formAcompDocente" onsubmit="enviarFormulario(event)">
+
+          <div class="bloque">
+            <div class="bloque-titulo">Datos generales</div>
+            <div class="bloque-cuerpo">
+              <div class="subtitulo">Datos del acompañante</div>
+              <div class="grid g-3">
+                <div class="campo"><label>Nombre del acompañante</label><input type="text" id="nombreAcompanante" name="nombreAcompanante" disabled /></div>
+                <div class="campo"><label>Rol</label><input type="text" id="rolAcompanante" name="rolAcompanante" disabled /></div>
+                <div class="campo">
+                  <label for="regional">Regional</label>
+                  <select id="regional" name="regional">
+                    <option value="">Seleccione</option>
+                    <option>01 – Barahona</option><option>02 – San Juan de la Maguana</option><option>03 – Azua</option>
+                    <option>04 – San Cristóbal</option><option>05 – Santo Domingo</option><option>06 – San Pedro de Macorís</option>
+                    <option>07 – La Romana</option><option>08 – La Vega</option><option>09 – Moca</option>
+                    <option>10 – Santiago</option><option>11 – Mao</option><option>12 – Nagua</option>
+                    <option>13 – San Francisco de Macorís</option><option>14 – Hato Mayor</option><option>15 – Higüey</option>
+                    <option>16 – Cotuí</option><option>17 – Bonao</option><option>18 – Baní</option>
+                    <option>Distrito Nacional</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grid g-3 fila-linea">
+                <div class="campo"><label for="distrito">Distrito educativo</label><input type="text" id="distrito" name="distrito" placeholder="Ej. 15-04" /></div>
+                <div class="campo" style="grid-column:span 2"><label for="centroEducativo">Centro educativo</label><input type="text" id="centroEducativo" name="centroEducativo" /></div>
+              </div>
+              <div class="grid g-2 fila-linea">
+                <div class="campo"><label for="codigoCentro">Código del centro</label><input type="text" id="codigoCentro" name="codigoCentro" /></div>
+                <div class="campo"><label>Zona</label><div class="opciones"><label class="opcion"><input type="radio" name="zona" value="Urbana"> Urbana</label><label class="opcion"><input type="radio" name="zona" value="Rural"> Rural</label></div></div>
+              </div>
+
+              <div class="subtitulo fila-linea">Datos del docente</div>
+              <div class="grid g-3">
+                <div class="campo"><label for="nombreDocente">Nombre del docente</label><input type="text" id="nombreDocente" name="nombreDocente" /></div>
+                <div class="campo"><label for="cedulaDocente">Cédula</label><input type="text" id="cedulaDocente" name="cedulaDocente" placeholder="000-0000000-0" /></div>
+                <div class="campo">
+                  <label for="gradoAcademicoDocente">Grado académico</label>
+                  <select id="gradoAcademicoDocente" name="gradoAcademicoDocente">
+                    <option value="">Seleccione</option><option>Bachiller</option><option>Técnico</option>
+                    <option>Licenciatura</option><option>Especialidad</option><option>Maestría</option><option>Doctorado</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grid g-3 fila-linea">
+                <div class="campo"><label>Situación laboral</label><div class="opciones"><label class="opcion"><input type="radio" name="situacionLaboral" value="Fijo"> Fijo</label><label class="opcion"><input type="radio" name="situacionLaboral" value="Interino"> Interino</label><label class="opcion"><input type="radio" name="situacionLaboral" value="Provisional"> Provisional</label></div></div>
+                <div class="campo"><label for="especialidadDocente">Especialidad</label><input type="text" id="especialidadDocente" name="especialidadDocente" /></div>
+                <div class="campo"><label for="aniosExp">Años de experiencia</label><input type="number" id="aniosExp" name="aniosExp" min="0" /></div>
+              </div>
+
+              <div class="subtitulo fila-linea">Datos de la clase acompañada</div>
+              <div class="grid g-3">
+                <div class="campo"><label>Modalidad</label><div class="opciones"><label class="opcion"><input type="radio" name="modalidad" value="Regular" onchange="toggleMultigrado()"> Regular</label><label class="opcion"><input type="radio" name="modalidad" value="Multigrado" onchange="toggleMultigrado()"> Multigrado</label></div></div>
+                <div class="campo">
+                  <label for="areaAcompanada">Área acompañada</label>
+                  <select id="areaAcompanada" name="areaAcompanada">
+                    <option value="">Seleccione</option><option>Lengua Española</option><option>Matemática</option>
+                    <option>Ciencias Sociales</option><option>Ciencias de la Naturaleza</option>
+                    <option>Lenguas Extranjeras (Inglés)</option><option>Educación Artística</option>
+                    <option>Formación Humana</option><option>Educación Física</option>
+                  </select>
+                </div>
+                <div class="campo" id="bloqueCicloRegular"><span class="grupo-label">Ciclo</span><div class="opciones"><label class="opcion"><input type="radio" name="ciclo" value="Primer Ciclo"> Primer Ciclo</label><label class="opcion"><input type="radio" name="ciclo" value="Segundo Ciclo"> Segundo Ciclo</label></div></div>
+                <div class="campo oculto" id="bloqueCiclosMulti"><span class="grupo-label">Ciclos</span><div class="opciones"><label class="opcion"><input type="checkbox" name="ciclosMultigrado" value="Primer Ciclo"> Primer Ciclo</label><label class="opcion"><input type="checkbox" name="ciclosMultigrado" value="Segundo Ciclo"> Segundo Ciclo</label></div></div>
+              </div>
+              <div class="campo fila-linea" id="bloqueGradoRegular"><span class="grupo-label">Grado acompañado</span><div class="selector-grados"><label class="grado-box"><input type="radio" name="gradoUnico" value="1ro."> 1ro.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="2do."> 2do.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="3ro."> 3ro.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="4to."> 4to.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="5to."> 5to.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="6to."> 6to.</label></div></div>
+              <div class="campo fila-linea oculto" id="bloqueGradosMulti"><span class="grupo-label">Grados acompañados</span><div class="selector-grados"><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="1ro."> 1ro.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="2do."> 2do.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="3ro."> 3ro.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="4to."> 4to.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="5to."> 5to.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="6to."> 6to.</label></div></div>
+
+              <div class="grid g-4 fila-linea">
+                <div class="campo"><label for="seccion">Sección</label><select id="seccion" name="seccion"><option value="">Seleccione</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option><option>H</option><option>I</option><option>J</option></select></div>
+              </div>
+
+              <div class="subtitulo fila-linea">Cantidad de estudiantes y tiempo</div>
+              <div class="grid g-4">
+                <div class="campo"><label for="inscritos">Inscritos</label><input type="number" id="inscritos" name="inscritos" min="0" /></div>
+                <div class="campo"><label for="presentes">Presentes</label><input type="number" id="presentes" name="presentes" min="0" /></div>
+                <div class="campo"><label for="fecha">Fecha</label><input type="date" id="fecha" name="fecha" /></div>
+                <div class="campo"><label for="horaInicio">Hora de inicio</label><input type="time" id="horaInicio" name="horaInicio" /></div>
+              </div>
+              <div class="grid g-3 fila-linea">
+                <div class="campo"><label for="horaTermino">Hora de término</label><input type="time" id="horaTermino" name="horaTermino" /></div>
+                <div class="campo" style="grid-column:span 2"><span class="grupo-label">Tipo de acompañamiento</span><div class="opciones"><label class="opcion"><input type="radio" name="tipoAcompanamiento" value="Diagnóstico"> Diagnóstico</label><label class="opcion"><input type="radio" name="tipoAcompanamiento" value="Focalizado"> Focalizado</label><label class="opcion"><input type="radio" name="tipoAcompanamiento" value="De seguimiento"> De seguimiento</label></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bloque">
+            <div class="bloque-cuerpo">
+              <div class="campo"><label for="foco">Describa el foco o propósito del acompañamiento</label><textarea id="foco" name="foco"></textarea></div>
+              <div class="campo fila-linea"><label for="intencionDocente">Describa la intención pedagógica del docente</label><textarea id="intencionDocente" name="intencionDocente"></textarea></div>
+              <div class="campo fila-linea"><label for="contenidoConceptual">Especifique el contenido conceptual abordado por el docente</label><textarea id="contenidoConceptual" name="contenidoConceptual"></textarea></div>
+            </div>
+          </div>
+
+          <div class="bloque">
+            <div class="bloque-titulo">Escala de Estimación</div>
+            <div class="bloque-cuerpo">
+              <div class="nota-escala">Lea cada indicador y marque el nivel correspondiente:<br><strong>1.</strong> No evidenciado &nbsp;&nbsp; <strong>2.</strong> Medianamente evidenciado &nbsp;&nbsp; <strong>3.</strong> Evidenciado &nbsp;&nbsp; <strong>4.</strong> No Aplica</div>
+              <div class="tabla-wrap"><table class="indicadores"><thead><tr><th class="col-codigo">#</th><th class="col-indicador">Indicadores</th><th class="col-valor">1</th><th class="col-valor">2</th><th class="col-valor">3</th><th class="col-valor">4</th><th class="col-obs">Observaciones</th></tr></thead><tbody id="tablaIndicadores"></tbody></table></div>
+              <div class="resumen-automatico"><h3>Resumen automático de indicadores por nivel</h3><div class="chips-resumen" id="resumenIndicadores"></div><div class="porcentajes-niveles" id="porcentajesNiveles"></div></div>
+              <div class="sugerencias-acuerdos"><h3>Acuerdos sugeridos según la escala</h3><p>Sugerencias automáticas para indicadores en nivel 1 o 2.</p><div class="lista-sugerencias" id="listaSugerenciasAcuerdos"></div><div class="acciones-sugerencias"><button type="button" class="btn-secundario" onclick="agregarAcuerdosSeleccionados()">Agregar seleccionados</button><button type="button" class="btn-secundario" onclick="seleccionarTodasSugerencias()">Seleccionar todas</button><button type="button" class="btn-secundario" onclick="limpiarSeleccionSugerencias()">Limpiar selección</button></div></div>
+            </div>
+          </div>
+
+          <div class="bloque">
+            <div class="bloque-titulo">Acuerdos / Compromisos</div>
+            <div class="bloque-cuerpo">
+              <div class="campo"><label for="acuerdos">Acuerdos / Compromisos</label><textarea id="acuerdos" name="acuerdos" style="min-height:200px;"></textarea></div>
+              <div class="firmas"><div class="firma"><div class="linea"></div><div>Nombre del/la docente acompañado(a)</div></div><div class="firma"><div class="linea"></div><div>Nombre del coordinador(a) docente</div></div></div>
+              <div class="firmas"><div class="firma"><div class="linea"></div><div>Director(a) del centro &nbsp;·&nbsp; <strong>SELLO</strong></div></div><div class="firma"><div class="linea"></div><div>Nombre del técnico(a) docente</div></div></div>
+            </div>
+          </div>
+
+          <div class="acciones">
+            <button type="button" class="btn-primario" onclick="window.print()">🖨️ Imprimir / PDF</button>
+            <button type="button" class="btn-secundario" id="btnBorrador" onclick="guardarBorrador()">💾 Guardar borrador</button>
+            <button type="submit" class="btn-primario" id="btnEnviar">✅ Enviar registro</button>
+            <button type="button" class="btn-peligro" onclick="limpiarFormulario()">🗑️ Limpiar</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- COORDINADORES -->
+      <div id="panel-formCoord" class="panel">
+        <div class="form-titulo">Instrumento de Acompañamiento al Coordinador Pedagógico</div>
+        <p class="form-sub">Nivel Primario — Ministerio de Educación (MINERD)</p>
+        <div class="pronto-card"><div class="ico">🚧</div><h3>Instrumento en construcción</h3><p>El instrumento para el acompañamiento a coordinadores pedagógicos está siendo elaborado. Estará disponible próximamente.</p></div>
+      </div>
+
+      <!-- MIS REGISTROS -->
+      <div id="panel-registros" class="panel">
+        <div class="dashboard-titulo">Mis registros</div>
+        <p class="dashboard-sub">Historial de acompañamientos guardados.</p>
+        <div class="tabla-wrap-outer">
+          <table class="tabla-registros">
+            <thead><tr><th>Fecha</th><th>Tipo</th><th>Docente</th><th>Centro</th><th>Área</th><th>Grado</th><th>Estado</th><th>Acción</th></tr></thead>
+            <tbody id="cuerpoMisRegistros"><tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Cargando…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ADMIN: USUARIOS -->
+      <div id="panel-adminUsuarios" class="panel">
+        <div class="dashboard-titulo">Gestionar usuarios</div>
+        <p class="dashboard-sub">Cree y administre los usuarios de la plataforma.</p>
+
+        <div class="form-usuario">
+          <h3>➕ Crear nuevo usuario</h3>
+          <div class="grid g-3">
+            <div class="campo"><label>Nombre completo</label><input type="text" id="nuNombre" placeholder="Juan Pérez" /></div>
+            <div class="campo"><label>Correo electrónico</label><input type="email" id="nuEmail" placeholder="usuario@minerd.gob.do" /></div>
+            <div class="campo"><label>Contraseña inicial</label><input type="password" id="nuClave" placeholder="Mínimo 8 caracteres" /></div>
+          </div>
+          <div class="grid g-3" style="margin-top:14px;">
+            <div class="campo">
+              <label>Rol</label>
+              <select id="nuRol">
+                <option value="">Seleccione</option>
+                <option value="Técnico/a Nacional">Técnico/a Nacional</option>
+                <option value="Técnico/a Regional">Técnico/a Regional</option>
+                <option value="Técnico/a Distrital">Técnico/a Distrital</option>
+                <option value="Coordinador/a Pedagógico/a">Coordinador/a Pedagógico/a</option>
+                <option value="Director/a de Centro">Director/a de Centro</option>
+                <option value="Administrador/a">Administrador/a</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label>Nivel de acceso</label>
+              <select id="nuNivel">
+                <option value="usuario">Usuario</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </div>
+          </div>
+          <div class="acciones">
+            <button class="btn-primario" id="btnCrearUsuario" onclick="crearUsuario()">Crear usuario</button>
+          </div>
+        </div>
+
+        <div class="seccion-titulo">Usuarios registrados</div>
+        <div class="tabla-wrap-outer">
+          <table class="tabla-registros">
+            <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Nivel</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="cuerpoTablaUsuarios"><tr><td colspan="6" style="text-align:center;color:#8fa5bb;padding:24px;">Cargando…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ADMIN: TODOS LOS REGISTROS -->
+      <div id="panel-adminRegistros" class="panel">
+        <div class="dashboard-titulo">Todos los registros</div>
+        <p class="dashboard-sub">Acompañamientos registrados por todos los usuarios.</p>
+        <div class="tabla-wrap-outer">
+          <table class="tabla-registros">
+            <thead><tr><th>Fecha</th><th>Acompañante</th><th>Tipo</th><th>Docente</th><th>Centro</th><th>Área</th><th>Estado</th></tr></thead>
+            <tbody id="cuerpoAdminRegistros"><tr><td colspan="7" style="text-align:center;color:#8fa5bb;padding:24px;">Cargando…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<div id="notificacion"></div>
+
+<script>
+// ── SUPABASE ──────────────────────────────────────────────────────────────────
+const SUPA_URL = 'https://howlmvxbcfxvvuoosvor.supabase.co';
+const SUPA_KEY = 'sb_publishable_QvSlRzrHBjmighOh-OF9xw_dnqrBqld';
+const { createClient } = supabase;
+const sb = createClient(SUPA_URL, SUPA_KEY);
+
+let usuarioActual = null;
+let perfilActual = null;
+
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
+async function iniciarSesion() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const clave = document.getElementById('loginClave').value;
+  const btn = document.getElementById('btnLogin');
+  const err = document.getElementById('errorLogin');
+  err.textContent = '';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Entrando…';
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: clave });
+  if (error) {
+    err.textContent = 'Correo o contraseña incorrectos.';
+    btn.disabled = false; btn.textContent = 'Entrar'; return;
+  }
+  usuarioActual = data.user;
+  await cargarPerfil();
+  mostrarApp();
+  btn.disabled = false; btn.textContent = 'Entrar';
+}
+
+document.getElementById('loginClave').addEventListener('keydown', e => { if (e.key === 'Enter') iniciarSesion(); });
+
+async function cargarPerfil() {
+  const { data } = await sb.from('perfiles').select('*').eq('id', usuarioActual.id).single();
+  perfilActual = data;
+}
+
+function mostrarApp() {
+  document.getElementById('pantallaLogin').style.display = 'none';
+  document.getElementById('appPrincipal').style.display = 'block';
+  document.getElementById('topNombre').textContent = perfilActual?.nombre || usuarioActual.email;
+  document.getElementById('topRol').textContent = perfilActual?.rol || '';
+  document.getElementById('nombreAcompanante').value = perfilActual?.nombre || '';
+  document.getElementById('rolAcompanante').value = perfilActual?.rol || '';
+  // Mostrar menú admin si corresponde
+  if (perfilActual?.nivel === 'admin') {
+    document.getElementById('menuAdmin').style.display = 'block';
+  }
+  document.getElementById('bienvenidaTitulo').textContent = 'Bienvenido/a, ' + (perfilActual?.nombre || '');
+  crearTablaIndicadores();
+  cargarDashboard();
+}
+
+async function cerrarSesion() {
+  await sb.auth.signOut();
+  usuarioActual = null; perfilActual = null;
+  document.getElementById('appPrincipal').style.display = 'none';
+  document.getElementById('pantallaLogin').style.display = 'flex';
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginClave').value = '';
+  document.getElementById('menuAdmin').style.display = 'none';
+}
+
+// ── NAVEGACIÓN ────────────────────────────────────────────────────────────────
+function mostrarPanel(id, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('activo'));
+  document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('activo'));
+  document.getElementById('panel-' + id).classList.add('activo');
+  if (el) el.classList.add('activo');
+  if (id === 'registros') cargarMisRegistros();
+  if (id === 'dashboard') cargarDashboard();
+  if (id === 'adminUsuarios') cargarUsuarios();
+  if (id === 'adminRegistros') cargarTodosRegistros();
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+async function cargarDashboard() {
+  const uid = usuarioActual?.id;
+  if (!uid) return;
+  const { data: todos } = await sb.from('acompañamientos').select('*').eq('usuario_id', uid).order('fecha', { ascending: false });
+  const registros = todos || [];
+  const hoy = new Date();
+  const mesActual = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0');
+  document.getElementById('statTotal').textContent = registros.length;
+  document.getElementById('statCentros').textContent = new Set(registros.map(r => r.centro_educativo).filter(Boolean)).size;
+  document.getElementById('statMes').textContent = registros.filter(r => r.fecha && r.fecha.startsWith(mesActual)).length;
+  document.getElementById('statEnviados').textContent = registros.filter(r => r.estado === 'Enviado').length;
+  const cuerpo = document.getElementById('cuerpoTablaRecientes');
+  if (registros.length === 0) {
+    cuerpo.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#8fa5bb;padding:24px;">No hay registros aún.</td></tr>'; return;
+  }
+  cuerpo.innerHTML = registros.slice(0,5).map(r => `
+    <tr>
+      <td>${r.fecha||'—'}</td><td>${r.tipo_acompanamiento||'—'}</td>
+      <td>${r.nombre_docente||'—'}</td><td>${r.area_acompanada||'—'}</td>
+      <td>${r.grado||'—'}</td>
+      <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td>
+    </tr>`).join('');
+}
+
+// ── MIS REGISTROS ─────────────────────────────────────────────────────────────
+async function cargarMisRegistros() {
+  const { data } = await sb.from('acompañamientos').select('*').eq('usuario_id', usuarioActual.id).order('created_at', { ascending: false });
+  const registros = data || [];
+  const cuerpo = document.getElementById('cuerpoMisRegistros');
+  if (registros.length === 0) {
+    cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">No hay registros guardados.</td></tr>'; return;
+  }
+  cuerpo.innerHTML = registros.map(r => `
+    <tr>
+      <td>${r.fecha||'—'}</td><td>${r.tipo_acompanamiento||'—'}</td>
+      <td>${r.nombre_docente||'—'}</td><td>${r.centro_educativo||'—'}</td>
+      <td>${r.area_acompanada||'—'}</td><td>${r.grado||'—'}</td>
+      <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td>
+      <td>${r.estado==='Borrador'?`<button class="btn-secundario btn-sm" onclick="eliminarRegistro('${r.id}')">Eliminar</button>`:'—'}</td>
+    </tr>`).join('');
+}
+
+async function eliminarRegistro(id) {
+  if (!confirm('¿Eliminar este borrador?')) return;
+  await sb.from('acompañamientos').delete().eq('id', id);
+  mostrarNotif('Borrador eliminado.');
+  cargarMisRegistros();
+}
+
+// ── FORMULARIO ────────────────────────────────────────────────────────────────
+async function enviarFormulario(e) {
+  e.preventDefault();
+  const btn = document.getElementById('btnEnviar');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Enviando…';
+  await guardarRegistro('Enviado');
+  btn.disabled = false; btn.textContent = '✅ Enviar registro';
+}
+
+async function guardarBorrador() {
+  const btn = document.getElementById('btnBorrador');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Guardando…';
+  await guardarRegistro('Borrador');
+  btn.disabled = false; btn.textContent = '💾 Guardar borrador';
+}
+
+async function guardarRegistro(estado) {
+  const v = id => (document.getElementById(id)||{}).value || '';
+  const r = name => { const el = document.querySelector('input[name="'+name+'"]:checked'); return el?el.value:''; };
+  const grado = r('gradoUnico') || Array.from(document.querySelectorAll('input[name="gradosMultigrado"]:checked')).map(c=>c.value).join(', ');
+
+  // Recoger indicadores como JSON
+  const indicadoresData = {};
+  INDICADORES.forEach(item => {
+    if (!item.codigo) return;
+    const sel = document.querySelector('input[name="val_'+item.codigo+'"]:checked');
+    const obs = document.querySelector('textarea[name="obs_'+item.codigo+'"]');
+    indicadoresData[item.codigo] = { valor: sel ? parseInt(sel.value) : null, observacion: obs ? obs.value : '' };
+  });
+
+  const registro = {
+    usuario_id: usuarioActual.id,
+    nombre_acompanante: v('nombreAcompanante'),
+    rol_acompanante: v('rolAcompanante'),
+    regional: v('regional'),
+    distrito: v('distrito'),
+    centro_educativo: v('centroEducativo'),
+    codigo_centro: v('codigoCentro'),
+    zona: r('zona'),
+    nombre_docente: v('nombreDocente'),
+    cedula_docente: v('cedulaDocente'),
+    grado_academico: v('gradoAcademicoDocente'),
+    situacion_laboral: r('situacionLaboral'),
+    especialidad: v('especialidadDocente'),
+    anios_experiencia: parseInt(v('aniosExp')) || null,
+    modalidad: r('modalidad'),
+    area_acompanada: v('areaAcompanada'),
+    ciclo: r('ciclo'),
+    grado,
+    seccion: v('seccion'),
+    inscritos: parseInt(v('inscritos')) || null,
+    presentes: parseInt(v('presentes')) || null,
+    fecha: v('fecha') || null,
+    hora_inicio: v('horaInicio') || null,
+    hora_termino: v('horaTermino') || null,
+    tipo_acompanamiento: r('tipoAcompanamiento'),
+    foco: v('foco'),
+    intencion_docente: v('intencionDocente'),
+    contenido_conceptual: v('contenidoConceptual'),
+    acuerdos: v('acuerdos'),
+    indicadores: indicadoresData,
+    estado,
+  };
+
+  const { error } = await sb.from('acompañamientos').insert(registro);
+  if (error) { mostrarNotif('Error al guardar: ' + error.message, true); return; }
+  mostrarNotif(estado === 'Enviado' ? 'Registro enviado correctamente.' : 'Borrador guardado.');
+  if (estado === 'Enviado') limpiarFormulario();
+}
+
+function limpiarFormulario() {
+  document.getElementById('formAcompDocente').reset();
+  document.getElementById('nombreAcompanante').value = perfilActual?.nombre || '';
+  document.getElementById('rolAcompanante').value = perfilActual?.rol || '';
+  crearTablaIndicadores();
+  ['resumenIndicadores','porcentajesNiveles','listaSugerenciasAcuerdos'].forEach(id => document.getElementById(id).innerHTML = '');
+}
+
+// ── MULTIGRADO ────────────────────────────────────────────────────────────────
+function toggleMultigrado() {
+  const multi = document.querySelector('input[name="modalidad"][value="Multigrado"]')?.checked;
+  document.getElementById('bloqueCicloRegular').classList.toggle('oculto', !!multi);
+  document.getElementById('bloqueCiclosMulti').classList.toggle('oculto', !multi);
+  document.getElementById('bloqueGradoRegular').classList.toggle('oculto', !!multi);
+  document.getElementById('bloqueGradosMulti').classList.toggle('oculto', !multi);
+}
+
+// ── INDICADORES ───────────────────────────────────────────────────────────────
+const INDICADORES = [
+  {tipo:'seccion',titulo:'1. Planificación'},
+  {codigo:'1.1',texto:'Cuenta con una planificación que responde a las estrategias orientadas desde el Nivel Primario.'},
+  {codigo:'1.2',texto:'Muestra una planificación diaria actualizada, orientada al desarrollo de las competencias del grado y propias del área acompañada, tomando como base la planificación de unidad.'},
+  {codigo:'1.3',texto:'Toma en cuenta las guías didácticas de su ciclo para la realización de la planificación diaria como se orientó desde el Nivel Primario.'},
+  {codigo:'1.4',texto:'Existe coherencia entre la intención pedagógica y las actividades elaboradas para cada uno de los momentos de la clase.'},
+  {codigo:'1.5',texto:'Se observan estrategias y actividades diferenciadas para atender a la diversidad del aula.'},
+  {codigo:'1.6',texto:'Elabora actividades de evaluación alineadas con la intención pedagógica e instrumentos para registrar los aprendizajes obtenidos por los estudiantes.'},
+  {codigo:'1.7',texto:'Se evidencia en la planificación diaria recursos didácticos previamente seleccionados en función al desarrollo de los contenidos a desarrollar y la intención pedagógica.'},
+  {tipo:'seccion',titulo:'2. Momentos de la práctica pedagógica'},
+  {tipo:'subseccion',titulo:'Actividades de inicio'},
+  {codigo:'2.1',texto:'Realiza la retroalimentación del tema anterior utilizando estrategias innovadoras.'},
+  {codigo:'2.2',texto:'Comparte con los alumnos la intención pedagógica de la clase como medio para motivar el aprendizaje.'},
+  {codigo:'2.3',texto:'Explora los conocimientos previos de los alumnos como punto de partida para el desarrollo de la temática.'},
+  {tipo:'subseccion',titulo:'Actividades de desarrollo'},
+  {codigo:'2.4',texto:'La clase está orientada al desarrollo de las competencias del área que está impartiendo.'},
+  {codigo:'2.5',texto:'Hace uso efectivo de las secuencias didácticas del área y del ciclo en el que está trabajando.'},
+  {codigo:'2.6',texto:'Apoya a los estudiantes durante el desarrollo de las actividades de construcción del conocimiento de manera individual y/o colectiva.'},
+  {codigo:'2.7',texto:'La secuencia de actividades desarrolladas es coherente con la intención pedagógica y posibilita la adquisición de nuevos conocimientos.'},
+  {codigo:'2.8',texto:'Desarrolla actividades específicas y pertinentes para atender a las necesidades educativas individuales de sus estudiantes.'},
+  {codigo:'2.9',texto:'Demuestra dominio de los contenidos del área durante las actividades de construcción de los conocimientos.'},
+  {codigo:'2.10',texto:'El aula está ambientada con sentido pedagógico y acorde con los contenidos curriculares que desarrolla, como lo indica el Modelo Pedagógico del Nivel Primario.'},
+  {codigo:'2.11',texto:'Utiliza los recursos de manera pertinente, en el desarrollo de las actividades, facilitando el logro de las competencias del área que está impartiendo, incorporando la tecnología.'},
+  {codigo:'2.12',texto:'Durante el desarrollo de la clase se evidencia un rol protagónico de los estudiantes, construyendo sus aprendizajes de manera reflexiva.'},
+  {codigo:'2.13',texto:'Se evidencia una disciplina funcional fundamentada en el respeto durante el desarrollo de la clase.'},
+  {codigo:'2.14',texto:'Se evidencia una distribución efectiva del tiempo para cada uno de los momentos: inicio, desarrollo y cierre.'},
+  {tipo:'subseccion',titulo:'Actividades de cierre'},
+  {codigo:'2.15',texto:'Realiza una actividad o ejercicio de evaluación alineada con la intención pedagógica, usando alguna técnica o instrumento de evaluación para registrar los aprendizajes obtenidos por los estudiantes.'},
+  {codigo:'2.16',texto:'Realiza el cierre pedagógico de la clase retomando la intención pedagógica presentada y socializada al inicio de la clase.'},
+  {tipo:'seccion',titulo:'3. Aspectos a tomar en cuenta'},
+  {codigo:'3.1',texto:'El docente muestra evidencia de la realización de evaluaciones sistemáticas y periódicas para determinar el nivel de avance de los estudiantes en el aprendizaje.'},
+  {codigo:'3.2',texto:'El docente hace un uso correcto del registro de grado completando todos los aspectos que tiene que haber trabajado al momento del acompañamiento.'},
+  {codigo:'3.3',texto:'Los cuadernos de los niños están organizados y hay evidencias de un trabajo sistemático mostrando coherencia entre lo planificado por el docente y lo trabajado por los estudiantes.'},
+  {codigo:'3.4',texto:'Los portafolios de los estudiantes están organizados y tienen evidencias de las evaluaciones y producciones de los estudiantes que permiten visualizar la evolución de sus aprendizajes.'},
+  {tipo:'seccion',titulo:'4. Una mirada reflexiva de la clase acompañada'},
+  {codigo:'4.1',texto:'El docente logra identificar sus fortalezas a partir de las preguntas reflexivas realizadas por el acompañante.'},
+  {codigo:'4.2',texto:'Logra identificar las oportunidades de mejora a partir de las preguntas reflexivas realizadas por el acompañante.'},
+  {codigo:'4.3',texto:'Muestra una actitud colaborativa y de respeto ante las observaciones y sugerencias dadas por el acompañante.'},
+  {codigo:'4.4',texto:'Construye los acuerdos tomando en cuenta las oportunidades de mejora detectadas en el acompañamiento, los escribe y muestra una actitud positiva con el cumplimiento de estos.'},
+];
+
+const SUGERENCIAS = {
+  '1.1':{b:'Planificación',t:'Elaborar la planificación alineada con las estrategias orientadas desde el Nivel Primario.'},
+  '1.2':{b:'Planificación',t:'Actualizar la planificación diaria tomando como base la planificación de unidad y las competencias del grado y del área.'},
+  '1.3':{b:'Planificación',t:'Incorporar de manera sistemática las guías didácticas del ciclo en la planificación diaria.'},
+  '1.4':{b:'Planificación',t:'Revisar la coherencia entre la intención pedagógica y las actividades previstas para cada momento de la clase.'},
+  '1.5':{b:'Planificación',t:'Incluir estrategias diferenciadas para atender la diversidad del aula.'},
+  '1.6':{b:'Planificación',t:'Diseñar actividades e instrumentos de evaluación alineados con la intención pedagógica.'},
+  '1.7':{b:'Planificación',t:'Seleccionar previamente los recursos didácticos según el contenido y la intención pedagógica.'},
+  '2.1':{b:'Inicio',t:'Implementar estrategias innovadoras para la retroalimentación del tema anterior.'},
+  '2.2':{b:'Inicio',t:'Comunicar explícitamente la intención pedagógica al inicio de cada clase.'},
+  '2.3':{b:'Inicio',t:'Incorporar actividades para explorar los conocimientos previos de los estudiantes.'},
+  '2.4':{b:'Desarrollo',t:'Orientar las actividades de clase al desarrollo de las competencias del área.'},
+  '2.5':{b:'Desarrollo',t:'Fortalecer el uso de las secuencias didácticas del área y del ciclo.'},
+  '2.6':{b:'Desarrollo',t:'Brindar acompañamiento más activo a los estudiantes durante la construcción del aprendizaje.'},
+  '2.7':{b:'Desarrollo',t:'Ajustar la secuencia de actividades para que responda mejor a la intención pedagógica.'},
+  '2.8':{b:'Desarrollo',t:'Diseñar actividades específicas para atender necesidades educativas individuales.'},
+  '2.9':{b:'Desarrollo',t:'Fortalecer el dominio de los contenidos del área acompañada.'},
+  '2.10':{b:'Desarrollo',t:'Ambientar el aula con mayor sentido pedagógico y en coherencia con los contenidos curriculares.'},
+  '2.11':{b:'Desarrollo',t:'Utilizar recursos y tecnología de forma más pertinente para favorecer el desarrollo de competencias.'},
+  '2.12':{b:'Desarrollo',t:'Promover un rol más protagónico del estudiante en la construcción de sus aprendizajes.'},
+  '2.13':{b:'Desarrollo',t:'Fortalecer una disciplina funcional basada en el respeto durante toda la clase.'},
+  '2.14':{b:'Desarrollo',t:'Organizar mejor el tiempo destinado a inicio, desarrollo y cierre de la clase.'},
+  '2.15':{b:'Cierre',t:'Aplicar actividades de evaluación alineadas con la intención pedagógica y registrar los resultados obtenidos.'},
+  '2.16':{b:'Cierre',t:'Realizar cierres pedagógicos que retomen la intención y los aprendizajes desarrollados en la clase.'},
+  '3.1':{b:'Evaluación',t:'Realizar evaluaciones sistemáticas y periódicas para dar seguimiento al avance de cada estudiante.'},
+  '3.2':{b:'Evaluación',t:'Mantener actualizado el registro de grado conforme a los aspectos trabajados.'},
+  '3.3':{b:'Evaluación',t:'Organizar los cuadernos de los estudiantes de manera coherente con la planificación y el trabajo de aula.'},
+  '3.4':{b:'Evaluación',t:'Fortalecer el uso del portafolio como evidencia de evaluación y seguimiento del aprendizaje.'},
+};
+
+function crearTablaIndicadores() {
+  const tabla = document.getElementById('tablaIndicadores');
+  if (!tabla) return;
+  tabla.innerHTML = '';
+  INDICADORES.forEach(item => {
+    if (item.tipo === 'seccion') { const tr = document.createElement('tr'); tr.className='fila-seccion'; tr.innerHTML='<td colspan="7">'+item.titulo+'</td>'; tabla.appendChild(tr); return; }
+    if (item.tipo === 'subseccion') { const tr = document.createElement('tr'); tr.className='fila-subseccion'; tr.innerHTML='<td colspan="7">'+item.titulo+'</td>'; tabla.appendChild(tr); return; }
+    const tr = document.createElement('tr');
+    let radios = '';
+    [1,2,3,4].forEach(v => { radios += '<td class="col-valor"><label class="valoracion"><input type="radio" name="val_'+item.codigo+'" value="'+v+'"></label></td>'; });
+    tr.innerHTML = '<td class="col-codigo">'+item.codigo+'</td><td class="col-indicador">'+item.texto+'</td>'+radios+'<td class="col-obs"><textarea name="obs_'+item.codigo+'" placeholder="Observaciones…" style="min-height:68px;"></textarea></td>';
+    tabla.appendChild(tr);
+  });
+  document.querySelectorAll('input[type="radio"][name^="val_"]').forEach(el => el.addEventListener('change', actualizarResumen));
+}
+
+function actualizarResumen() {
+  const totales={1:0,2:0,3:0,4:0};
+  const totalInd = INDICADORES.filter(i=>i.codigo).length;
+  const sugerencias=[];
+  INDICADORES.forEach(item => {
+    if (!item.codigo) return;
+    const sel = document.querySelector('input[name="val_'+item.codigo+'"]:checked');
+    if (sel) { const n=sel.value; totales[n]++; if((n==='1'||n==='2')&&SUGERENCIAS[item.codigo]) sugerencias.push({codigo:item.codigo,nivel:n,...SUGERENCIAS[item.codigo]}); }
+  });
+  const respondidos=totales[1]+totales[2]+totales[3]+totales[4];
+  const base=totalInd-totales[4];
+  const pct=v=>base>0?((v/base)*100).toFixed(1):'0.0';
+  document.getElementById('resumenIndicadores').innerHTML=
+    ['Nivel 1: '+totales[1],'Nivel 2: '+totales[2],'Nivel 3: '+totales[3],'Nivel 4 (N/A): '+totales[4],'Sin responder: '+(totalInd-respondidos),'Total: '+totalInd]
+    .map(t=>'<div class="chip-resumen">'+t+'</div>').join('');
+  document.getElementById('porcentajesNiveles').innerHTML=
+    [['No evidenciado',1],['Medianamente evidenciado',2],['Evidenciado',3]].map(([lbl,n])=>
+      `<div class="porcentaje-box"><div class="nivel">${lbl}</div><div class="valor">${pct(totales[n])}%</div><div class="detalle">${totales[n]} de ${base} observados</div></div>`).join('');
+  const lista=document.getElementById('listaSugerenciasAcuerdos');
+  lista.innerHTML=sugerencias.length===0
+    ?'<div class="sugerencia-vacia">No hay sugerencias activas.</div>'
+    :sugerencias.map(s=>`<div class="sugerencia-item"><input type="checkbox" class="sugerencia-check" data-texto="${s.t}" style="margin-top:3px;accent-color:var(--azul);width:18px;height:18px;flex-shrink:0;"><div><div class="sugerencia-codigo">Indicador ${s.codigo} — Nivel ${s.nivel} — ${s.b}</div><div class="sugerencia-texto">${s.t}</div></div></div>`).join('');
+}
+
+function agregarAcuerdosSeleccionados(){
+  const checks=document.querySelectorAll('.sugerencia-check:checked');
+  if(!checks.length){mostrarNotif('Seleccione al menos una sugerencia.');return;}
+  const campo=document.getElementById('acuerdos');
+  const textos=Array.from(checks).map(c=>'• '+c.dataset.texto);
+  campo.value=(campo.value.trim()?campo.value.trim()+'\n':'')+textos.join('\n');
+  mostrarNotif('Acuerdos agregados.');
+}
+function seleccionarTodasSugerencias(){document.querySelectorAll('.sugerencia-check').forEach(c=>c.checked=true);}
+function limpiarSeleccionSugerencias(){document.querySelectorAll('.sugerencia-check').forEach(c=>c.checked=false);}
+
+// ── ADMIN: USUARIOS ───────────────────────────────────────────────────────────
+async function crearUsuario() {
+  const nombre = document.getElementById('nuNombre').value.trim();
+  const email  = document.getElementById('nuEmail').value.trim();
+  const clave  = document.getElementById('nuClave').value;
+  const rol    = document.getElementById('nuRol').value;
+  const nivel  = document.getElementById('nuNivel').value;
+  if (!nombre||!email||!clave||!rol) { mostrarNotif('Complete todos los campos.', true); return; }
+  const btn = document.getElementById('btnCrearUsuario');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Creando…';
+
+  // Crear usuario en Auth de Supabase
+  const { data, error } = await sb.auth.admin.createUser({ email, password: clave, email_confirm: true });
+  if (error) {
+    // Si no tiene permisos de admin, usar signUp normal
+    const { data: d2, error: e2 } = await sb.auth.signUp({ email, password: clave });
+    if (e2) { mostrarNotif('Error: ' + e2.message, true); btn.disabled=false; btn.textContent='Crear usuario'; return; }
+    const uid = d2.user?.id;
+    if (uid) await sb.from('perfiles').insert({ id: uid, nombre, rol, nivel, activo: true });
+  } else {
+    const uid = data.user?.id;
+    if (uid) await sb.from('perfiles').insert({ id: uid, nombre, rol, nivel, activo: true });
+  }
+
+  mostrarNotif('Usuario creado correctamente.');
+  document.getElementById('nuNombre').value='';
+  document.getElementById('nuEmail').value='';
+  document.getElementById('nuClave').value='';
+  document.getElementById('nuRol').value='';
+  btn.disabled=false; btn.textContent='Crear usuario';
+  cargarUsuarios();
+}
+
+async function cargarUsuarios() {
+  const { data } = await sb.from('perfiles').select('*').order('nombre');
+  const cuerpo = document.getElementById('cuerpoTablaUsuarios');
+  if (!data || data.length === 0) { cuerpo.innerHTML='<tr><td colspan="6" style="text-align:center;color:#8fa5bb;padding:24px;">No hay usuarios registrados.</td></tr>'; return; }
+  cuerpo.innerHTML = data.map(u => `
+    <tr>
+      <td>${u.nombre||'—'}</td>
+      <td style="font-size:12px;">${u.email||'—'}</td>
+      <td>${u.rol||'—'}</td>
+      <td><span class="badge ${u.nivel==='admin'?'badge-azul':'badge-amarillo'}">${u.nivel==='admin'?'Admin':'Usuario'}</span></td>
+      <td><span class="badge ${u.activo!==false?'badge-verde':'badge-rojo'}">${u.activo!==false?'Activo':'Inactivo'}</span></td>
+      <td>
+        ${u.activo!==false
+          ? `<button class="btn-peligro btn-sm" onclick="toggleUsuario('${u.id}',false)">Desactivar</button>`
+          : `<button class="btn-secundario btn-sm" onclick="toggleUsuario('${u.id}',true)">Activar</button>`}
+      </td>
+    </tr>`).join('');
+}
+
+async function toggleUsuario(id, activo) {
+  await sb.from('perfiles').update({ activo }).eq('id', id);
+  mostrarNotif(activo ? 'Usuario activado.' : 'Usuario desactivado.');
+  cargarUsuarios();
+}
+
+async function cargarTodosRegistros() {
+  const { data } = await sb.from('acompañamientos').select('*, perfiles(nombre)').order('created_at', { ascending: false });
+  const cuerpo = document.getElementById('cuerpoAdminRegistros');
+  if (!data || data.length === 0) { cuerpo.innerHTML='<tr><td colspan="7" style="text-align:center;color:#8fa5bb;padding:24px;">No hay registros.</td></tr>'; return; }
+  cuerpo.innerHTML = data.map(r => `
+    <tr>
+      <td>${r.fecha||'—'}</td>
+      <td>${r.perfiles?.nombre||r.nombre_acompanante||'—'}</td>
+      <td>${r.tipo_acompanamiento||'—'}</td>
+      <td>${r.nombre_docente||'—'}</td>
+      <td>${r.centro_educativo||'—'}</td>
+      <td>${r.area_acompanada||'—'}</td>
+      <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td>
+    </tr>`).join('');
+}
+
+// ── NOTIFICACIÓN ──────────────────────────────────────────────────────────────
+function mostrarNotif(msg, error=false) {
+  const n = document.getElementById('notificacion');
+  n.textContent = msg;
+  n.className = error ? 'visible error' : 'visible';
+  setTimeout(() => n.className = '', 3400);
+}
+
+// ── RESTAURAR SESIÓN ──────────────────────────────────────────────────────────
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'SIGNED_IN' && session && !usuarioActual) {
+    usuarioActual = session.user;
+    await cargarPerfil();
+    mostrarApp();
+  }
+});
+</script>
+</body>
+</html>
