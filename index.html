@@ -546,8 +546,28 @@ async function iniciarSesion() {
 document.getElementById('loginClave').addEventListener('keydown', e => { if (e.key === 'Enter') iniciarSesion(); });
 
 async function cargarPerfil() {
-  const { data } = await sb.from('perfiles').select('*').eq('id', usuarioActual.id).single();
-  perfilActual = data;
+  try {
+    const { data, error } = await sb.from('perfiles').select('*').eq('id', usuarioActual.id).maybeSingle();
+    if (!error && data) {
+      perfilActual = data;
+    } else {
+      perfilActual = {
+        id: usuarioActual.id,
+        nombre: usuarioActual.email.split('@')[0],
+        rol: 'Usuario',
+        nivel: 'usuario',
+        activo: true
+      };
+    }
+  } catch(e) {
+    perfilActual = {
+      id: usuarioActual.id,
+      nombre: usuarioActual.email.split('@')[0],
+      rol: 'Usuario',
+      nivel: 'usuario',
+      activo: true
+    };
+  }
 }
 
 function mostrarApp() {
@@ -967,7 +987,7 @@ function mostrarNotif(msg, error=false) {
 
 // ── RESTAURAR SESIÓN ──────────────────────────────────────────────────────────
 sb.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'SIGNED_IN' && session && !usuarioActual) {
+  if (event === 'INITIAL_SESSION' && session && !usuarioActual) {
     usuarioActual = session.user;
     await cargarPerfil();
     mostrarApp();
