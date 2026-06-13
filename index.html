@@ -641,7 +641,10 @@ function mostrarPanel(id, el) {
 async function cargarDashboard() {
   const uid = usuarioActual?.id;
   if (!uid) return;
-  const { data: todos } = await sb.from('acompañamientos').select('*').eq('usuario_id', uid).order('fecha', { ascending: false });
+  const esAdmin = perfilActual?.nivel === 'admin';
+  let query = sb.from('acompañamientos').select('*').order('fecha', { ascending: false });
+  if (!esAdmin) query = query.eq('usuario_id', uid);
+  const { data: todos } = await query;
   const registros = todos || [];
   const hoy = new Date();
   const mesActual = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0');
@@ -664,7 +667,10 @@ async function cargarDashboard() {
 
 // ── MIS REGISTROS ─────────────────────────────────────────────────────────────
 async function cargarMisRegistros() {
-  const { data } = await sb.from('acompañamientos').select('*').eq('usuario_id', usuarioActual.id).order('created_at', { ascending: false });
+  const esAdmin = perfilActual?.nivel === 'admin';
+  let query = sb.from('acompañamientos').select('*').order('created_at', { ascending: false });
+  if (!esAdmin) query = query.eq('usuario_id', usuarioActual.id);
+  const { data } = await query;
   const registros = data || [];
   const cuerpo = document.getElementById('cuerpoMisRegistros');
   if (registros.length === 0) {
