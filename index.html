@@ -225,6 +225,39 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
     .modal p{font-size:14px;color:#617384;margin-bottom:20px;line-height:1.55;}
     .modal-acciones{display:flex;gap:10px;justify-content:flex-end;}
 
+
+    /* FILTROS */
+    .filtros-bar{background:#fff;border:1px solid #dce9f5;border-radius:14px;padding:18px 20px;margin-bottom:4px;box-shadow:var(--sombra);}
+    .filtros-titulo{font-size:13px;font-weight:800;color:var(--azul-osc);margin-bottom:12px;text-transform:uppercase;letter-spacing:.8px;}
+    .filtros-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}
+    .filtros-grid .campo label{font-size:11px;}
+    .filtros-grid select{padding:8px 10px;font-size:13px;}
+
+    /* GRÁFICAS */
+    .dash-graficas{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin:20px 0;}
+    .dash-dos-col{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:20px;}
+    .grafica-card{background:#fff;border:1px solid #dce9f5;border-radius:14px;padding:20px;box-shadow:var(--sombra);}
+    .grafica-titulo{font-size:14px;font-weight:800;color:var(--azul-osc);margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #edf3f8;}
+    .barras-wrap{display:flex;flex-direction:column;gap:8px;}
+    .barra-fila{display:flex;align-items:center;gap:10px;font-size:13px;}
+    .barra-etiqueta{width:180px;flex-shrink:0;color:#2d4a63;font-weight:600;font-size:12px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .barra-contenedor{flex:1;background:#edf3f8;border-radius:999px;height:22px;overflow:hidden;}
+    .barra-relleno{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--azul),#2a8ad4);transition:width .4s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;}
+    .barra-valor{font-size:11px;font-weight:800;color:#fff;white-space:nowrap;}
+    .barra-vacia{font-size:13px;color:#8fa5bb;padding:8px 0;}
+
+    /* TABLA REGIONALES */
+    .regional-fila{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #edf3f8;font-size:13px;}
+    .regional-fila:last-child{border-bottom:none;}
+    .regional-nombre{font-weight:600;color:#2d4a63;}
+    .regional-num{font-weight:800;color:var(--azul-osc);background:var(--azul-claro);padding:3px 10px;border-radius:999px;font-size:12px;}
+
+    @media(max-width:900px){
+      .dash-graficas{grid-template-columns:1fr;}
+      .dash-dos-col{grid-template-columns:1fr;}
+      .barra-etiqueta{width:110px;}
+    }
+
     @media(max-width:900px){
       .sidebar{display:none;}
       .contenido{padding:18px 16px 36px;}
@@ -304,26 +337,148 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
       <!-- DASHBOARD -->
       <div id="panel-dashboard" class="panel activo">
         <div class="dashboard-titulo" id="bienvenidaTitulo">Bienvenido/a</div>
-        <p class="dashboard-sub">Resumen de sus acompañamientos registrados.</p>
-        <div class="cards-resumen">
-          <div class="card-stat"><div class="icono">📋</div><div class="numero" id="statTotal">—</div><div class="etiqueta">Acompañamientos a docentes</div></div>
-          <div class="card-stat"><div class="icono">🏫</div><div class="numero" id="statCentros">—</div><div class="etiqueta">Centros visitados</div></div>
-          <div class="card-stat"><div class="icono">📅</div><div class="numero" id="statMes">—</div><div class="etiqueta">Este mes</div></div>
-          <div class="card-stat"><div class="icono">✅</div><div class="numero" id="statEnviados">—</div><div class="etiqueta">Enviados</div></div>
+        <p class="dashboard-sub">Plataforma de seguimiento y monitoreo del acompañamiento pedagógico — Nivel Primario</p>
+
+        <!-- FILTROS -->
+        <div class="filtros-bar">
+          <div class="filtros-titulo">🔍 Filtros</div>
+          <div class="filtros-grid">
+            <div class="campo">
+              <label>Período</label>
+              <select id="filtroMes" onchange="cargarDashboard()">
+                <option value="">Todo el tiempo</option>
+                <option value="mes">Este mes</option>
+                <option value="trimestre">Este trimestre</option>
+                <option value="anio">Este año</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label>Regional</label>
+              <select id="filtroRegional" onchange="cargarDashboard()">
+                <option value="">Todas las regionales</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label>Distrito</label>
+              <select id="filtroDistrito" onchange="cargarDashboard()">
+                <option value="">Todos los distritos</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label>Área</label>
+              <select id="filtroArea" onchange="cargarDashboard()">
+                <option value="">Todas las áreas</option>
+                <option>Lengua Española</option>
+                <option>Matemática</option>
+                <option>Ciencias Sociales</option>
+                <option>Ciencias de la Naturaleza</option>
+                <option>Lenguas Extranjeras (Inglés)</option>
+                <option>Educación Artística</option>
+                <option>Formación Humana</option>
+                <option>Educación Física</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label>Tipo</label>
+              <select id="filtroTipo" onchange="cargarDashboard()">
+                <option value="">Todos los tipos</option>
+                <option>Diagnóstico</option>
+                <option>Focalizado</option>
+                <option>De seguimiento</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label>Estado</label>
+              <select id="filtroEstado" onchange="cargarDashboard()">
+                <option value="">Todos</option>
+                <option>Enviado</option>
+                <option>Borrador</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn-secundario btn-sm" onclick="limpiarFiltros()" style="margin-top:8px;">✕ Limpiar filtros</button>
         </div>
-        <div class="seccion-titulo">Acompañamientos recientes</div>
-        <div class="tabla-wrap-outer">
-          <table class="tabla-registros">
-            <thead><tr><th>Fecha</th><th>Tipo</th><th>Docente</th><th>Área</th><th>Grado</th><th>Estado</th></tr></thead>
-            <tbody id="cuerpoTablaRecientes"><tr><td colspan="6" style="text-align:center;color:#8fa5bb;padding:24px;">Cargando…</td></tr></tbody>
-          </table>
+
+        <!-- TARJETAS RESUMEN -->
+        <div class="cards-resumen" style="margin-top:20px;">
+          <div class="card-stat">
+            <div class="icono">📋</div>
+            <div class="numero" id="statTotal">—</div>
+            <div class="etiqueta">Total acompañamientos</div>
+          </div>
+          <div class="card-stat">
+            <div class="icono">✅</div>
+            <div class="numero" id="statEnviados">—</div>
+            <div class="etiqueta">Enviados</div>
+          </div>
+          <div class="card-stat">
+            <div class="icono">📝</div>
+            <div class="numero" id="statBorradores">—</div>
+            <div class="etiqueta">Borradores</div>
+          </div>
+          <div class="card-stat">
+            <div class="icono">🏫</div>
+            <div class="numero" id="statCentros">—</div>
+            <div class="etiqueta">Centros visitados</div>
+          </div>
+          <div class="card-stat">
+            <div class="icono">👨‍🏫</div>
+            <div class="numero" id="statDocentes">—</div>
+            <div class="etiqueta">Docentes acompañados</div>
+          </div>
+          <div class="card-stat">
+            <div class="icono">📅</div>
+            <div class="numero" id="statMes">—</div>
+            <div class="etiqueta">Este mes</div>
+          </div>
         </div>
+
+        <!-- GRÁFICAS -->
+        <div class="dash-graficas">
+
+          <div class="grafica-card">
+            <div class="grafica-titulo">Acompañamientos por área curricular</div>
+            <div class="barras-wrap" id="graficaAreas"></div>
+          </div>
+
+          <div class="grafica-card">
+            <div class="grafica-titulo">Acompañamientos por tipo</div>
+            <div class="barras-wrap" id="graficaTipos"></div>
+          </div>
+
+          <div class="grafica-card">
+            <div class="grafica-titulo">Acompañamientos por grado</div>
+            <div class="barras-wrap" id="graficaGrados"></div>
+          </div>
+
+          <div class="grafica-card">
+            <div class="grafica-titulo">Acompañamientos por modalidad</div>
+            <div class="barras-wrap" id="graficaModalidad"></div>
+          </div>
+
+        </div>
+
+        <!-- TOP REGIONALES -->
+        <div class="dash-dos-col">
+          <div class="grafica-card">
+            <div class="grafica-titulo">Acompañamientos por regional</div>
+            <div id="tablaRegionales"></div>
+          </div>
+          <div class="grafica-card">
+            <div class="grafica-titulo">Últimos acompañamientos registrados</div>
+            <div class="tabla-wrap-outer">
+              <table class="tabla-registros" style="box-shadow:none;">
+                <thead><tr><th>Fecha</th><th>Docente</th><th>Área</th><th>Centro</th><th>Estado</th></tr></thead>
+                <tbody id="cuerpoTablaRecientes"><tr><td colspan="5" style="text-align:center;color:#8fa5bb;padding:16px;">Cargando…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         <div class="acciones">
           <button class="btn-primario" onclick="mostrarPanel('formDocente',document.querySelector('[onclick*=formDocente]'))">+ Nuevo acompañamiento</button>
         </div>
-      </div>
-
-      <!-- FORM DOCENTE -->
+      </div><!-- FORM DOCENTE -->
       <div id="panel-formDocente" class="panel">
         <div class="form-titulo">Instrumento de Acompañamiento al Docente</div>
         <p class="form-sub">Nivel Primario — Ministerio de Educación (MINERD)</p>
@@ -637,33 +792,145 @@ function mostrarPanel(id, el) {
   if (id === 'adminRegistros') cargarTodosRegistros();
 }
 
-// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+
+// ── DASHBOARD AVANZADO ────────────────────────────────────────────────────────
+let todosRegistros = [];
+
 async function cargarDashboard() {
   const uid = usuarioActual?.id;
   if (!uid) return;
   const esAdmin = perfilActual?.nivel === 'admin';
+
+  // Construir query con filtros
   let query = sb.from('acompañamientos').select('*').order('fecha', { ascending: false });
   if (!esAdmin) query = query.eq('usuario_id', uid);
-  const { data: todos } = await query;
-  const registros = todos || [];
+
+  const filtroEstado   = document.getElementById('filtroEstado')?.value;
+  const filtroArea     = document.getElementById('filtroArea')?.value;
+  const filtroTipo     = document.getElementById('filtroTipo')?.value;
+  const filtroRegional = document.getElementById('filtroRegional')?.value;
+  const filtroDistrito = document.getElementById('filtroDistrito')?.value;
+  const filtroMes      = document.getElementById('filtroMes')?.value;
+
+  if (filtroEstado)   query = query.eq('estado', filtroEstado);
+  if (filtroArea)     query = query.eq('area_acompanada', filtroArea);
+  if (filtroTipo)     query = query.eq('tipo_acompanamiento', filtroTipo);
+  if (filtroRegional) query = query.ilike('regional', '%' + filtroRegional + '%');
+  if (filtroDistrito) query = query.ilike('distrito', '%' + filtroDistrito + '%');
+
+  // Filtro de período
+  if (filtroMes) {
+    const hoy = new Date();
+    let desde;
+    if (filtroMes === 'mes') {
+      desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0,10);
+    } else if (filtroMes === 'trimestre') {
+      desde = new Date(hoy.getFullYear(), Math.floor(hoy.getMonth()/3)*3, 1).toISOString().slice(0,10);
+    } else if (filtroMes === 'anio') {
+      desde = hoy.getFullYear() + '-01-01';
+    }
+    if (desde) query = query.gte('fecha', desde);
+  }
+
+  const { data } = await query;
+  todosRegistros = data || [];
   const hoy = new Date();
   const mesActual = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0');
-  document.getElementById('statTotal').textContent = registros.length;
-  document.getElementById('statCentros').textContent = new Set(registros.map(r => r.centro_educativo).filter(Boolean)).size;
-  document.getElementById('statMes').textContent = registros.filter(r => r.fecha && r.fecha.startsWith(mesActual)).length;
-  document.getElementById('statEnviados').textContent = registros.filter(r => r.estado === 'Enviado').length;
+
+  // Tarjetas resumen
+  document.getElementById('statTotal').textContent     = todosRegistros.length;
+  document.getElementById('statEnviados').textContent  = todosRegistros.filter(r => r.estado === 'Enviado').length;
+  document.getElementById('statBorradores').textContent= todosRegistros.filter(r => r.estado === 'Borrador').length;
+  document.getElementById('statCentros').textContent   = new Set(todosRegistros.map(r => r.centro_educativo).filter(Boolean)).size;
+  document.getElementById('statDocentes').textContent  = new Set(todosRegistros.map(r => r.nombre_docente).filter(Boolean)).size;
+  document.getElementById('statMes').textContent       = todosRegistros.filter(r => r.fecha && r.fecha.startsWith(mesActual)).length;
+
+  // Poblar filtros dinámicos (solo la primera vez)
+  poblarFiltrosDinamicos(todosRegistros);
+
+  // Gráficas
+  renderBarras('graficaAreas',    contarPor(todosRegistros, 'area_acompanada'));
+  renderBarras('graficaTipos',    contarPor(todosRegistros, 'tipo_acompanamiento'));
+  renderBarras('graficaGrados',   contarPor(todosRegistros, 'grado'), true);
+  renderBarras('graficaModalidad',contarPor(todosRegistros, 'modalidad'));
+
+  // Tabla de regionales
+  renderRegionales(contarPor(todosRegistros, 'regional'));
+
+  // Últimos registros
   const cuerpo = document.getElementById('cuerpoTablaRecientes');
-  if (registros.length === 0) {
-    cuerpo.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#8fa5bb;padding:24px;">No hay registros aún.</td></tr>'; return;
+  if (todosRegistros.length === 0) {
+    cuerpo.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8fa5bb;padding:16px;">No hay registros con los filtros seleccionados.</td></tr>';
+  } else {
+    cuerpo.innerHTML = todosRegistros.slice(0,8).map(r => `
+      <tr>
+        <td>${r.fecha||'—'}</td>
+        <td>${r.nombre_docente||'—'}</td>
+        <td style="font-size:12px;">${r.area_acompanada||'—'}</td>
+        <td style="font-size:12px;">${r.centro_educativo||'—'}</td>
+        <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td>
+      </tr>`).join('');
   }
-  cuerpo.innerHTML = registros.slice(0,5).map(r => `
-    <tr>
-      <td>${r.fecha||'—'}</td><td>${r.tipo_acompanamiento||'—'}</td>
-      <td>${r.nombre_docente||'—'}</td><td>${r.area_acompanada||'—'}</td>
-      <td>${r.grado||'—'}</td>
-      <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td>
-    </tr>`).join('');
 }
+
+function contarPor(registros, campo) {
+  const mapa = {};
+  registros.forEach(r => {
+    const val = r[campo];
+    if (val) mapa[val] = (mapa[val] || 0) + 1;
+  });
+  return Object.entries(mapa).sort((a,b) => b[1]-a[1]);
+}
+
+function renderBarras(contenedorId, datos, ordenarEtiqueta=false) {
+  const el = document.getElementById(contenedorId);
+  if (!el) return;
+  if (!datos.length) { el.innerHTML = '<div class="barra-vacia">Sin datos para mostrar.</div>'; return; }
+  if (ordenarEtiqueta) datos = [...datos].sort((a,b) => a[0].localeCompare(b[0]));
+  const max = Math.max(...datos.map(d => d[1]));
+  el.innerHTML = datos.map(([etiqueta, valor]) => {
+    const pct = max > 0 ? Math.round((valor/max)*100) : 0;
+    return `<div class="barra-fila">
+      <div class="barra-etiqueta" title="${etiqueta}">${etiqueta}</div>
+      <div class="barra-contenedor">
+        <div class="barra-relleno" style="width:${pct}%">
+          <span class="barra-valor">${valor}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderRegionales(datos) {
+  const el = document.getElementById('tablaRegionales');
+  if (!el) return;
+  if (!datos.length) { el.innerHTML = '<div class="barra-vacia">Sin datos.</div>'; return; }
+  el.innerHTML = datos.map(([nombre, total]) =>
+    `<div class="regional-fila">
+      <span class="regional-nombre">${nombre}</span>
+      <span class="regional-num">${total}</span>
+    </div>`).join('');
+}
+
+function poblarFiltrosDinamicos(registros) {
+  const regionales = [...new Set(registros.map(r => r.regional).filter(Boolean))].sort();
+  const distritos  = [...new Set(registros.map(r => r.distrito).filter(Boolean))].sort();
+  const selReg  = document.getElementById('filtroRegional');
+  const selDist = document.getElementById('filtroDistrito');
+  if (selReg && selReg.options.length <= 1) {
+    regionales.forEach(r => { const o = new Option(r,r); selReg.appendChild(o); });
+  }
+  if (selDist && selDist.options.length <= 1) {
+    distritos.forEach(d => { const o = new Option(d,d); selDist.appendChild(o); });
+  }
+}
+
+function limpiarFiltros() {
+  ['filtroMes','filtroRegional','filtroDistrito','filtroArea','filtroTipo','filtroEstado']
+    .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  cargarDashboard();
+}
+
 
 // ── MIS REGISTROS ─────────────────────────────────────────────────────────────
 async function cargarMisRegistros() {
