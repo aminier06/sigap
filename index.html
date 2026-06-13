@@ -538,7 +538,8 @@ async function iniciarSesion() {
     btn.disabled = false; btn.textContent = 'Entrar'; return;
   }
   usuarioActual = data.user;
-  await cargarPerfil();
+  const perfilOk = await cargarPerfil();
+  if (!perfilOk) return;
   mostrarApp();
   btn.disabled = false; btn.textContent = 'Entrar';
 }
@@ -546,28 +547,16 @@ async function iniciarSesion() {
 document.getElementById('loginClave').addEventListener('keydown', e => { if (e.key === 'Enter') iniciarSesion(); });
 
 async function cargarPerfil() {
-  try {
-    const { data, error } = await sb.from('perfiles').select('*').eq('id', usuarioActual.id).maybeSingle();
-    if (!error && data) {
-      perfilActual = data;
-    } else {
-      perfilActual = {
-        id: usuarioActual.id,
-        nombre: usuarioActual.email.split('@')[0],
-        rol: 'Usuario',
-        nivel: 'usuario',
-        activo: true
-      };
-    }
-  } catch(e) {
-    perfilActual = {
-      id: usuarioActual.id,
-      nombre: usuarioActual.email.split('@')[0],
-      rol: 'Usuario',
-      nivel: 'usuario',
-      activo: true
-    };
+  const { data, error } = await sb.from('perfiles').select('*').eq('id', usuarioActual.id).maybeSingle();
+  if (error || !data) {
+    await sb.auth.signOut();
+    document.getElementById('errorLogin').textContent = 'Su usuario no tiene un perfil configurado. Contacte al administrador.';
+    document.getElementById('btnLogin').disabled = false;
+    document.getElementById('btnLogin').textContent = 'Entrar';
+    return false;
   }
+  perfilActual = data;
+  return true;
 }
 
 function mostrarApp() {
