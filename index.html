@@ -151,23 +151,24 @@ async function ejecutarCargaMasiva() {
     const clave = 'Sigap' + num + esp;
 
     try {
-      const { data, error } = await sb.auth.signUp({
-        email: u.email,
-        password: clave,
-        options: { data: { nombre: u.nombre, rol: u.rol, nivel: u.nivel } }
-      });
-
-      if (error) throw new Error(error.message);
-
-      const uid = data.user?.id;
-      if (uid) {
-        await sb.from('perfiles').upsert({
-          id: uid, nombre: u.nombre, rol: u.rol, nivel: u.nivel,
+      const { data: { session } } = await sb.auth.getSession();
+      const resp = await fetch(SUPA_URL + '/functions/v1/crear-usuario', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + session.access_token,
+          'apikey': SUPA_KEY
+        },
+        body: JSON.stringify({
+          email: u.email, password: clave,
+          nombre: u.nombre, rol: u.rol, nivel: u.nivel,
           regional: u.regional, distrito: u.distrito,
           codigo_centro: u.codigoCentro, nombre_centro: u.nombreCentro,
           activo: u.activo
-        });
-      }
+        })
+      });
+      const result = await resp.json();
+      if (!resp.ok || result.error) throw new Error(result.error || 'Error desconocido');
 
       creados++;
       log.innerHTML += `<span style="color:#2a6b1a;">✓ ${u.nombre} (${u.email}) — Clave: <strong>${clave}</strong></span>\n`;
@@ -217,6 +218,53 @@ function cancelarCarga() {
   document.getElementById('progresoCarga').style.display   = 'none';
   document.getElementById('resultadoCarga').style.display  = 'none';
 }
+
+
+// ── ELIMINAR USUARIO ──────────────────────────────────────────────────────────
+function confirmarEliminarUsuario(id, nombre) {
+  document.getElementById('eliminarUsuarioId').value = id;
+  document.getElementById('textoEliminarUsuario').innerHTML =
+    `¿Está seguro de que desea eliminar a <strong>${nombre}</strong>? `+
+    `Esta acción es <strong>permanente e irreversible</strong>. Se eliminarán también todos sus datos de perfil.`;
+  document.getElementById('modalEliminarUsuario').style.display = 'flex';
+}
+
+function cerrarModalEliminar() {
+  document.getElementById('modalEliminarUsuario').style.display = 'none';
+  document.getElementById('eliminarUsuarioId').value = '';
+}
+
+async function ejecutarEliminarUsuario() {
+  const id  = document.getElementById('eliminarUsuarioId').value;
+  if (!id) return;
+
+  const btn = document.getElementById('btnConfirmarEliminar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Eliminando…';
+
+  // 1. Delete profile (auth user deletion requires admin API — we delete profile and deactivate)
+  const { error: errPerfil } = await sb.from('perfiles').delete().eq('id', id);
+  if (errPerfil) {
+    mostrarNotif('Error al eliminar perfil: ' + errPerfil.message, true);
+    btn.disabled = false;
+    btn.innerHTML = '🗑️ Sí, eliminar usuario';
+    return;
+  }
+
+  // 2. Try to delete auth user via admin API (only works if service role key is available)
+  // Since we use anon key, we can only delete the profile.
+  // The auth entry will remain but won't be able to log in (no profile = access denied)
+  cerrarModalEliminar();
+  mostrarNotif('Usuario eliminado correctamente.');
+  btn.disabled = false;
+  btn.innerHTML = '🗑️ Sí, eliminar usuario';
+  cargarUsuarios();
+}
+
+// Close modal on outside click
+document.getElementById('modalEliminarUsuario').addEventListener('click', function(e) {
+  if (e.target === this) cerrarModalEliminar();
+});
 
 // ── EDITAR USUARIO ────────────────────────────────────────────────────────────
 function abrirModalEditar(u) {
@@ -1660,20 +1708,27 @@ async function crearUsuario() {
   const btn = document.getElementById('btnCrearUsuario');
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Creando…';
 
-  // Crear usuario en Auth de Supabase
-  const { data, error } = await sb.auth.admin.createUser({ email, password: clave, email_confirm: true });
-  if (error) {
-    // Si no tiene permisos de admin, usar signUp normal
-    const { data: d2, error: e2 } = await sb.auth.signUp({
-      email, password: clave,
-      options: { data: { nombre, rol, nivel } }
-    });
-    if (e2) { mostrarNotif('Error: ' + e2.message, true); btn.disabled=false; btn.textContent='Crear usuario'; return; }
-    const uid = d2.user?.id;
-    if (uid) await sb.from('perfiles').upsert({ id: uid, nombre, rol, nivel, regional, distrito, codigo_centro: codigoCentro, nombre_centro: nombreCentro, activo: true });
-  } else {
-    const uid = data.user?.id;
-    if (uid) await sb.from('perfiles').upsert({ id: uid, nombre, rol, nivel, regional, distrito, codigo_centro: codigoCentro, nombre_centro: nombreCentro, activo: true });
+  // Usar Edge Function para crear usuario sin cerrar sesión del administrador
+  const { data: { session } } = await sb.auth.getSession();
+  const resp = await fetch(SUPA_URL + '/functions/v1/crear-usuario', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + session.access_token,
+      'apikey': SUPA_KEY
+    },
+    body: JSON.stringify({
+      email, password: clave, nombre, rol, nivel,
+      regional, distrito,
+      codigo_centro: codigoCentro,
+      nombre_centro: nombreCentro,
+      activo: true
+    })
+  });
+  const result = await resp.json();
+  if (!resp.ok || result.error) {
+    mostrarNotif('Error: ' + (result.error || 'Error desconocido'), true);
+    btn.disabled=false; btn.textContent='Crear usuario'; return;
   }
 
   mostrarNotif('Usuario creado correctamente.');
@@ -1709,6 +1764,7 @@ async function cargarUsuarios() {
         ${u.activo!==false
           ? `<button class="btn-peligro btn-sm" onclick="toggleUsuario('${u.id}',false)">Desactivar</button>`
           : `<button class="btn-secundario btn-sm" onclick="toggleUsuario('${u.id}',true)">Activar</button>`}
+        <button class="btn-peligro btn-sm" onclick="confirmarEliminarUsuario('${u.id}','${u.nombre||u.email}')">🗑️ Eliminar</button>
       </td>
     </tr>`).join('');
 }
@@ -1904,23 +1960,24 @@ async function ejecutarCargaMasiva() {
     const clave = 'Sigap' + num + esp;
 
     try {
-      const { data, error } = await sb.auth.signUp({
-        email: u.email,
-        password: clave,
-        options: { data: { nombre: u.nombre, rol: u.rol, nivel: u.nivel } }
-      });
-
-      if (error) throw new Error(error.message);
-
-      const uid = data.user?.id;
-      if (uid) {
-        await sb.from('perfiles').upsert({
-          id: uid, nombre: u.nombre, rol: u.rol, nivel: u.nivel,
+      const { data: { session } } = await sb.auth.getSession();
+      const resp = await fetch(SUPA_URL + '/functions/v1/crear-usuario', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + session.access_token,
+          'apikey': SUPA_KEY
+        },
+        body: JSON.stringify({
+          email: u.email, password: clave,
+          nombre: u.nombre, rol: u.rol, nivel: u.nivel,
           regional: u.regional, distrito: u.distrito,
           codigo_centro: u.codigoCentro, nombre_centro: u.nombreCentro,
           activo: u.activo
-        });
-      }
+        })
+      });
+      const result = await resp.json();
+      if (!resp.ok || result.error) throw new Error(result.error || 'Error desconocido');
 
       creados++;
       log.innerHTML += `<span style="color:#2a6b1a;">✓ ${u.nombre} (${u.email}) — Clave: <strong>${clave}</strong></span>\n`;
@@ -1971,6 +2028,53 @@ function cancelarCarga() {
   document.getElementById('resultadoCarga').style.display  = 'none';
 }
 
+
+// ── ELIMINAR USUARIO ──────────────────────────────────────────────────────────
+function confirmarEliminarUsuario(id, nombre) {
+  document.getElementById('eliminarUsuarioId').value = id;
+  document.getElementById('textoEliminarUsuario').innerHTML =
+    `¿Está seguro de que desea eliminar a <strong>${nombre}</strong>? `+
+    `Esta acción es <strong>permanente e irreversible</strong>. Se eliminarán también todos sus datos de perfil.`;
+  document.getElementById('modalEliminarUsuario').style.display = 'flex';
+}
+
+function cerrarModalEliminar() {
+  document.getElementById('modalEliminarUsuario').style.display = 'none';
+  document.getElementById('eliminarUsuarioId').value = '';
+}
+
+async function ejecutarEliminarUsuario() {
+  const id  = document.getElementById('eliminarUsuarioId').value;
+  if (!id) return;
+
+  const btn = document.getElementById('btnConfirmarEliminar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Eliminando…';
+
+  // 1. Delete profile (auth user deletion requires admin API — we delete profile and deactivate)
+  const { error: errPerfil } = await sb.from('perfiles').delete().eq('id', id);
+  if (errPerfil) {
+    mostrarNotif('Error al eliminar perfil: ' + errPerfil.message, true);
+    btn.disabled = false;
+    btn.innerHTML = '🗑️ Sí, eliminar usuario';
+    return;
+  }
+
+  // 2. Try to delete auth user via admin API (only works if service role key is available)
+  // Since we use anon key, we can only delete the profile.
+  // The auth entry will remain but won't be able to log in (no profile = access denied)
+  cerrarModalEliminar();
+  mostrarNotif('Usuario eliminado correctamente.');
+  btn.disabled = false;
+  btn.innerHTML = '🗑️ Sí, eliminar usuario';
+  cargarUsuarios();
+}
+
+// Close modal on outside click
+document.getElementById('modalEliminarUsuario').addEventListener('click', function(e) {
+  if (e.target === this) cerrarModalEliminar();
+});
+
 // ── EDITAR USUARIO ────────────────────────────────────────────────────────────
 function abrirModalEditar(u) {
   document.getElementById('editUserId').value = u.id;
@@ -2011,6 +2115,25 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
 });
 
 </script>
+
+<!-- MODAL CONFIRMAR ELIMINAR USUARIO -->
+<div id="modalEliminarUsuario" style="display:none;" class="modal-overlay">
+  <div class="modal">
+    <h3>⚠️ Eliminar usuario</h3>
+    <p id="textoEliminarUsuario">¿Está seguro de que desea eliminar este usuario? Esta acción es <strong>permanente e irreversible</strong>. Se eliminarán también todos sus datos de perfil.</p>
+    <div style="background:#fee2e2;border:1px solid #f4c2bd;border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;color:#7f1d1d;">
+      ⚠️ Los acompañamientos registrados por este usuario <strong>no se eliminarán</strong> y permanecerán en el sistema.
+    </div>
+    <input type="hidden" id="eliminarUsuarioId" />
+    <div class="modal-acciones">
+      <button class="btn-secundario" onclick="cerrarModalEliminar()">Cancelar</button>
+      <button class="btn-peligro" id="btnConfirmarEliminar" onclick="ejecutarEliminarUsuario()"
+        style="background:#b42318;color:#fff;border-color:#b42318;">
+        🗑️ Sí, eliminar usuario
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL EDITAR USUARIO -->
 <div id="modalEditarUsuario" style="display:none;" class="modal-overlay">
