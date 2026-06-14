@@ -610,6 +610,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
                 <option value="">Todo el tiempo</option>
                 <option value="mes">Este mes</option>
                 <option value="trimestre">Este trimestre</option>
+                <option value="semestre">Este semestre</option>
                 <option value="anio">Este año</option>
               </select>
             </div>
@@ -1210,11 +1211,28 @@ let todosRegistros = [];
 async function cargarDashboard() {
   const uid = usuarioActual?.id;
   if (!uid) return;
-  const esAdmin = perfilActual?.nivel === 'admin';
+  const esAdmin  = perfilActual?.nivel === 'admin';
+  const rol      = perfilActual?.rol || '';
+  const regional = perfilActual?.regional || '';
+  const distrito = perfilActual?.distrito || '';
+  const centro   = perfilActual?.codigo_centro || '';
 
-  // Construir query con filtros
+  // Construir query base según demarcación del usuario
   let query = sb.from('acompañamientos').select('*').order('fecha', { ascending: false });
-  if (!esAdmin) query = query.eq('usuario_id', uid);
+
+  if (esAdmin || rol === 'Técnico/a Nacional') {
+    // Ven todo — sin filtro adicional
+  } else if (rol === 'Técnico/a Regional') {
+    if (regional) query = query.ilike('regional', '%' + regional.split(' - ').slice(1).join(' - ') + '%');
+  } else if (rol === 'Técnico/a Distrital') {
+    if (distrito) query = query.ilike('distrito', '%' + distrito.split(' - ').slice(1).join(' - ') + '%');
+  } else if (rol === 'Coordinador/a Pedagógico/a' || rol === 'Director/a de Centro') {
+    if (centro) query = query.eq('codigo_centro', centro);
+    else query = query.eq('usuario_id', uid);
+  } else {
+    // Cualquier otro rol: solo sus propios registros
+    query = query.eq('usuario_id', uid);
+  }
 
   const filtroEstado   = document.getElementById('filtroEstado')?.value;
   const filtroArea     = document.getElementById('filtroArea')?.value;
@@ -1237,6 +1255,8 @@ async function cargarDashboard() {
       desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0,10);
     } else if (filtroMes === 'trimestre') {
       desde = new Date(hoy.getFullYear(), Math.floor(hoy.getMonth()/3)*3, 1).toISOString().slice(0,10);
+    } else if (filtroMes === 'semestre') {
+      desde = new Date(hoy.getFullYear(), hoy.getMonth() < 6 ? 0 : 6, 1).toISOString().slice(0,10);
     } else if (filtroMes === 'anio') {
       desde = hoy.getFullYear() + '-01-01';
     }
