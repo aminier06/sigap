@@ -583,6 +583,11 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
         <div class="menu-item" onclick="mostrarPanel('formCoord',this)"><span class="menu-icono">📝</span> Acomp. a Coordinadores</div>
       </div>
       <div class="menu-grupo">
+        <div class="menu-etiqueta">Planificación</div>
+        <div class="menu-item" onclick="mostrarPanel('planificacion',this)"><span class="menu-icono">📅</span> Planificar semana</div>
+        <div class="menu-item" onclick="mostrarPanel('seguimiento',this)"><span class="menu-icono">📈</span> Seguimiento</div>
+      </div>
+      <div class="menu-grupo">
         <div class="menu-etiqueta">Consultas</div>
         <div class="menu-item" onclick="mostrarPanel('registros',this)"><span class="menu-icono">📊</span> Mis registros</div>
       </div>
@@ -918,6 +923,212 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
             <thead><tr><th>Fecha</th><th>Tipo</th><th>Docente</th><th>Centro</th><th>Área</th><th>Grado</th><th>Estado</th><th>Acción</th></tr></thead>
             <tbody id="cuerpoMisRegistros"><tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Cargando…</td></tr></tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- PLANIFICACIÓN -->
+      <div id="panel-planificacion" class="panel">
+        <div class="dashboard-titulo">Planificación semanal de acompañamientos</div>
+        <p class="dashboard-sub">Instrumento de Planificación — Dirección General de Educación Primaria</p>
+
+        <!-- Selector de semana -->
+        <div class="filtros-bar" style="margin-bottom:20px;">
+          <div class="filtros-grid" style="grid-template-columns:auto auto auto 1fr;align-items:end;">
+            <div class="campo">
+              <label>Semana del</label>
+              <input type="date" id="planSemanaInicio" onchange="calcularFinSemana()" />
+            </div>
+            <div class="campo">
+              <label>Al</label>
+              <input type="date" id="planSemanaFin" disabled style="background:#f0f7ff;" />
+            </div>
+            <div class="campo">
+              <label>Año escolar</label>
+              <select id="planAnioEscolar">
+                <option>2024-2025</option>
+                <option selected>2025-2026</option>
+                <option>2026-2027</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-end;">
+              <button class="btn-secundario" onclick="cargarPlanificacion()">🔍 Cargar semana</button>
+              <button class="btn-primario" onclick="nuevaPlanificacion()">+ Nueva planificación</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla de planificación -->
+        <div class="bloque">
+          <div class="bloque-titulo">Planificación de los acompañamientos semanales</div>
+          <div class="bloque-cuerpo" style="padding:0;">
+            <div class="tabla-wrap-outer">
+              <table class="tabla-registros" id="tablaPlanificacion" style="box-shadow:none;min-width:900px;">
+                <thead>
+                  <tr>
+                    <th style="width:40px;">#</th>
+                    <th>Fecha del acompañamiento</th>
+                    <th>Centro educativo</th>
+                    <th>Hora</th>
+                    <th>Docente a acompañar</th>
+                    <th>Foco del acompañamiento</th>
+                    <th>Insumos a utilizar</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="cuerpoPlanificacion">
+                  <tr><td colspan="9" style="text-align:center;color:#8fa5bb;padding:32px;">
+                    Seleccione una semana y haga clic en "Cargar semana", o cree una nueva planificación.
+                  </td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Formulario nueva fila -->
+        <div class="bloque" id="formNuevaPlan" style="display:none;">
+          <div class="bloque-titulo">➕ Agregar acompañamiento a la planificación</div>
+          <div class="bloque-cuerpo">
+            <div class="grid g-3">
+              <div class="campo">
+                <label>Fecha prevista</label>
+                <input type="date" id="planFecha" />
+              </div>
+              <div class="campo">
+                <label>Código del centro</label>
+                <input type="text" id="planCodigoCentro" placeholder="Ej. 02334"
+                  oninput="buscarCentroPlan(this.value)" />
+                <div id="estadoCentroPlan" style="font-size:12px;min-height:16px;margin-top:3px;color:#617384;"></div>
+              </div>
+              <div class="campo">
+                <label>Centro educativo</label>
+                <input type="text" id="planCentro" placeholder="Autocompletado" style="background:#f0f7ff;" />
+              </div>
+            </div>
+            <div class="grid g-3 fila-linea">
+              <div class="campo">
+                <label>Hora prevista</label>
+                <input type="time" id="planHora" />
+              </div>
+              <div class="campo">
+                <label>Docente a acompañar</label>
+                <input type="text" id="planDocente" placeholder="Nombre del docente" />
+              </div>
+              <div class="campo">
+                <label>Área curricular</label>
+                <select id="planArea">
+                  <option value="">Seleccione</option>
+                  <option>Lengua Española</option><option>Matemática</option>
+                  <option>Ciencias Sociales</option><option>Ciencias de la Naturaleza</option>
+                  <option>Lenguas Extranjeras (Inglés)</option><option>Educación Artística</option>
+                  <option>Formación Humana</option><option>Educación Física</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid g-2 fila-linea">
+              <div class="campo">
+                <label>Foco del acompañamiento</label>
+                <textarea id="planFoco" style="min-height:80px;" placeholder="Describa el foco o propósito del acompañamiento"></textarea>
+              </div>
+              <div class="campo">
+                <label>Insumos a utilizar</label>
+                <textarea id="planInsumos" style="min-height:80px;" placeholder="Materiales, instrumentos, recursos a utilizar"></textarea>
+              </div>
+            </div>
+            <div class="acciones">
+              <button class="btn-primario" onclick="guardarItemPlan()">💾 Guardar</button>
+              <button class="btn-secundario" onclick="cancelarItemPlan()">Cancelar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="acciones" id="accionesPlan" style="display:none;">
+          <button class="btn-primario" onclick="window.print()">🖨️ Imprimir planificación</button>
+          <button class="btn-secundario" onclick="nuevaPlanificacion()">+ Agregar acompañamiento</button>
+        </div>
+      </div>
+
+      <!-- SEGUIMIENTO -->
+      <div id="panel-seguimiento" class="panel">
+        <div class="dashboard-titulo">Seguimiento: Planificado vs. Ejecutado</div>
+        <p class="dashboard-sub">Compare lo planificado con los acompañamientos realmente realizados.</p>
+
+        <!-- Filtros -->
+        <div class="filtros-bar" style="margin-bottom:20px;">
+          <div class="filtros-grid" style="grid-template-columns:repeat(3,1fr);align-items:end;">
+            <div class="campo">
+              <label>Desde</label>
+              <input type="date" id="segDesde" />
+            </div>
+            <div class="campo">
+              <label>Hasta</label>
+              <input type="date" id="segHasta" />
+            </div>
+            <div>
+              <button class="btn-primario" onclick="cargarSeguimiento()" style="margin-top:20px;">📊 Ver seguimiento</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tarjetas resumen -->
+        <div class="cards-resumen" id="cardsSeguimiento" style="display:none;">
+          <div class="card-stat">
+            <div class="icono">📅</div>
+            <div class="numero" id="segTotalPlan">—</div>
+            <div class="etiqueta">Planificados</div>
+          </div>
+          <div class="card-stat">
+            <div class="icono">✅</div>
+            <div class="numero" id="segTotalEjec">—</div>
+            <div class="etiqueta">Ejecutados</div>
+          </div>
+          <div class="card-stat">
+            <div class="icono">⏳</div>
+            <div class="numero" id="segPendientes">—</div>
+            <div class="etiqueta">Pendientes</div>
+          </div>
+          <div class="card-stat">
+            <div class="icono">📊</div>
+            <div class="numero" id="segPorcentaje">—</div>
+            <div class="etiqueta">% Cumplimiento</div>
+          </div>
+        </div>
+
+        <!-- Barra de cumplimiento -->
+        <div id="barraCumplimiento" style="display:none;margin:20px 0;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:var(--azul-osc);margin-bottom:6px;">
+            <span>Cumplimiento general</span>
+            <span id="pctCumplimiento">0%</span>
+          </div>
+          <div style="background:#edf3f8;border-radius:999px;height:24px;overflow:hidden;">
+            <div id="rellenoCumplimiento" style="height:100%;border-radius:999px;background:linear-gradient(90deg,#1a6fb5,#2a8ad4);transition:width .6s ease;width:0%;display:flex;align-items:center;justify-content:flex-end;padding-right:12px;">
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla comparativa -->
+        <div class="bloque" id="tablaSeguimientoWrap" style="display:none;">
+          <div class="bloque-titulo">Detalle comparativo</div>
+          <div class="bloque-cuerpo" style="padding:0;">
+            <div class="tabla-wrap-outer">
+              <table class="tabla-registros" style="box-shadow:none;min-width:900px;">
+                <thead>
+                  <tr>
+                    <th>Fecha planificada</th>
+                    <th>Centro</th>
+                    <th>Docente planificado</th>
+                    <th>Foco</th>
+                    <th>Estado</th>
+                    <th>Fecha ejecutada</th>
+                    <th>Docente acompañado</th>
+                    <th>Cumplimiento</th>
+                  </tr>
+                </thead>
+                <tbody id="cuerpSeguimiento"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1416,6 +1627,270 @@ async function guardarBorrador() {
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Guardando…';
   await guardarRegistro('Borrador');
   btn.disabled = false; btn.textContent = '💾 Guardar borrador';
+}
+
+
+// ── PLANIFICACIÓN ─────────────────────────────────────────────────────────────
+let planActual = []; // items de la semana cargada
+
+function calcularFinSemana() {
+  const inicio = document.getElementById('planSemanaInicio').value;
+  if (!inicio) return;
+  const d = new Date(inicio);
+  // Calcular viernes de esa semana
+  const dia = d.getDay(); // 0=dom, 1=lun ...
+  const diffViernes = dia === 0 ? 5 : (5 - dia + 7) % 7;
+  d.setDate(d.getDate() + diffViernes);
+  document.getElementById('planSemanaFin').value = d.toISOString().slice(0,10);
+}
+
+// Autocompletar centro en planificación
+let buscarCentroPlanTimeout = null;
+async function buscarCentroPlan(codigo) {
+  const estado = document.getElementById('estadoCentroPlan');
+  codigo = codigo.trim();
+  if (codigo.length < 4) { estado.textContent=''; document.getElementById('planCentro').value=''; return; }
+  clearTimeout(buscarCentroPlanTimeout);
+  buscarCentroPlanTimeout = setTimeout(async () => {
+    const { data } = await sb.from('centros').select('nombre').eq('codigo', codigo).maybeSingle();
+    if (!data) {
+      estado.textContent='⚠️ Código no encontrado.'; estado.style.color='#b45309';
+      document.getElementById('planCentro').value='';
+    } else {
+      document.getElementById('planCentro').value = data.nombre;
+      estado.textContent='✅ Centro encontrado.'; estado.style.color='#2a6b1a';
+    }
+  }, 400);
+}
+
+async function cargarPlanificacion() {
+  const desde = document.getElementById('planSemanaInicio').value;
+  const hasta = document.getElementById('planSemanaFin').value;
+  if (!desde || !hasta) { mostrarNotif('Seleccione una semana primero.', true); return; }
+
+  const esAdmin = perfilActual?.nivel === 'admin';
+  const rol     = perfilActual?.rol || '';
+  let query = sb.from('planificaciones').select('*')
+    .gte('fecha_prevista', desde).lte('fecha_prevista', hasta)
+    .order('fecha_prevista');
+
+  if (!esAdmin && rol !== 'Técnico/a Nacional') {
+    query = query.eq('usuario_id', usuarioActual.id);
+  }
+
+  const { data, error } = await query;
+  if (error) { mostrarNotif('Error: ' + error.message, true); return; }
+
+  planActual = data || [];
+  renderizarPlanificacion();
+  document.getElementById('accionesPlan').style.display = 'flex';
+}
+
+function renderizarPlanificacion() {
+  const cuerpo = document.getElementById('cuerpoPlanificacion');
+  if (!planActual.length) {
+    cuerpo.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#8fa5bb;padding:32px;">No hay acompañamientos planificados para esta semana.<br><button class="btn-primario" onclick="nuevaPlanificacion()" style="margin-top:12px;">+ Agregar</button></td></tr>';
+    return;
+  }
+  cuerpo.innerHTML = planActual.map((p, i) => `
+    <tr>
+      <td style="text-align:center;font-weight:700;color:#8fa5bb;">${i+1}</td>
+      <td>${p.fecha_prevista || '—'}</td>
+      <td>${p.centro_educativo || '—'}</td>
+      <td>${p.hora_prevista || '—'}</td>
+      <td>${p.nombre_docente || '—'}</td>
+      <td style="font-size:12px;">${p.foco || '—'}</td>
+      <td style="font-size:12px;">${p.insumos || '—'}</td>
+      <td>
+        <span class="badge ${
+          p.estado === 'Ejecutado' ? 'badge-verde' :
+          p.estado === 'Pendiente' ? 'badge-amarillo' : 'badge-rojo'
+        }">${p.estado || 'Pendiente'}</span>
+      </td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${p.estado !== 'Ejecutado'
+          ? `<button class="btn-secundario btn-sm" onclick="marcarEjecutado('${p.id}')">✅ Ejecutado</button>
+             <button class="btn-peligro btn-sm" onclick="eliminarItemPlan('${p.id}')">🗑️</button>`
+          : '<span style="font-size:12px;color:#2a6b1a;">Realizado</span>'}
+      </td>
+    </tr>`).join('');
+}
+
+function nuevaPlanificacion() {
+  document.getElementById('formNuevaPlan').style.display = 'block';
+  // Pre-fill dates from selected week
+  const desde = document.getElementById('planSemanaInicio').value;
+  if (desde) document.getElementById('planFecha').value = desde;
+  document.getElementById('formNuevaPlan').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelarItemPlan() {
+  document.getElementById('formNuevaPlan').style.display = 'none';
+  ['planFecha','planCodigoCentro','planCentro','planHora','planDocente','planFoco','planInsumos'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('planArea').value = '';
+  document.getElementById('estadoCentroPlan').textContent = '';
+}
+
+async function guardarItemPlan() {
+  const fecha    = document.getElementById('planFecha').value;
+  const centro   = document.getElementById('planCentro').value.trim();
+  const codCentro= document.getElementById('planCodigoCentro').value.trim();
+  const hora     = document.getElementById('planHora').value;
+  const docente  = document.getElementById('planDocente').value.trim();
+  const area     = document.getElementById('planArea').value;
+  const foco     = document.getElementById('planFoco').value.trim();
+  const insumos  = document.getElementById('planInsumos').value.trim();
+  const anio     = document.getElementById('planAnioEscolar').value;
+
+  if (!fecha || !centro) {
+    mostrarNotif('La fecha y el centro son obligatorios.', true); return;
+  }
+
+  const { error } = await sb.from('planificaciones').insert({
+    usuario_id:       usuarioActual.id,
+    nombre_acompanante: perfilActual?.nombre || '',
+    anio_escolar:     anio,
+    fecha_prevista:   fecha,
+    codigo_centro:    codCentro,
+    centro_educativo: centro,
+    hora_prevista:    hora || null,
+    nombre_docente:   docente,
+    area_curricular:  area,
+    foco,
+    insumos,
+    estado:           'Pendiente',
+  });
+
+  if (error) { mostrarNotif('Error al guardar: ' + error.message, true); return; }
+  mostrarNotif('Acompañamiento agregado a la planificación.');
+  cancelarItemPlan();
+  cargarPlanificacion();
+}
+
+async function marcarEjecutado(id) {
+  const { error } = await sb.from('planificaciones').update({ estado: 'Ejecutado' }).eq('id', id);
+  if (error) { mostrarNotif('Error: ' + error.message, true); return; }
+  mostrarNotif('Marcado como ejecutado.');
+  cargarPlanificacion();
+}
+
+async function eliminarItemPlan(id) {
+  if (!confirm('¿Eliminar este acompañamiento de la planificación?')) return;
+  await sb.from('planificaciones').delete().eq('id', id);
+  mostrarNotif('Eliminado de la planificación.');
+  cargarPlanificacion();
+}
+
+// ── SEGUIMIENTO ───────────────────────────────────────────────────────────────
+async function cargarSeguimiento() {
+  const desde = document.getElementById('segDesde').value;
+  const hasta = document.getElementById('segHasta').value;
+  if (!desde || !hasta) { mostrarNotif('Seleccione el período.', true); return; }
+
+  const esAdmin = perfilActual?.nivel === 'admin';
+  const rol     = perfilActual?.rol || '';
+
+  // Cargar planificaciones del período
+  let qPlan = sb.from('planificaciones').select('*')
+    .gte('fecha_prevista', desde).lte('fecha_prevista', hasta)
+    .order('fecha_prevista');
+  if (!esAdmin && rol !== 'Técnico/a Nacional') {
+    qPlan = qPlan.eq('usuario_id', usuarioActual.id);
+  }
+
+  // Cargar acompañamientos ejecutados del período
+  let qEjec = sb.from('acompañamientos').select('*')
+    .gte('fecha', desde).lte('fecha', hasta).eq('estado', 'Enviado')
+    .order('fecha');
+  if (!esAdmin && rol !== 'Técnico/a Nacional') {
+    qEjec = qEjec.eq('usuario_id', usuarioActual.id);
+  }
+
+  const [{ data: planificados }, { data: ejecutados }] = await Promise.all([qPlan, qEjec]);
+
+  const plan = planificados || [];
+  const ejec = ejecutados  || [];
+
+  const totalPlan  = plan.length;
+  const totalEjec  = ejec.length;
+  const pendientes = plan.filter(p => p.estado !== 'Ejecutado').length;
+  const pct        = totalPlan > 0 ? Math.round((Math.min(totalEjec, totalPlan) / totalPlan) * 100) : 0;
+
+  // Tarjetas
+  document.getElementById('segTotalPlan').textContent  = totalPlan;
+  document.getElementById('segTotalEjec').textContent  = totalEjec;
+  document.getElementById('segPendientes').textContent = pendientes;
+  document.getElementById('segPorcentaje').textContent = pct + '%';
+  document.getElementById('cardsSeguimiento').style.display = 'grid';
+
+  // Barra
+  document.getElementById('barraCumplimiento').style.display = 'block';
+  document.getElementById('pctCumplimiento').textContent = pct + '%';
+  setTimeout(() => {
+    document.getElementById('rellenoCumplimiento').style.width = pct + '%';
+  }, 100);
+
+  // Tabla comparativa: cruzar planificados con ejecutados por fecha y centro
+  const filas = plan.map(p => {
+    // Buscar ejecutado que coincida con centro y fecha cercana (±3 días)
+    const fechaPlan = new Date(p.fecha_prevista);
+    const match = ejec.find(e => {
+      const fechaEjec = new Date(e.fecha);
+      const diff = Math.abs(fechaEjec - fechaPlan) / (1000*60*60*24);
+      return diff <= 3 && (
+        e.codigo_centro === p.codigo_centro ||
+        e.nombre_docente?.toLowerCase() === p.nombre_docente?.toLowerCase()
+      );
+    });
+
+    const cumple = match ? 'badge-verde' : (new Date(p.fecha_prevista) < new Date() ? 'badge-rojo' : 'badge-amarillo');
+    const label  = match ? '✅ Cumplido' : (new Date(p.fecha_prevista) < new Date() ? '❌ No ejecutado' : '⏳ Pendiente');
+
+    return `<tr>
+      <td>${p.fecha_prevista||'—'}</td>
+      <td style="font-size:12px;">${p.centro_educativo||'—'}</td>
+      <td style="font-size:12px;">${p.nombre_docente||'—'}</td>
+      <td style="font-size:12px;">${p.foco||'—'}</td>
+      <td><span class="badge ${p.estado==='Ejecutado'?'badge-verde':'badge-amarillo'}">${p.estado||'Pendiente'}</span></td>
+      <td>${match ? match.fecha : '—'}</td>
+      <td style="font-size:12px;">${match ? match.nombre_docente : '—'}</td>
+      <td><span class="badge ${cumple}">${label}</span></td>
+    </tr>`;
+  });
+
+  // Add executed with no planning match
+  const noPlaneados = ejec.filter(e => {
+    const fechaEjec = new Date(e.fecha);
+    return !plan.some(p => {
+      const fechaPlan = new Date(p.fecha_prevista);
+      const diff = Math.abs(fechaEjec - fechaPlan) / (1000*60*60*24);
+      return diff <= 3 && (
+        e.codigo_centro === p.codigo_centro ||
+        e.nombre_docente?.toLowerCase() === p.nombre_docente?.toLowerCase()
+      );
+    });
+  });
+
+  noPlaneados.forEach(e => {
+    filas.push(`<tr style="background:#f0fdf4;">
+      <td>—</td>
+      <td style="font-size:12px;">${e.centro_educativo||'—'}</td>
+      <td style="font-size:12px;">—</td>
+      <td style="font-size:12px;">—</td>
+      <td><span class="badge badge-azul">No planificado</span></td>
+      <td>${e.fecha||'—'}</td>
+      <td style="font-size:12px;">${e.nombre_docente||'—'}</td>
+      <td><span class="badge badge-azul">➕ Extra</span></td>
+    </tr>`);
+  });
+
+  document.getElementById('cuerpSeguimiento').innerHTML =
+    filas.length ? filas.join('') : '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Sin datos en el período seleccionado.</td></tr>';
+
+  document.getElementById('tablaSeguimientoWrap').style.display = 'block';
 }
 
 // ── AUTOCOMPLETAR CENTRO ──────────────────────────────────────────────────────
