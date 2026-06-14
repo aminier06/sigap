@@ -242,23 +242,30 @@ async function ejecutarEliminarUsuario() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Eliminando…';
 
-  // 1. Delete profile (auth user deletion requires admin API — we delete profile and deactivate)
-  const { error: errPerfil } = await sb.from('perfiles').delete().eq('id', id);
-  if (errPerfil) {
-    mostrarNotif('Error al eliminar perfil: ' + errPerfil.message, true);
-    btn.disabled = false;
-    btn.innerHTML = '🗑️ Sí, eliminar usuario';
-    return;
+  try {
+    // Usar Edge Function para eliminar usuario completamente
+    const { data: { session } } = await sb.auth.getSession();
+    const resp = await fetch(SUPA_URL + '/functions/v1/eliminar-usuario', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + session.access_token,
+        'apikey': SUPA_KEY
+      },
+      body: JSON.stringify({ usuario_id: id })
+    });
+    const result = await resp.json();
+    if (!resp.ok || result.error) throw new Error(result.error || 'Error desconocido');
+
+    cerrarModalEliminar();
+    mostrarNotif('Usuario eliminado correctamente.');
+    cargarUsuarios();
+  } catch(e) {
+    mostrarNotif('Error al eliminar: ' + e.message, true);
   }
 
-  // 2. Try to delete auth user via admin API (only works if service role key is available)
-  // Since we use anon key, we can only delete the profile.
-  // The auth entry will remain but won't be able to log in (no profile = access denied)
-  cerrarModalEliminar();
-  mostrarNotif('Usuario eliminado correctamente.');
   btn.disabled = false;
   btn.innerHTML = '🗑️ Sí, eliminar usuario';
-  cargarUsuarios();
 }
 
 // Close modal on outside click
@@ -2545,23 +2552,30 @@ async function ejecutarEliminarUsuario() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Eliminando…';
 
-  // 1. Delete profile (auth user deletion requires admin API — we delete profile and deactivate)
-  const { error: errPerfil } = await sb.from('perfiles').delete().eq('id', id);
-  if (errPerfil) {
-    mostrarNotif('Error al eliminar perfil: ' + errPerfil.message, true);
-    btn.disabled = false;
-    btn.innerHTML = '🗑️ Sí, eliminar usuario';
-    return;
+  try {
+    // Usar Edge Function para eliminar usuario completamente
+    const { data: { session } } = await sb.auth.getSession();
+    const resp = await fetch(SUPA_URL + '/functions/v1/eliminar-usuario', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + session.access_token,
+        'apikey': SUPA_KEY
+      },
+      body: JSON.stringify({ usuario_id: id })
+    });
+    const result = await resp.json();
+    if (!resp.ok || result.error) throw new Error(result.error || 'Error desconocido');
+
+    cerrarModalEliminar();
+    mostrarNotif('Usuario eliminado correctamente.');
+    cargarUsuarios();
+  } catch(e) {
+    mostrarNotif('Error al eliminar: ' + e.message, true);
   }
 
-  // 2. Try to delete auth user via admin API (only works if service role key is available)
-  // Since we use anon key, we can only delete the profile.
-  // The auth entry will remain but won't be able to log in (no profile = access denied)
-  cerrarModalEliminar();
-  mostrarNotif('Usuario eliminado correctamente.');
   btn.disabled = false;
   btn.innerHTML = '🗑️ Sí, eliminar usuario';
-  cargarUsuarios();
 }
 
 // Close modal on outside click
