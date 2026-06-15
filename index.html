@@ -559,7 +559,37 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
     </div>
     <button class="btn-login" id="btnLogin" onclick="iniciarSesion()">Entrar</button>
     <div class="error-login" id="errorLogin"></div>
+    <div style="text-align:center;margin-top:12px;">
+      <span onclick="mostrarPanelReset()" style="font-size:13px;color:var(--azul);cursor:pointer;text-decoration:underline;">
+        ¿Olvidó su contraseña?
+      </span>
+    </div>
     <div class="login-pie">MINERD · Dirección de Educación Primaria<br>Para soporte técnico, contacte a su coordinador regional.<br><span style="margin-top:6px;display:inline-block;">Desarrollado por <strong>Aneudy Minier</strong> &nbsp;·&nbsp; © <span id="anioActual"></span></span></div>
+  </div>
+
+  <!-- PANEL RESTABLECER CONTRASEÑA -->
+  <div class="login-card" id="panelReset" style="display:none;">
+    <div class="login-logo">
+      <img src="logominerd.jpeg" alt="MINERD"
+        style="height:90px;object-fit:contain;display:block;margin:0 auto 16px;"
+        onerror="this.style.display='none'" />
+      <div class="sigla">SIGAP</div>
+      <div class="nombre">Sistema de Gestión de Acompañamiento Pedagógico</div>
+    </div>
+    <h2>Restablecer contraseña</h2>
+    <p class="sub">Ingrese su correo y le enviaremos un enlace para crear una nueva contraseña.</p>
+    <div class="campo-login">
+      <label for="resetEmail">Correo electrónico</label>
+      <input type="email" id="resetEmail" placeholder="usuario@minerd.gob.do" />
+    </div>
+    <button class="btn-login" id="btnReset" onclick="enviarReset()">Enviar enlace</button>
+    <div class="error-login" id="mensajeReset"></div>
+    <div style="text-align:center;margin-top:12px;">
+      <span onclick="volverLogin()" style="font-size:13px;color:var(--azul);cursor:pointer;text-decoration:underline;">
+        ← Volver al inicio de sesión
+      </span>
+    </div>
+    <div class="login-pie">MINERD · Dirección de Educación Primaria</div>
   </div>
 </div>
 
@@ -579,6 +609,21 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
       </div>
     </div>
     <div class="topbar-right">
+      <!-- Búsqueda rápida -->
+      <div style="position:relative;">
+        <input type="text" id="busquedaGlobal"
+          placeholder="🔍 Buscar docente, centro..."
+          oninput="busquedaRapida(this.value)"
+          onfocus="mostrarResultados()"
+          style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);
+                 border-radius:8px;padding:7px 14px;font-size:13px;color:#fff;width:240px;outline:none;"
+          autocomplete="off" />
+        <div id="resultadosBusqueda" style="
+          display:none;position:absolute;top:42px;right:0;
+          background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.18);
+          width:360px;max-height:320px;overflow-y:auto;z-index:200;">
+        </div>
+      </div>
       <div class="usuario-info">
         <div class="usuario-nombre" id="topNombre"></div>
         <div class="usuario-rol" id="topRol"></div>
@@ -781,8 +826,16 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
         </div>
       </div><!-- FORM DOCENTE -->
       <div id="panel-formDocente" class="panel">
-        <div class="form-titulo">Instrumento de Acompañamiento al Docente</div>
-        <p class="form-sub">Nivel Primario — Ministerio de Educación (MINERD)</p>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+          <div>
+            <div class="form-titulo">Instrumento de Acompañamiento al Docente</div>
+            <p class="form-sub">Nivel Primario — Ministerio de Educación (MINERD)</p>
+          </div>
+          <div id="indicadorAutoguardado"
+            style="font-size:12px;color:#2a6b1a;background:#d8ead0;border-radius:8px;
+                   padding:6px 12px;opacity:0;transition:opacity .5s;white-space:nowrap;align-self:center;">
+          </div>
+        </div>
         <form id="formAcompDocente" onsubmit="enviarFormulario(event)">
 
           <div class="bloque">
@@ -1435,12 +1488,187 @@ function mostrarPanel(id, el) {
   document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('activo'));
   document.getElementById('panel-' + id).classList.add('activo');
   if (el) el.classList.add('activo');
-  if (id === 'registros') cargarMisRegistros();
-  if (id === 'dashboard') cargarDashboard();
-  if (id === 'adminUsuarios') cargarUsuarios();
+  if (id === 'registros')      cargarMisRegistros();
+  if (id === 'dashboard')      cargarDashboard();
+  if (id === 'adminUsuarios')  cargarUsuarios();
   if (id === 'adminRegistros') cargarTodosRegistros();
+  // Autoguardado: activar solo en el formulario
+  if (id === 'formDocente') iniciarAutoguardado();
+  else detenerAutoguardado();
 }
 
+
+
+// ── RESTABLECER CONTRASEÑA ────────────────────────────────────────────────────
+function mostrarPanelReset() {
+  document.querySelector('.login-card').style.display = 'none';
+  document.getElementById('panelReset').style.display = 'block';
+  document.getElementById('resetEmail').focus();
+}
+
+function volverLogin() {
+  document.getElementById('panelReset').style.display = 'none';
+  document.querySelector('.login-card').style.display = 'block';
+  document.getElementById('mensajeReset').textContent = '';
+  document.getElementById('resetEmail').value = '';
+}
+
+async function enviarReset() {
+  const email = document.getElementById('resetEmail').value.trim();
+  const msg   = document.getElementById('mensajeReset');
+  const btn   = document.getElementById('btnReset');
+  if (!email) { msg.textContent = 'Ingrese su correo electrónico.'; return; }
+
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Enviando…';
+
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.href
+  });
+
+  btn.disabled = false; btn.textContent = 'Enviar enlace';
+
+  if (error) {
+    msg.style.color = 'var(--rojo)';
+    msg.textContent = 'Error: ' + error.message;
+  } else {
+    msg.style.color = '#2a6b1a';
+    msg.textContent = '✅ Enlace enviado. Revise su correo electrónico.';
+  }
+}
+
+// Detectar si el usuario viene de un enlace de restablecimiento
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    const nuevaClave = prompt('Ingrese su nueva contraseña (mínimo 8 caracteres):');
+    if (nuevaClave && nuevaClave.length >= 8) {
+      const { error } = await sb.auth.updateUser({ password: nuevaClave });
+      if (!error) {
+        alert('✅ Contraseña actualizada correctamente. Puede iniciar sesión.');
+        window.location.reload();
+      } else {
+        alert('Error al actualizar: ' + error.message);
+      }
+    }
+  }
+  if (event === 'INITIAL_SESSION' && session && !usuarioActual) {
+    usuarioActual = session.user;
+    await cargarPerfil();
+    const ok = await cargarPerfil();
+    if (ok !== false) mostrarApp();
+  }
+});
+
+// ── BÚSQUEDA RÁPIDA ───────────────────────────────────────────────────────────
+let busquedaTimeout = null;
+
+async function busquedaRapida(termino) {
+  const contenedor = document.getElementById('resultadosBusqueda');
+  termino = termino.trim();
+  if (termino.length < 2) { contenedor.style.display = 'none'; return; }
+
+  clearTimeout(busquedaTimeout);
+  busquedaTimeout = setTimeout(async () => {
+    contenedor.style.display = 'block';
+    contenedor.innerHTML = '<div style="padding:16px;text-align:center;color:#8fa5bb;font-size:13px;">Buscando…</div>';
+
+    const esAdmin = perfilActual?.nivel === 'admin';
+    const rol     = perfilActual?.rol || '';
+    let query = sb.from('acompañamientos')
+      .select('id,fecha,nombre_docente,centro_educativo,area_acompanada,grado,estado')
+      .or(`nombre_docente.ilike.%${termino}%,centro_educativo.ilike.%${termino}%,codigo_centro.ilike.%${termino}%`)
+      .order('fecha', { ascending: false })
+      .limit(8);
+
+    if (!esAdmin && rol !== 'Técnico/a Nacional') {
+      query = query.eq('usuario_id', usuarioActual.id);
+    }
+
+    const { data } = await query;
+    const resultados = data || [];
+
+    if (!resultados.length) {
+      contenedor.innerHTML = '<div style="padding:16px;text-align:center;color:#8fa5bb;font-size:13px;">Sin resultados para "<strong>' + termino + '</strong>"</div>';
+      return;
+    }
+
+    contenedor.innerHTML = `
+      <div style="padding:10px 14px;font-size:11px;font-weight:800;color:#8fa5bb;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid #edf3f8;">
+        ${resultados.length} resultado${resultados.length !== 1 ? 's' : ''}
+      </div>
+      ${resultados.map(r => `
+        <div onclick="verRegistroBusqueda('${r.id}')"
+          style="padding:12px 14px;border-bottom:1px solid #f0f5fa;cursor:pointer;transition:background .12s;"
+          onmouseover="this.style.background='#f7fbfe'" onmouseout="this.style.background=''">
+          <div style="font-size:13px;font-weight:700;color:#1c2b3a;">${r.nombre_docente || '—'}</div>
+          <div style="font-size:12px;color:#617384;margin-top:2px;">
+            ${r.centro_educativo || '—'} &nbsp;·&nbsp; ${r.fecha || '—'} &nbsp;·&nbsp; ${r.area_acompanada || '—'}
+          </div>
+          <div style="margin-top:4px;">
+            <span class="badge ${r.estado === 'Enviado' ? 'badge-verde' : 'badge-amarillo'}" style="font-size:10px;">${r.estado}</span>
+          </div>
+        </div>`).join('')}
+    `;
+  }, 350);
+}
+
+function mostrarResultados() {
+  const val = document.getElementById('busquedaGlobal').value.trim();
+  if (val.length >= 2) busquedaRapida(val);
+}
+
+function verRegistroBusqueda(id) {
+  ocultarResultados();
+  document.getElementById('busquedaGlobal').value = '';
+  mostrarPanel('registros', document.querySelector('[onclick*=registros]'));
+}
+
+function ocultarResultados() {
+  document.getElementById('resultadosBusqueda').style.display = 'none';
+}
+
+// Cerrar resultados al hacer clic fuera
+document.addEventListener('click', e => {
+  const barra = document.getElementById('busquedaGlobal');
+  const res   = document.getElementById('resultadosBusqueda');
+  if (barra && res && !barra.contains(e.target) && !res.contains(e.target)) {
+    ocultarResultados();
+  }
+});
+
+// ── AUTOGUARDADO ──────────────────────────────────────────────────────────────
+let autoguardadoTimer = null;
+let ultimoAutoguardado = null;
+
+function iniciarAutoguardado() {
+  if (autoguardadoTimer) clearInterval(autoguardadoTimer);
+  autoguardadoTimer = setInterval(async () => {
+    // Solo autoguardar si hay datos mínimos en el formulario
+    const fecha   = document.getElementById('fecha')?.value;
+    const docente = document.getElementById('nombreDocente')?.value?.trim();
+    if (!fecha && !docente) return;
+
+    // No autoguardar si el panel activo no es el formulario
+    if (!document.getElementById('panel-formDocente')?.classList.contains('activo')) return;
+
+    await guardarRegistro('Borrador');
+    ultimoAutoguardado = new Date();
+    mostrarIndicadorAutoguardado();
+  }, 3 * 60 * 1000); // cada 3 minutos
+}
+
+function mostrarIndicadorAutoguardado() {
+  const hora = ultimoAutoguardado.toLocaleTimeString('es-DO', { hour:'2-digit', minute:'2-digit' });
+  const indicador = document.getElementById('indicadorAutoguardado');
+  if (indicador) {
+    indicador.textContent = '💾 Autoguardado a las ' + hora;
+    indicador.style.opacity = '1';
+    setTimeout(() => { indicador.style.opacity = '0'; }, 4000);
+  }
+}
+
+function detenerAutoguardado() {
+  if (autoguardadoTimer) { clearInterval(autoguardadoTimer); autoguardadoTimer = null; }
+}
 
 // ── DASHBOARD AVANZADO ────────────────────────────────────────────────────────
 let todosRegistros = [];
@@ -2325,14 +2553,7 @@ function mostrarNotif(msg, error=false) {
   setTimeout(() => n.className = '', 3400);
 }
 
-// ── RESTAURAR SESIÓN ──────────────────────────────────────────────────────────
-sb.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'INITIAL_SESSION' && session && !usuarioActual) {
-    usuarioActual = session.user;
-    await cargarPerfil();
-    mostrarApp();
-  }
-});
+// onAuthStateChange handled above
 
 
 // ── GENERADOR DE CONTRASEÑA ───────────────────────────────────────────────────
