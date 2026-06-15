@@ -2,7 +2,14 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="theme-color" content="#0d4a7a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SIGAP" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="logominerd.jpeg" />
   <title>SIGAP — Acompañamiento Pedagógico</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
 
@@ -520,6 +527,100 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
     .regional-nombre{font-weight:600;color:#2d4a63;}
     .regional-num{font-weight:800;color:var(--azul-osc);background:var(--azul-claro);padding:3px 10px;border-radius:999px;font-size:12px;}
 
+
+    /* ── RESPONSIVE MÓVIL ─────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      /* Login */
+      .login-card { padding: 28px 20px 24px; margin: 16px; border-radius: 16px; }
+      .login-logo .sigla { font-size: 28px; }
+
+      /* Topbar */
+      .topbar { padding: 0 14px; height: 52px; }
+      .topbar-sigla { font-size: 16px; }
+      .topbar-nombre { display: none; }
+      .usuario-rol { display: none; }
+      .usuario-nombre { font-size: 12px; }
+      .btn-salir { padding: 5px 10px; font-size: 12px; }
+      #busquedaGlobal { display: none; }
+
+      /* Layout */
+      .app-layout { flex-direction: column; }
+      .sidebar { display: none; }
+      .contenido { padding: 14px 12px 80px; }
+
+      /* Menú hamburguesa */
+      #menuMovil {
+        display: flex !important;
+        position: fixed; bottom: 0; left: 0; right: 0;
+        background: #fff; border-top: 1px solid #dce9f5;
+        z-index: 200; padding: 6px 0 env(safe-area-inset-bottom);
+        box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+      }
+      .menu-movil-item {
+        flex: 1; display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        padding: 6px 4px; font-size: 10px; font-weight: 700;
+        color: #617384; cursor: pointer; gap: 3px;
+        border-top: 2px solid transparent; transition: all .15s;
+      }
+      .menu-movil-item.activo { color: var(--azul-osc); border-top-color: var(--azul); }
+      .menu-movil-item .ico { font-size: 20px; }
+
+      /* Grids */
+      .g-2, .g-3, .g-4 { grid-template-columns: 1fr !important; }
+      .firmas { grid-template-columns: 1fr !important; }
+      .porcentajes-niveles { grid-template-columns: 1fr !important; }
+      .cards-resumen { grid-template-columns: repeat(2, 1fr) !important; }
+      .dash-graficas { grid-template-columns: 1fr !important; }
+      .dash-dos-col { grid-template-columns: 1fr !important; }
+      .filtros-grid { grid-template-columns: 1fr !important; }
+
+      /* Formulario */
+      .bloque-titulo { font-size: 14px; }
+      .tabla-wrap { overflow-x: auto; }
+      table.indicadores { min-width: 700px; }
+
+      /* Botones */
+      .acciones { flex-direction: column; }
+      .acciones button { width: 100%; }
+
+      /* Cards */
+      .card-stat .numero { font-size: 28px; }
+
+      /* Pie de página */
+      #piePagina { padding: 8px 14px; font-size: 10px; }
+    }
+
+    /* Menú móvil oculto en desktop */
+    #menuMovil { display: none; }
+
+    /* Banner offline */
+    #bannerOffline {
+      display: none; position: fixed; top: 0; left: 0; right: 0;
+      background: #b45309; color: #fff; text-align: center;
+      padding: 8px 16px; font-size: 13px; font-weight: 700;
+      z-index: 999; animation: slideDown .3s ease;
+    }
+    #bannerOffline.visible { display: block; }
+    @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+
+    /* Badge sincronización pendiente */
+    .badge-sync {
+      background: #fef3c7; color: #8a5d00;
+      border-radius: 999px; padding: 3px 10px;
+      font-size: 11px; font-weight: 800;
+    }
+
+    /* Botón instalar PWA */
+    #btnInstalar {
+      display: none;
+      background: var(--verde); color: var(--azul-osc);
+      border: 1.5px solid #a3c99a; border-radius: 10px;
+      padding: 10px 18px; font-size: 13px; font-weight: 800;
+      cursor: pointer; margin: 12px 0;
+      width: 100%; text-align: center;
+    }
+
     @media(max-width:900px){
       .dash-graficas{grid-template-columns:1fr;}
       .dash-dos-col{grid-template-columns:1fr;}
@@ -536,6 +637,11 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
   </style>
 </head>
 <body>
+
+<!-- BANNER OFFLINE -->
+<div id="bannerOffline">
+  📡 Sin conexión — Los cambios se guardarán localmente y se sincronizarán al reconectar.
+</div>
 
 <!-- LOGIN -->
 <div id="pantallaLogin">
@@ -650,7 +756,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
       </div>
       <div class="menu-grupo">
         <div class="menu-etiqueta">Consultas</div>
-        <div class="menu-item" onclick="mostrarPanel('registros',this)"><span class="menu-icono">📊</span> Mis registros</div>
+        <div class="menu-item" onclick="mostrarPanel('registros',this)"><span class="menu-icono">📊</span> Mis registros <span id="badgeSync" style="display:none;margin-left:6px;background:#fef3c7;color:#8a5d00;border-radius:999px;padding:2px 7px;font-size:10px;font-weight:800;"></span></div>
       </div>
       <div class="menu-grupo admin-only" id="menuAdmin">
         <div class="menu-etiqueta">Administración</div>
@@ -1462,6 +1568,8 @@ function mostrarApp() {
   // Mostrar menú admin si corresponde
   if (perfilActual?.nivel === 'admin') {
     document.getElementById('menuAdmin').style.display = 'block';
+    const mma = document.getElementById('menuMasAdmin');
+    if (mma) mma.style.display = 'block';
   }
   document.getElementById('bienvenidaTitulo').textContent = 'Bienvenido/a, ' + (perfilActual?.nombre || '');
   document.getElementById('piePagina').style.display = 'block';
@@ -2862,6 +2970,207 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
   if (e.target === this) cerrarModalEditar();
 });
 
+
+// ── OFFLINE / PWA ─────────────────────────────────────────────────────────────
+const DB_NAME = 'sigap_offline';
+let db = null;
+
+function abrirDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('pendientes'))
+        d.createObjectStore('pendientes', { keyPath: 'id', autoIncrement: true });
+      if (!d.objectStoreNames.contains('cache_registros'))
+        d.createObjectStore('cache_registros', { keyPath: 'id' });
+    };
+    req.onsuccess = e => { db = e.target.result; resolve(db); };
+    req.onerror   = reject;
+  });
+}
+
+async function guardarOffline(tipo, datos) {
+  if (!db) await abrirDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('pendientes', 'readwrite');
+    tx.objectStore('pendientes').add({ tipo, datos, timestamp: new Date().toISOString() });
+    tx.oncomplete = resolve; tx.onerror = reject;
+  });
+}
+
+async function obtenerPendientes() {
+  if (!db) await abrirDB();
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction('pendientes', 'readonly');
+    const req = tx.objectStore('pendientes').getAll();
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = reject;
+  });
+}
+
+async function eliminarPendiente(id) {
+  if (!db) await abrirDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('pendientes', 'readwrite');
+    tx.objectStore('pendientes').delete(id);
+    tx.oncomplete = resolve; tx.onerror = reject;
+  });
+}
+
+// ── DETECCIÓN DE CONEXIÓN ─────────────────────────────────────────────────────
+let estaOffline = !navigator.onLine;
+
+function actualizarEstadoConexion() {
+  estaOffline = !navigator.onLine;
+  const banner = document.getElementById('bannerOffline');
+  if (banner) {
+    if (estaOffline) {
+      banner.classList.add('visible');
+    } else {
+      banner.classList.remove('visible');
+      sincronizarPendientes();
+    }
+  }
+  actualizarIndicadorSync();
+}
+
+window.addEventListener('online',  actualizarEstadoConexion);
+window.addEventListener('offline', actualizarEstadoConexion);
+
+async function actualizarIndicadorSync() {
+  try {
+    const pendientes = await obtenerPendientes();
+    const badge = document.getElementById('badgeSync');
+    if (badge) {
+      if (pendientes.length > 0) {
+        badge.textContent = pendientes.length + ' pendiente' + (pendientes.length !== 1 ? 's' : '');
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+  } catch(e) {}
+}
+
+// ── SINCRONIZACIÓN ────────────────────────────────────────────────────────────
+async function sincronizarPendientes() {
+  if (estaOffline || !usuarioActual) return;
+  const pendientes = await obtenerPendientes();
+  if (!pendientes.length) return;
+
+  mostrarNotif('Sincronizando ' + pendientes.length + ' registro(s) pendiente(s)…');
+  let ok = 0;
+  for (const p of pendientes) {
+    try {
+      const tabla = p.tipo === 'acompanamiento' ? 'acompañamientos' : 'planificaciones';
+      const { error } = await sb.from(tabla).insert(p.datos);
+      if (!error) { await eliminarPendiente(p.id); ok++; }
+    } catch(e) {}
+  }
+  if (ok > 0) {
+    mostrarNotif('✅ ' + ok + ' registro(s) sincronizado(s).');
+    actualizarIndicadorSync();
+    cargarDashboard();
+  }
+}
+
+// ── OVERRIDE guardarRegistro PARA OFFLINE ─────────────────────────────────────
+const _guardarOriginal = guardarRegistro;
+guardarRegistro = async function(estado) {
+  if (!estaOffline) return _guardarOriginal(estado);
+
+  const v  = id => (document.getElementById(id)||{}).value || '';
+  const r  = name => { const el = document.querySelector('input[name="'+name+'"]:checked'); return el?el.value:''; };
+  const grado = r('gradoUnico') || Array.from(document.querySelectorAll('input[name="gradosMultigrado"]:checked')).map(c=>c.value).join(', ');
+  const indicadoresData = {};
+  INDICADORES.forEach(item => {
+    if (!item.codigo) return;
+    const sel = document.querySelector('input[name="val_'+item.codigo+'"]:checked');
+    const obs = document.querySelector('textarea[name="obs_'+item.codigo+'"]');
+    indicadoresData[item.codigo] = { valor: sel ? parseInt(sel.value) : null, observacion: obs ? obs.value : '' };
+  });
+
+  await guardarOffline('acompanamiento', {
+    usuario_id: usuarioActual.id,
+    nombre_acompanante: v('nombreAcompanante'), rol_acompanante: v('rolAcompanante'),
+    regional: v('regional'), distrito: v('distrito'),
+    centro_educativo: v('centroEducativo'), codigo_centro: v('codigoCentro'),
+    sector: v('sectorCentro'), zona: r('zona'),
+    nombre_docente: v('nombreDocente'), cedula_docente: v('cedulaDocente'),
+    grado_academico: v('gradoAcademicoDocente'),
+    especialidad: v('especialidadDocente'),
+    anios_experiencia: parseInt(v('aniosExp')) || null,
+    modalidad: r('modalidad'), area_acompanada: v('areaAcompanada'),
+    ciclo: r('ciclo'), grado, seccion: v('seccion'),
+    inscritos: parseInt(v('inscritos')) || null,
+    presentes: parseInt(v('presentes')) || null,
+    fecha: v('fecha') || null, hora_inicio: v('horaInicio') || null,
+    hora_termino: v('horaTermino') || null,
+    tipo_acompanamiento: r('tipoAcompanamiento'),
+    foco: v('foco'), intencion_docente: v('intencionDocente'),
+    contenido_conceptual: v('contenidoConceptual'),
+    acuerdos: v('acuerdos'), indicadores: indicadoresData, estado,
+  });
+  await actualizarIndicadorSync();
+  mostrarNotif('💾 Guardado localmente. Se sincronizará al reconectar.');
+  if (estado === 'Enviado') limpiarFormulario();
+};
+
+// ── INSTALACIÓN PWA ───────────────────────────────────────────────────────────
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const c = document.getElementById('contenedorInstalar');
+  const b = document.getElementById('btnInstalar');
+  if (c && b) { c.style.display = 'block'; b.style.display = 'block'; }
+});
+
+async function instalarPWA() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  if (outcome === 'accepted') {
+    mostrarNotif('✅ SIGAP instalado correctamente.');
+    document.getElementById('contenedorInstalar').style.display = 'none';
+  }
+  deferredPrompt = null;
+}
+
+// ── MENÚ MÓVIL ────────────────────────────────────────────────────────────────
+function mostrarPanelMovil(id, el) {
+  document.querySelectorAll('.menu-movil-item').forEach(m => m.classList.remove('activo'));
+  if (el) el.classList.add('activo');
+  mostrarPanel(id, null);
+}
+
+function toggleMenuMas() {
+  const menu = document.getElementById('menuMas');
+  if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+document.addEventListener('click', e => {
+  const menu = document.getElementById('menuMas');
+  if (!menu) return;
+  const btn = document.querySelector('[onclick="toggleMenuMas()"]');
+  if (btn && !menu.contains(e.target) && !btn.contains(e.target)) {
+    menu.style.display = 'none';
+  }
+});
+
+// Inicializar offline DB
+(async () => {
+  try { await abrirDB(); actualizarEstadoConexion(); } catch(e) {}
+})();
+
+// Registrar Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
 </script>
 
 <!-- MODAL CONFIRMAR ELIMINAR USUARIO -->
@@ -2919,6 +3228,61 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
     </div>
   </div>
 </div>
+
+  <!-- MENÚ MÓVIL INFERIOR -->
+  <nav id="menuMovil">
+    <div class="menu-movil-item activo" id="mmDashboard" onclick="mostrarPanelMovil('dashboard',this)">
+      <span class="ico">🏠</span> Inicio
+    </div>
+    <div class="menu-movil-item" id="mmForm" onclick="mostrarPanelMovil('formDocente',this)">
+      <span class="ico">📋</span> Acomp.
+    </div>
+    <div class="menu-movil-item" id="mmPlan" onclick="mostrarPanelMovil('planificacion',this)">
+      <span class="ico">📅</span> Plan
+    </div>
+    <div class="menu-movil-item" id="mmRegistros" onclick="mostrarPanelMovil('registros',this)">
+      <span class="ico">📊</span> Registros
+    </div>
+    <div class="menu-movil-item" id="mmMas" onclick="toggleMenuMas()">
+      <span class="ico">⋯</span> Más
+    </div>
+  </nav>
+
+  <!-- MENÚ MÁS (móvil) -->
+  <div id="menuMas" style="display:none;position:fixed;bottom:65px;right:0;left:0;
+    background:#fff;border-top:1px solid #dce9f5;z-index:199;padding:8px 0;
+    box-shadow:0 -4px 16px rgba(0,0,0,.1);">
+    <div onclick="mostrarPanelMovil('seguimiento',null);toggleMenuMas()"
+      style="padding:14px 20px;font-size:14px;font-weight:700;color:#2d4a63;border-bottom:1px solid #f0f5fa;">
+      📈 Seguimiento
+    </div>
+    <div onclick="mostrarPanelMovil('formCoord',null);toggleMenuMas()"
+      style="padding:14px 20px;font-size:14px;font-weight:700;color:#2d4a63;border-bottom:1px solid #f0f5fa;">
+      📝 Acomp. Coordinadores
+    </div>
+    <div id="menuMasAdmin" style="display:none;">
+      <div onclick="mostrarPanelMovil('adminUsuarios',null);toggleMenuMas()"
+        style="padding:14px 20px;font-size:14px;font-weight:700;color:#2d4a63;border-bottom:1px solid #f0f5fa;">
+        👥 Gestionar usuarios
+      </div>
+      <div onclick="mostrarPanelMovil('adminRegistros',null);toggleMenuMas()"
+        style="padding:14px 20px;font-size:14px;font-weight:700;color:#2d4a63;">
+        🗄️ Todos los registros
+      </div>
+    </div>
+    <div onclick="cerrarSesion();toggleMenuMas()"
+      style="padding:14px 20px;font-size:14px;font-weight:700;color:var(--rojo);">
+      🚪 Cerrar sesión
+    </div>
+  </div>
+
+  <!-- BOTÓN INSTALAR PWA -->
+  <div id="contenedorInstalar" style="display:none;position:fixed;bottom:70px;left:50%;
+    transform:translateX(-50%);z-index:198;width:90%;max-width:360px;">
+    <button id="btnInstalar" onclick="instalarPWA()">
+      📲 Instalar SIGAP en este dispositivo
+    </button>
+  </div>
 
   <!-- PIE DE PÁGINA GLOBAL -->
   <div id="piePagina" style="
