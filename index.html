@@ -541,7 +541,9 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
 <div id="pantallaLogin">
   <div class="login-card">
     <div class="login-logo">
-      <img src="logominerd.jpeg" alt="MINERD" style="height:72px;object-fit:contain;margin-bottom:12px;display:block;margin-left:auto;margin-right:auto;" onerror="this.style.display='none'" />
+      <img src="logominerd.jpeg" alt="MINERD"
+        style="height:90px;object-fit:contain;display:block;margin:0 auto 16px;"
+        onerror="this.style.display='none'" />
       <div class="sigla">SIGAP</div>
       <div class="nombre">Sistema de Gestión de Acompañamiento Pedagógico</div>
     </div>
@@ -565,10 +567,12 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
 <div id="appPrincipal">
   <div class="topbar">
     <div class="topbar-left">
-      <img src="logominerd.jpeg" alt="MINERD"
-        style="height:40px;object-fit:contain;filter:brightness(0) invert(1);opacity:.9;"
-        onerror="this.style.display='none'" />
-      <div style="width:1px;height:32px;background:rgba(255,255,255,.25);margin:0 4px;"></div>
+      <div style="background:#fff;border-radius:8px;padding:3px 8px;display:flex;align-items:center;justify-content:center;height:44px;">
+        <img src="logominerd.jpeg" alt="MINERD"
+          style="height:38px;width:auto;object-fit:contain;display:block;"
+          onerror="this.parentElement.style.display='none'" />
+      </div>
+      <div style="width:1px;height:32px;background:rgba(255,255,255,.25);margin:0 10px;"></div>
       <div>
         <div class="topbar-sigla">SIGAP</div>
         <div class="topbar-nombre">Acompañamiento Pedagógico</div>
@@ -1407,6 +1411,9 @@ function mostrarApp() {
     document.getElementById('menuAdmin').style.display = 'block';
   }
   document.getElementById('bienvenidaTitulo').textContent = 'Bienvenido/a, ' + (perfilActual?.nombre || '');
+  document.getElementById('piePagina').style.display = 'block';
+  document.getElementById('anioFooter').textContent = new Date().getFullYear();
+  document.querySelector('.contenido').style.paddingBottom = '52px';
   crearTablaIndicadores();
   cargarDashboard();
 }
@@ -1416,6 +1423,7 @@ async function cerrarSesion() {
   usuarioActual = null; perfilActual = null;
   document.getElementById('appPrincipal').style.display = 'none';
   document.getElementById('pantallaLogin').style.display = 'flex';
+  document.getElementById('piePagina').style.display = 'none';
   document.getElementById('loginEmail').value = '';
   document.getElementById('loginClave').value = '';
   document.getElementById('menuAdmin').style.display = 'none';
@@ -2690,6 +2698,26 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
     </div>
   </div>
 </div>
+
+  <!-- PIE DE PÁGINA GLOBAL -->
+  <div id="piePagina" style="
+    display:none;
+    background:#fff;
+    border-top:1px solid #dce9f5;
+    padding:10px 28px;
+    font-size:11px;
+    color:#8fa5bb;
+    text-align:center;
+    position:fixed;
+    bottom:0;
+    left:0;
+    right:0;
+    z-index:90;
+  ">
+    MINERD · Dirección de Educación Primaria &nbsp;·&nbsp;
+    Desarrollado por <strong style="color:#617384;">Aneudy Minier</strong>
+    &nbsp;·&nbsp; © <span id="anioFooter"></span>
+  </div>
 
 </body>
 </html>
