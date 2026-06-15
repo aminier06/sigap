@@ -1,0 +1,26 @@
+{
+  "name": "SIGAP — Acompañamiento Pedagógico",
+  "short_name": "SIGAP",
+  "description": "Sistema de Gestión de Acompañamiento Pedagógico — MINERD",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0d4a7a",
+  "theme_color": "#0d4a7a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "logominerd.jpeg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logominerd.jpeg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "lang": "es-DO"
+}
