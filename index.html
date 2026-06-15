@@ -541,6 +541,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
 <div id="pantallaLogin">
   <div class="login-card">
     <div class="login-logo">
+      <img src="logominerd.jpeg" alt="MINERD" style="height:72px;object-fit:contain;margin-bottom:12px;display:block;margin-left:auto;margin-right:auto;" onerror="this.style.display='none'" />
       <div class="sigla">SIGAP</div>
       <div class="nombre">Sistema de Gestión de Acompañamiento Pedagógico</div>
     </div>
@@ -556,7 +557,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
     </div>
     <button class="btn-login" id="btnLogin" onclick="iniciarSesion()">Entrar</button>
     <div class="error-login" id="errorLogin"></div>
-    <div class="login-pie">MINERD · Dirección de Educación Primaria<br>Para soporte técnico, contacte a su coordinador regional.</div>
+    <div class="login-pie">MINERD · Dirección de Educación Primaria<br>Para soporte técnico, contacte a su coordinador regional.<br><span style="margin-top:6px;display:inline-block;">Desarrollado por <strong>Aneudy Minier</strong> &nbsp;·&nbsp; © <span id="anioActual"></span></span></div>
   </div>
 </div>
 
@@ -564,6 +565,10 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
 <div id="appPrincipal">
   <div class="topbar">
     <div class="topbar-left">
+      <img src="logominerd.jpeg" alt="MINERD"
+        style="height:40px;object-fit:contain;filter:brightness(0) invert(1);opacity:.9;"
+        onerror="this.style.display='none'" />
+      <div style="width:1px;height:32px;background:rgba(255,255,255,.25);margin:0 4px;"></div>
       <div>
         <div class="topbar-sigla">SIGAP</div>
         <div class="topbar-nombre">Acompañamiento Pedagógico</div>
@@ -1338,6 +1343,12 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
 <div id="notificacion"></div>
 
 <script>
+// ── AÑO ACTUAL ───────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const el = document.getElementById('anioActual');
+  if (el) el.textContent = new Date().getFullYear();
+});
+
 // ── SUPABASE ──────────────────────────────────────────────────────────────────
 const SUPA_URL = 'https://howlmvxbcfxvvuoosvor.supabase.co';
 const SUPA_KEY = 'sb_publishable_QvSlRzrHBjmighOh-OF9xw_dnqrBqld';
