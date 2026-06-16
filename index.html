@@ -758,6 +758,11 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
         <div class="menu-etiqueta">Consultas</div>
         <div class="menu-item" onclick="mostrarPanel('registros',this)"><span class="menu-icono">📊</span> Mis registros <span id="badgeSync" style="display:none;margin-left:6px;background:#fef3c7;color:#8a5d00;border-radius:999px;padding:2px 7px;font-size:10px;font-weight:800;"></span></div>
       </div>
+      <div class="menu-grupo">
+        <div class="menu-etiqueta">Análisis</div>
+        <div class="menu-item" onclick="mostrarPanel('historialDocente',this)"><span class="menu-icono">👨‍🏫</span> Historial por docente</div>
+        <div class="menu-item" onclick="mostrarPanel('reportes',this)"><span class="menu-icono">📨</span> Reportes y alertas</div>
+      </div>
       <div class="menu-grupo admin-only" id="menuAdmin">
         <div class="menu-etiqueta">Administración</div>
         <div class="menu-item" onclick="mostrarPanel('adminUsuarios',this)"><span class="menu-icono">👥</span> Gestionar usuarios</div>
@@ -1301,6 +1306,215 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
                   </tr>
                 </thead>
                 <tbody id="cuerpSeguimiento"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- HISTORIAL POR DOCENTE -->
+      <div id="panel-historialDocente" class="panel">
+        <div class="dashboard-titulo">Historial por docente</div>
+        <p class="dashboard-sub">Evolución de los indicadores de un docente a través del tiempo.</p>
+
+        <div class="filtros-bar" style="margin-bottom:20px;">
+          <div class="filtros-grid" style="grid-template-columns:1fr 1fr auto;align-items:end;">
+            <div class="campo">
+              <label>Nombre del docente</label>
+              <input type="text" id="buscarDocente" placeholder="Escriba el nombre..."
+                oninput="buscarDocenteHistorial(this.value)" autocomplete="off" />
+              <div id="sugerenciasDocente" style="position:relative;"></div>
+            </div>
+            <div class="campo">
+              <label>Centro educativo</label>
+              <input type="text" id="filtroCentroHistorial" placeholder="Opcional" />
+            </div>
+            <div>
+              <button class="btn-primario" onclick="cargarHistorialDocente()" style="margin-top:20px;">
+                Ver historial
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="historialResultado" style="display:none;">
+          <!-- Resumen del docente -->
+          <div class="bloque" id="resumenDocente">
+            <div class="bloque-titulo" id="nombreDocenteHistorial">—</div>
+            <div class="bloque-cuerpo">
+              <div class="cards-resumen" style="margin-bottom:0;">
+                <div class="card-stat"><div class="icono">📋</div><div class="numero" id="hdTotal">—</div><div class="etiqueta">Acompañamientos</div></div>
+                <div class="card-stat"><div class="icono">📅</div><div class="numero" id="hdUltimo">—</div><div class="etiqueta">Último acompañamiento</div></div>
+                <div class="card-stat"><div class="icono">📈</div><div class="numero" id="hdTendencia">—</div><div class="etiqueta">Tendencia</div></div>
+                <div class="card-stat"><div class="icono">⭐</div><div class="numero" id="hdMejorArea">—</div><div class="etiqueta">Área más acompañada</div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Evolución de indicadores -->
+          <div class="bloque" style="margin-top:16px;">
+            <div class="bloque-titulo">Evolución de indicadores por acompañamiento</div>
+            <div class="bloque-cuerpo">
+              <p style="font-size:13px;color:#617384;margin-bottom:16px;">
+                Porcentaje de indicadores en nivel 3 (Evidenciado) en cada acompañamiento realizado.
+              </p>
+              <div id="graficaEvolucion" style="overflow-x:auto;"></div>
+            </div>
+          </div>
+
+          <!-- Tabla de acompañamientos -->
+          <div class="bloque" style="margin-top:16px;">
+            <div class="bloque-titulo">Detalle de acompañamientos</div>
+            <div class="bloque-cuerpo" style="padding:0;">
+              <div class="tabla-wrap-outer">
+                <table class="tabla-registros" style="box-shadow:none;">
+                  <thead>
+                    <tr>
+                      <th>#</th><th>Fecha</th><th>Área</th><th>Tipo</th><th>Grado</th>
+                      <th>% Nivel 3</th><th>% Nivel 1-2</th><th>Acompañante</th>
+                    </tr>
+                  </thead>
+                  <tbody id="cuerpoHistorialDocente"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Indicadores con más oportunidades de mejora -->
+          <div class="bloque" style="margin-top:16px;">
+            <div class="bloque-titulo">Indicadores con más oportunidades de mejora</div>
+            <div class="bloque-cuerpo">
+              <p style="font-size:13px;color:#617384;margin-bottom:14px;">
+                Indicadores que han aparecido en nivel 1 o 2 con mayor frecuencia en todos los acompañamientos del docente.
+              </p>
+              <div id="indicadoresCriticos"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="historialVacio" style="text-align:center;padding:40px;color:#8fa5bb;display:none;">
+          <div style="font-size:40px;margin-bottom:12px;">👨‍🏫</div>
+          <div style="font-size:15px;font-weight:700;">No se encontraron acompañamientos para este docente.</div>
+        </div>
+      </div>
+
+      <!-- REPORTES Y ALERTAS -->
+      <div id="panel-reportes" class="panel">
+        <div class="dashboard-titulo">Reportes y alertas</div>
+        <p class="dashboard-sub">Configure y envíe reportes semanales y alertas de rezago.</p>
+
+        <!-- Configuración de lista de correos -->
+        <div class="bloque">
+          <div class="bloque-titulo">📧 Lista de destinatarios</div>
+          <div class="bloque-cuerpo">
+            <p style="font-size:13px;color:#617384;margin-bottom:14px;">
+              Correos que recibirán los reportes semanales y alertas. Uno por línea.
+            </p>
+            <div class="campo">
+              <label>Correos electrónicos</label>
+              <textarea id="listaDestinatarios" style="min-height:120px;font-family:monospace;"
+                placeholder="director@minerd.gob.do&#10;coordinador@minerd.gob.do&#10;tecnico.regional@minerd.gob.do"></textarea>
+            </div>
+            <div class="acciones">
+              <button class="btn-primario" onclick="guardarDestinatarios()">💾 Guardar lista</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reporte semanal -->
+        <div class="bloque">
+          <div class="bloque-titulo">📊 Reporte semanal</div>
+          <div class="bloque-cuerpo">
+            <p style="font-size:13px;color:#617384;margin-bottom:16px;">
+              Resumen semanal de acompañamientos registrados, planificados vs. ejecutados y cumplimiento por regional.
+            </p>
+            <div class="grid g-2" style="margin-bottom:16px;">
+              <div class="campo">
+                <label>Desde</label>
+                <input type="date" id="reporteDesde" />
+              </div>
+              <div class="campo">
+                <label>Hasta</label>
+                <input type="date" id="reporteHasta" />
+              </div>
+            </div>
+            <div id="previstaReporte" style="display:none;background:#f8fbfe;border:1px solid #dce9f5;border-radius:12px;padding:16px;margin-bottom:16px;">
+              <div style="font-size:14px;font-weight:800;color:var(--azul-osc);margin-bottom:12px;">Vista previa del reporte</div>
+              <div id="contenidoPrevistaReporte"></div>
+            </div>
+            <div class="acciones">
+              <button class="btn-secundario" onclick="generarVistaPrevia()">👁️ Vista previa</button>
+              <button class="btn-primario" id="btnEnviarReporte" onclick="enviarReporte()">📨 Enviar por correo</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alertas de rezago -->
+        <div class="bloque">
+          <div class="bloque-titulo">⚠️ Alertas de rezago</div>
+          <div class="bloque-cuerpo">
+            <p style="font-size:13px;color:#617384;margin-bottom:16px;">
+              Identifique técnicos que llevan más de X días sin registrar acompañamientos.
+            </p>
+            <div class="grid g-3" style="margin-bottom:16px;">
+              <div class="campo">
+                <label>Días sin registrar</label>
+                <input type="number" id="diasRezago" value="7" min="1" max="90" />
+              </div>
+            </div>
+            <div class="acciones" style="margin-bottom:16px;">
+              <button class="btn-secundario" onclick="verificarRezago()">🔍 Verificar rezago</button>
+              <button class="btn-peligro" id="btnEnviarAlertas" onclick="enviarAlertas()" style="display:none;">
+                📨 Enviar alertas por correo
+              </button>
+            </div>
+            <div id="resultadoRezago"></div>
+          </div>
+        </div>
+
+        <!-- Alerta coordinadores bajo cumplimiento -->
+        <div class="bloque">
+          <div class="bloque-titulo">📉 Alerta — Coordinadores con bajo cumplimiento</div>
+          <div class="bloque-cuerpo">
+            <p style="font-size:13px;color:#617384;margin-bottom:16px;">
+              Identifica coordinadores pedagógicos cuyo porcentaje de acompañamientos ejecutados
+              vs. planificados es menor al umbral configurado.
+            </p>
+            <div class="grid g-3" style="margin-bottom:16px;">
+              <div class="campo">
+                <label>Umbral de cumplimiento (%)</label>
+                <input type="number" id="umbralCumplimiento" value="60" min="1" max="100" />
+              </div>
+              <div class="campo">
+                <label>Período — Desde</label>
+                <input type="date" id="coordDesde" />
+              </div>
+              <div class="campo">
+                <label>Hasta</label>
+                <input type="date" id="coordHasta" />
+              </div>
+            </div>
+            <div class="acciones" style="margin-bottom:16px;">
+              <button class="btn-secundario" onclick="verificarCumplimientoCoord()">🔍 Verificar cumplimiento</button>
+              <button class="btn-peligro" id="btnEnviarAlertaCoord" onclick="enviarAlertaCoord()" style="display:none;">
+                📨 Enviar alerta por correo
+              </button>
+            </div>
+            <div id="resultadoCumplimientoCoord"></div>
+          </div>
+        </div>
+
+        <!-- Historial de envíos -->
+        <div class="bloque">
+          <div class="bloque-titulo">📬 Historial de envíos</div>
+          <div class="bloque-cuerpo" style="padding:0;">
+            <div class="tabla-wrap-outer">
+              <table class="tabla-registros" style="box-shadow:none;">
+                <thead><tr><th>Fecha</th><th>Tipo</th><th>Destinatarios</th><th>Estado</th></tr></thead>
+                <tbody id="historialEnvios">
+                  <tr><td colspan="4" style="text-align:center;color:#8fa5bb;padding:24px;">No hay envíos registrados aún.</td></tr>
+                </tbody>
               </table>
             </div>
           </div>
@@ -2969,6 +3183,588 @@ async function guardarEdicionUsuario() {
 document.getElementById('modalEditarUsuario').addEventListener('click', function(e) {
   if (e.target === this) cerrarModalEditar();
 });
+
+
+
+// ── HISTORIAL POR DOCENTE ─────────────────────────────────────────────────────
+let docenteSeleccionado = null;
+let historialTimeout = null;
+
+async function buscarDocenteHistorial(termino) {
+  const contenedor = document.getElementById('sugerenciasDocente');
+  termino = termino.trim();
+  if (termino.length < 2) { contenedor.innerHTML = ''; return; }
+
+  clearTimeout(historialTimeout);
+  historialTimeout = setTimeout(async () => {
+    const esAdmin = perfilActual?.nivel === 'admin';
+    let query = sb.from('acompañamientos')
+      .select('nombre_docente,centro_educativo')
+      .ilike('nombre_docente', `%${termino}%`)
+      .limit(8);
+    if (!esAdmin && perfilActual?.rol !== 'Técnico/a Nacional')
+      query = query.eq('usuario_id', usuarioActual.id);
+
+    const { data } = await query;
+    const unicos = [...new Map((data||[]).map(d => [d.nombre_docente, d])).values()];
+
+    contenedor.innerHTML = unicos.length ? `
+      <div style="position:absolute;top:4px;left:0;right:0;background:#fff;border:1px solid #dce9f5;
+        border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:100;overflow:hidden;">
+        ${unicos.map(d => `
+          <div onclick="seleccionarDocente('${d.nombre_docente.replace(/'/g,"\'")}','${(d.centro_educativo||'').replace(/'/g,"\'")}' )"
+            style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f5fa;"
+            onmouseover="this.style.background='#f7fbfe'" onmouseout="this.style.background=''">
+            <strong>${d.nombre_docente}</strong>
+            <span style="color:#8fa5bb;font-size:11px;"> — ${d.centro_educativo||'—'}</span>
+          </div>`).join('')}
+      </div>` : '';
+  }, 300);
+}
+
+function seleccionarDocente(nombre, centro) {
+  document.getElementById('buscarDocente').value = nombre;
+  document.getElementById('filtroCentroHistorial').value = centro;
+  document.getElementById('sugerenciasDocente').innerHTML = '';
+  docenteSeleccionado = nombre;
+  cargarHistorialDocente();
+}
+
+async function cargarHistorialDocente() {
+  const nombre = document.getElementById('buscarDocente').value.trim();
+  if (!nombre) { mostrarNotif('Ingrese el nombre del docente.', true); return; }
+
+  const esAdmin = perfilActual?.nivel === 'admin';
+  let query = sb.from('acompañamientos')
+    .select('*')
+    .ilike('nombre_docente', `%${nombre}%`)
+    .eq('estado', 'Enviado')
+    .order('fecha', { ascending: true });
+  if (!esAdmin && perfilActual?.rol !== 'Técnico/a Nacional')
+    query = query.eq('usuario_id', usuarioActual.id);
+
+  const { data } = await query;
+  const registros = data || [];
+
+  document.getElementById('historialResultado').style.display = 'none';
+  document.getElementById('historialVacio').style.display = 'none';
+
+  if (!registros.length) {
+    document.getElementById('historialVacio').style.display = 'block'; return;
+  }
+
+  // Resumen
+  document.getElementById('nombreDocenteHistorial').textContent = registros[0].nombre_docente;
+  document.getElementById('hdTotal').textContent    = registros.length;
+  document.getElementById('hdUltimo').textContent   = registros[registros.length-1].fecha || '—';
+
+  // Área más acompañada
+  const areas = {};
+  registros.forEach(r => { if (r.area_acompanada) areas[r.area_acompanada] = (areas[r.area_acompanada]||0)+1; });
+  const topArea = Object.entries(areas).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('hdMejorArea').textContent = topArea ? topArea[0].split(' ')[0] : '—';
+
+  // Calcular % nivel 3 por acompañamiento
+  const datosEvolucion = registros.map((r, i) => {
+    const ind = r.indicadores || {};
+    const vals = Object.values(ind).map(v => v?.valor).filter(v => v !== null && v !== 4);
+    const nivel3 = vals.filter(v => v === 3).length;
+    const pct    = vals.length > 0 ? Math.round((nivel3 / vals.length) * 100) : 0;
+    return { num: i+1, fecha: r.fecha, area: r.area_acompanada, tipo: r.tipo_acompanamiento,
+             grado: r.grado, pct, nivel1: vals.filter(v=>v===1).length,
+             nivel2: vals.filter(v=>v===2).length, nivel3, total: vals.length,
+             acompanante: r.nombre_acompanante, id: r.id };
+  });
+
+  // Tendencia
+  if (datosEvolucion.length >= 2) {
+    const primero = datosEvolucion[0].pct;
+    const ultimo  = datosEvolucion[datosEvolucion.length-1].pct;
+    const diff    = ultimo - primero;
+    document.getElementById('hdTendencia').textContent =
+      diff > 0 ? `+${diff}%` : diff < 0 ? `${diff}%` : '=';
+    document.getElementById('hdTendencia').style.color =
+      diff > 0 ? '#2a6b1a' : diff < 0 ? '#b42318' : '#617384';
+  } else {
+    document.getElementById('hdTendencia').textContent = '—';
+  }
+
+  // Gráfica de evolución
+  const grafEl = document.getElementById('graficaEvolucion');
+  const maxPct = Math.max(...datosEvolucion.map(d => d.pct), 1);
+  grafEl.innerHTML = `
+    <div style="display:flex;align-items:flex-end;gap:12px;min-height:160px;padding:12px 0;">
+      ${datosEvolucion.map(d => `
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:60px;">
+          <div style="font-size:12px;font-weight:800;color:var(--azul-osc);">${d.pct}%</div>
+          <div style="
+            width:100%;background:linear-gradient(180deg,var(--azul),#2a8ad4);
+            border-radius:6px 6px 0 0;
+            height:${Math.max(Math.round((d.pct/100)*120), 4)}px;
+            min-width:40px;position:relative;cursor:default;
+            transition:height .4s ease;"
+            title="Acomp. ${d.num} — ${d.fecha} — ${d.pct}% en nivel 3">
+          </div>
+          <div style="font-size:10px;color:#617384;text-align:center;">
+            ${d.fecha ? d.fecha.slice(5) : '—'}<br>
+            <span style="font-weight:700;">${(d.area||'').split(' ')[0]}</span>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div style="font-size:11px;color:#8fa5bb;text-align:center;margin-top:4px;">
+      Porcentaje de indicadores en nivel 3 (Evidenciado) por acompañamiento
+    </div>`;
+
+  // Tabla detalle
+  document.getElementById('cuerpoHistorialDocente').innerHTML = datosEvolucion.map(d => {
+    const pctN12 = d.total > 0 ? Math.round(((d.nivel1+d.nivel2)/d.total)*100) : 0;
+    const color  = d.pct >= 70 ? 'badge-verde' : d.pct >= 40 ? 'badge-amarillo' : 'badge-rojo';
+    return `<tr>
+      <td style="text-align:center;font-weight:800;color:#8fa5bb;">${d.num}</td>
+      <td>${d.fecha||'—'}</td>
+      <td style="font-size:12px;">${d.area||'—'}</td>
+      <td style="font-size:12px;">${d.tipo||'—'}</td>
+      <td>${d.grado||'—'}</td>
+      <td><span class="badge ${color}">${d.pct}%</span></td>
+      <td><span class="badge badge-amarillo">${pctN12}%</span></td>
+      <td style="font-size:12px;">${d.acompanante||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Indicadores críticos
+  const frecuencia = {};
+  registros.forEach(r => {
+    const ind = r.indicadores || {};
+    Object.entries(ind).forEach(([cod, v]) => {
+      if (v?.valor === 1 || v?.valor === 2) {
+        frecuencia[cod] = (frecuencia[cod]||0) + 1;
+      }
+    });
+  });
+  const criticos = Object.entries(frecuencia).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const indMap   = {};
+  INDICADORES.filter(i=>i.codigo).forEach(i => { indMap[i.codigo] = i.texto; });
+
+  document.getElementById('indicadoresCriticos').innerHTML = criticos.length
+    ? `<div style="display:flex;flex-direction:column;gap:10px;">
+        ${criticos.map(([cod, veces]) => `
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:#fff8f0;border:1px solid #fcd9a0;border-radius:12px;">
+            <div style="font-size:20px;flex-shrink:0;">⚠️</div>
+            <div style="flex:1;">
+              <div style="font-size:12px;font-weight:800;color:#8a5d00;">Indicador ${cod} — Aparece ${veces} vez${veces>1?'es':''} en nivel 1 o 2</div>
+              <div style="font-size:13px;color:#1c2b3a;margin-top:2px;">${indMap[cod]||cod}</div>
+            </div>
+          </div>`).join('')}
+      </div>`
+    : '<div style="color:#2a6b1a;font-size:13px;padding:12px;background:#d8ead0;border-radius:10px;">✅ No hay indicadores críticos recurrentes. El docente muestra buen desempeño general.</div>';
+
+  document.getElementById('historialResultado').style.display = 'block';
+}
+
+// ── REPORTES Y ALERTAS ────────────────────────────────────────────────────────
+async function guardarDestinatarios() {
+  const lista = document.getElementById('listaDestinatarios').value.trim();
+  localStorage.setItem('sigap_destinatarios', lista);
+  mostrarNotif('Lista de destinatarios guardada.');
+}
+
+function cargarDestinatariosGuardados() {
+  const saved = localStorage.getItem('sigap_destinatarios');
+  if (saved) document.getElementById('listaDestinatarios').value = saved;
+}
+
+function obtenerDestinatarios() {
+  const raw = document.getElementById('listaDestinatarios').value;
+  return raw.split('\n').map(e => e.trim()).filter(e => e.includes('@'));
+}
+
+async function generarVistaPrevia() {
+  const desde = document.getElementById('reporteDesde').value;
+  const hasta = document.getElementById('reporteHasta').value;
+  if (!desde || !hasta) { mostrarNotif('Seleccione el período del reporte.', true); return; }
+
+  const esAdmin = perfilActual?.nivel === 'admin';
+  let query = sb.from('acompañamientos').select('*')
+    .gte('fecha', desde).lte('fecha', hasta).eq('estado', 'Enviado');
+  if (!esAdmin) query = query.eq('usuario_id', usuarioActual.id);
+
+  const { data } = await query;
+  const registros = data || [];
+  const hoy = new Date().toLocaleDateString('es-DO', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  const areas    = {};
+  const tipos    = {};
+  const regionals = {};
+  registros.forEach(r => {
+    if (r.area_acompanada)  areas[r.area_acompanada]     = (areas[r.area_acompanada]||0)+1;
+    if (r.tipo_acompanamiento) tipos[r.tipo_acompanamiento] = (tipos[r.tipo_acompanamiento]||0)+1;
+    if (r.regional)         regionals[r.regional]        = (regionals[r.regional]||0)+1;
+  });
+
+  const topArea = Object.entries(areas).sort((a,b)=>b[1]-a[1])[0];
+  const topTipo = Object.entries(tipos).sort((a,b)=>b[1]-a[1])[0];
+
+  const html = `
+    <div style="font-size:12px;color:#617384;margin-bottom:8px;">Generado: ${hoy}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
+      <div style="background:#fff;border:1px solid #dce9f5;border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:24px;font-weight:900;color:var(--azul-osc);">${registros.length}</div>
+        <div style="font-size:11px;color:#617384;">Acompañamientos</div>
+      </div>
+      <div style="background:#fff;border:1px solid #dce9f5;border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:24px;font-weight:900;color:var(--azul-osc);">${new Set(registros.map(r=>r.centro_educativo).filter(Boolean)).size}</div>
+        <div style="font-size:11px;color:#617384;">Centros visitados</div>
+      </div>
+      <div style="background:#fff;border:1px solid #dce9f5;border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:24px;font-weight:900;color:var(--azul-osc);">${new Set(registros.map(r=>r.nombre_docente).filter(Boolean)).size}</div>
+        <div style="font-size:11px;color:#617384;">Docentes</div>
+      </div>
+    </div>
+    ${topArea ? `<div style="font-size:13px;margin-bottom:4px;">📚 Área más acompañada: <strong>${topArea[0]}</strong> (${topArea[1]})</div>` : ''}
+    ${topTipo ? `<div style="font-size:13px;margin-bottom:4px;">📋 Tipo predominante: <strong>${topTipo[0]}</strong> (${topTipo[1]})</div>` : ''}
+    ${Object.keys(regionals).length > 0 ? `
+      <div style="margin-top:10px;font-size:12px;font-weight:800;color:var(--azul-osc);">Por regional:</div>
+      ${Object.entries(regionals).map(([r,n])=>`<div style="font-size:12px;color:#617384;padding:2px 0;">${r}: <strong>${n}</strong></div>`).join('')}
+    ` : ''}`;
+
+  document.getElementById('contenidoPrevistaReporte').innerHTML = html;
+  document.getElementById('previstaReporte').style.display = 'block';
+}
+
+async function enviarReporte() {
+  const destinatarios = obtenerDestinatarios();
+  if (!destinatarios.length) { mostrarNotif('Agregue al menos un destinatario.', true); return; }
+  const desde = document.getElementById('reporteDesde').value;
+  const hasta = document.getElementById('reporteHasta').value;
+  if (!desde || !hasta) { mostrarNotif('Seleccione el período.', true); return; }
+
+  const btn = document.getElementById('btnEnviarReporte');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Enviando…';
+
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const resp = await fetch(SUPA_URL + '/functions/v1/enviar-reporte', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + session.access_token,
+        'apikey': SUPA_KEY
+      },
+      body: JSON.stringify({ destinatarios, desde, hasta, tipo: 'semanal',
+        usuario: perfilActual?.nombre, rol: perfilActual?.rol })
+    });
+    const result = await resp.json();
+    if (!resp.ok || result.error) throw new Error(result.error);
+    mostrarNotif('✅ Reporte enviado a ' + destinatarios.length + ' destinatario(s).');
+    agregarHistorialEnvio('Reporte semanal', destinatarios.length, 'Enviado');
+  } catch(e) {
+    mostrarNotif('Error al enviar: ' + e.message, true);
+    agregarHistorialEnvio('Reporte semanal', destinatarios.length, 'Error');
+  }
+
+  btn.disabled = false; btn.textContent = '📨 Enviar por correo';
+}
+
+async function verificarRezago() {
+  const dias = parseInt(document.getElementById('diasRezago').value) || 7;
+  const fechaLimite = new Date();
+  fechaLimite.setDate(fechaLimite.getDate() - dias);
+  const limite = fechaLimite.toISOString().slice(0,10);
+
+  // Obtener todos los usuarios activos
+  const { data: usuarios } = await sb.from('perfiles').select('*').eq('activo', true)
+    .neq('nivel', 'admin');
+
+  // Obtener último acompañamiento por usuario
+  const { data: ultimos } = await sb.from('acompañamientos')
+    .select('usuario_id, fecha').eq('estado', 'Enviado')
+    .order('fecha', { ascending: false });
+
+  const ultimoPorUsuario = {};
+  (ultimos||[]).forEach(r => {
+    if (!ultimoPorUsuario[r.usuario_id]) ultimoPorUsuario[r.usuario_id] = r.fecha;
+  });
+
+  const rezagados = (usuarios||[]).filter(u => {
+    const ultimo = ultimoPorUsuario[u.id];
+    return !ultimo || ultimo < limite;
+  });
+
+  const contenedor = document.getElementById('resultadoRezago');
+  if (!rezagados.length) {
+    contenedor.innerHTML = `<div style="background:#d8ead0;border-radius:12px;padding:16px;font-size:13px;color:#17324d;">
+      ✅ Todos los técnicos han registrado acompañamientos en los últimos ${dias} días.</div>`;
+    document.getElementById('btnEnviarAlertas').style.display = 'none';
+    return;
+  }
+
+  contenedor.innerHTML = `
+    <div style="background:#fff8f0;border:1px solid #fcd9a0;border-radius:12px;padding:16px;margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:800;color:#8a5d00;margin-bottom:12px;">
+        ⚠️ ${rezagados.length} técnico(s) sin registros en los últimos ${dias} días
+      </div>
+      <table class="tabla-registros" style="box-shadow:none;">
+        <thead><tr><th>Nombre</th><th>Rol</th><th>Regional</th><th>Último registro</th><th>Días sin registrar</th></tr></thead>
+        <tbody>
+          ${rezagados.map(u => {
+            const ultimo  = ultimoPorUsuario[u.id];
+            const diasSin = ultimo
+              ? Math.floor((new Date()-new Date(ultimo))/(1000*60*60*24))
+              : 'Sin registros';
+            return `<tr>
+              <td>${u.nombre||'—'}</td>
+              <td style="font-size:12px;">${u.rol||'—'}</td>
+              <td style="font-size:12px;">${u.regional||'—'}</td>
+              <td>${ultimo||'Nunca'}</td>
+              <td><span class="badge badge-rojo">${diasSin}</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  document.getElementById('btnEnviarAlertas').style.display = 'inline-block';
+  // Store for sending
+  window._rezagados = rezagados;
+}
+
+async function enviarAlertas() {
+  const destinatarios = obtenerDestinatarios();
+  if (!destinatarios.length) { mostrarNotif('Agregue al menos un destinatario.', true); return; }
+  const dias = parseInt(document.getElementById('diasRezago').value) || 7;
+
+  const btn = document.getElementById('btnEnviarAlertas');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Enviando…';
+
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const resp = await fetch(SUPA_URL + '/functions/v1/enviar-reporte', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + session.access_token,
+        'apikey': SUPA_KEY
+      },
+      body: JSON.stringify({
+        destinatarios, tipo: 'alerta_rezago',
+        rezagados: window._rezagados || [], dias,
+        usuario: perfilActual?.nombre
+      })
+    });
+    const result = await resp.json();
+    if (!resp.ok || result.error) throw new Error(result.error);
+    mostrarNotif('✅ Alertas enviadas a ' + destinatarios.length + ' destinatario(s).');
+    agregarHistorialEnvio('Alerta de rezago', destinatarios.length, 'Enviado');
+  } catch(e) {
+    mostrarNotif('Error: ' + e.message, true);
+  }
+
+  btn.disabled = false; btn.textContent = '📨 Enviar alertas por correo';
+}
+
+function agregarHistorialEnvio(tipo, nDest, estado) {
+  const tbody = document.getElementById('historialEnvios');
+  const fecha = new Date().toLocaleString('es-DO');
+  const fila  = document.createElement('tr');
+  fila.innerHTML = `
+    <td style="font-size:12px;">${fecha}</td>
+    <td>${tipo}</td>
+    <td>${nDest} destinatario(s)</td>
+    <td><span class="badge ${estado==='Enviado'?'badge-verde':'badge-rojo'}">${estado}</span></td>`;
+  if (tbody.querySelector('td[colspan]')) tbody.innerHTML = '';
+  tbody.insertBefore(fila, tbody.firstChild);
+}
+
+// Cargar destinatarios guardados al abrir el panel
+const _mostrarPanelOrig = mostrarPanel;
+mostrarPanel = function(id, el) {
+  _mostrarPanelOrig(id, el);
+  if (id === 'reportes') cargarDestinatariosGuardados();
+};
+
+
+
+// ── ALERTA COORDINADORES CON BAJO CUMPLIMIENTO ────────────────────────────────
+async function verificarCumplimientoCoord() {
+  const umbral = parseInt(document.getElementById('umbralCumplimiento').value) || 60;
+  const desde  = document.getElementById('coordDesde').value;
+  const hasta  = document.getElementById('coordHasta').value;
+
+  if (!desde || !hasta) {
+    mostrarNotif('Seleccione el período de análisis.', true); return;
+  }
+
+  // Obtener todos los coordinadores pedagógicos activos
+  const { data: coordinadores } = await sb.from('perfiles')
+    .select('*')
+    .eq('rol', 'Coordinador/a Pedagógico/a')
+    .eq('activo', true);
+
+  if (!coordinadores?.length) {
+    document.getElementById('resultadoCumplimientoCoord').innerHTML =
+      '<div style="background:#f0f5fa;border-radius:12px;padding:16px;font-size:13px;color:#617384;">No hay coordinadores pedagógicos registrados en el sistema.</div>';
+    document.getElementById('btnEnviarAlertaCoord').style.display = 'none';
+    return;
+  }
+
+  // Para cada coordinador, obtener planificados y ejecutados en el período
+  const resultados = [];
+
+  for (const coord of coordinadores) {
+    // Planificados en el período
+    const { data: planificados } = await sb.from('planificaciones')
+      .select('id, estado')
+      .eq('usuario_id', coord.id)
+      .gte('fecha_prevista', desde)
+      .lte('fecha_prevista', hasta);
+
+    // Ejecutados (acompañamientos enviados) en el período
+    const { data: ejecutados } = await sb.from('acompañamientos')
+      .select('id')
+      .eq('usuario_id', coord.id)
+      .eq('estado', 'Enviado')
+      .gte('fecha', desde)
+      .lte('fecha', hasta);
+
+    const nPlan  = planificados?.length || 0;
+    const nEjec  = ejecutados?.length  || 0;
+    const pct    = nPlan > 0 ? Math.round((nEjec / nPlan) * 100) : (nEjec > 0 ? 100 : 0);
+    const bajoCumplimiento = nPlan > 0 && pct < umbral;
+
+    resultados.push({
+      ...coord,
+      planificados: nPlan,
+      ejecutados:   nEjec,
+      pct,
+      bajoCumplimiento
+    });
+  }
+
+  // Ordenar: primero los de bajo cumplimiento
+  resultados.sort((a, b) => a.pct - b.pct);
+
+  const bajos   = resultados.filter(r => r.bajoCumplimiento);
+  const normales = resultados.filter(r => !r.bajoCumplimiento);
+
+  const contenedor = document.getElementById('resultadoCumplimientoCoord');
+
+  if (!bajos.length) {
+    contenedor.innerHTML = `
+      <div style="background:#d8ead0;border-radius:12px;padding:16px;font-size:13px;color:#17324d;">
+        ✅ Todos los coordinadores tienen un cumplimiento igual o superior al ${umbral}% en el período seleccionado.
+      </div>`;
+    document.getElementById('btnEnviarAlertaCoord').style.display = 'none';
+
+    // Mostrar tabla de todos aunque todos estén bien
+    if (normales.length) {
+      contenedor.innerHTML += renderTablaCoord(normales, umbral, false);
+    }
+    return;
+  }
+
+  // Mostrar alertas y tabla completa
+  contenedor.innerHTML = `
+    <div style="background:#fff0f0;border:1px solid #f4c2bd;border-radius:12px;padding:16px;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:800;color:#b42318;margin-bottom:12px;">
+        📉 ${bajos.length} coordinador(es) con cumplimiento por debajo del ${umbral}%
+      </div>
+      ${renderTablaCoord(bajos, umbral, true)}
+    </div>
+    ${normales.length ? `
+      <div style="font-size:13px;font-weight:800;color:var(--azul-osc);margin:16px 0 8px;">
+        ✅ Coordinadores con cumplimiento adecuado
+      </div>
+      ${renderTablaCoord(normales, umbral, false)}` : ''}`;
+
+  document.getElementById('btnEnviarAlertaCoord').style.display = 'inline-block';
+  window._coordBajos = bajos;
+  window._umbralCoord = umbral;
+}
+
+function renderTablaCoord(lista, umbral, alerta) {
+  return `
+    <div class="tabla-wrap-outer">
+      <table class="tabla-registros" style="box-shadow:none;">
+        <thead>
+          <tr>
+            <th>Coordinador/a</th>
+            <th>Centro</th>
+            <th>Planificados</th>
+            <th>Ejecutados</th>
+            <th>% Cumplimiento</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${lista.map(c => {
+            const color = c.pct >= umbral ? 'badge-verde' :
+                          c.pct >= umbral * 0.7 ? 'badge-amarillo' : 'badge-rojo';
+            const barra = `
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div style="flex:1;background:#edf3f8;border-radius:999px;height:10px;overflow:hidden;">
+                  <div style="width:${Math.min(c.pct,100)}%;height:100%;background:${
+                    c.pct >= umbral ? '#2a8a1a' : c.pct >= umbral*0.7 ? '#d97706' : '#b42318'
+                  };border-radius:999px;"></div>
+                </div>
+                <span class="badge ${color}" style="white-space:nowrap;">${c.pct}%</span>
+              </div>`;
+            return `<tr ${alerta ? 'style="background:#fffbfb;"' : ''}>
+              <td>${c.nombre||'—'}</td>
+              <td style="font-size:12px;">${c.nombre_centro||c.codigo_centro||'—'}</td>
+              <td style="text-align:center;font-weight:700;">${c.planificados}</td>
+              <td style="text-align:center;font-weight:700;">${c.ejecutados}</td>
+              <td>${barra}</td>
+              <td><span class="badge ${color}">${
+                c.pct >= umbral ? 'Adecuado' :
+                c.pct >= umbral*0.7 ? 'En riesgo' : 'Bajo'
+              }</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+async function enviarAlertaCoord() {
+  const destinatarios = obtenerDestinatarios();
+  if (!destinatarios.length) {
+    mostrarNotif('Agregue destinatarios en la lista de correos.', true); return;
+  }
+
+  const btn = document.getElementById('btnEnviarAlertaCoord');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Enviando…';
+
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const resp = await fetch(SUPA_URL + '/functions/v1/enviar-reporte', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + session.access_token,
+        'apikey': SUPA_KEY
+      },
+      body: JSON.stringify({
+        destinatarios,
+        tipo: 'alerta_coordinadores',
+        coordinadores: window._coordBajos || [],
+        umbral: window._umbralCoord || 60,
+        desde: document.getElementById('coordDesde').value,
+        hasta: document.getElementById('coordHasta').value,
+        usuario: perfilActual?.nombre
+      })
+    });
+    const result = await resp.json();
+    if (!resp.ok || result.error) throw new Error(result.error);
+    mostrarNotif('✅ Alerta enviada a ' + destinatarios.length + ' destinatario(s).');
+    agregarHistorialEnvio('Alerta coordinadores', destinatarios.length, 'Enviado');
+  } catch(e) {
+    mostrarNotif('Error: ' + e.message, true);
+    agregarHistorialEnvio('Alerta coordinadores', 0, 'Error');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '📨 Enviar alerta por correo';
+}
 
 
 // ── OFFLINE / PWA ─────────────────────────────────────────────────────────────
