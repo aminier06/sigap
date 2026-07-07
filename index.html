@@ -2121,6 +2121,13 @@ function detenerAutoguardado() {
 let todosRegistros = [];
 let todosRegistrosCoord = [];
 
+// Extrae el código numérico inicial de un valor "01 - Barahona" o "01 – BARAHONA"
+// (funciona sin importar el tipo de guion o si el nombre está en mayúsculas).
+function codigoDe(valor) {
+  const m = (valor || '').match(/^\d+/);
+  return m ? m[0] : '';
+}
+
 async function cargarDashboard() {
   const uid = usuarioActual?.id;
   if (!uid) return;
@@ -2157,8 +2164,12 @@ async function cargarDashboard() {
   if (filtroEstado)   query = query.eq('estado', filtroEstado);
   if (filtroArea)     query = query.eq('area_acompanada', filtroArea);
   if (filtroTipo)     query = query.eq('tipo_acompanamiento', filtroTipo);
-  if (filtroRegional) query = query.ilike('regional', '%' + filtroRegional + '%');
-  if (filtroDistrito) query = query.ilike('distrito', '%' + filtroDistrito + '%');
+  // Se compara solo por el código (ej. "01", "0101"), no por la cadena completa:
+  // el dato guardado usa guion largo "–" y nombre en mayúsculas ("01 – BARAHONA"),
+  // mientras que las opciones del filtro usan guion corto y formato título
+  // ("01 - Barahona"). El código sí es idéntico en ambos lados.
+  if (filtroRegional) query = query.ilike('regional', codigoDe(filtroRegional) + '%');
+  if (filtroDistrito) query = query.ilike('distrito', codigoDe(filtroDistrito) + '%');
 
   // Filtro de período (se calcula una vez y se aplica también a coordinadores)
   let desdeMes = null;
@@ -2233,8 +2244,8 @@ async function cargarDashboard() {
   }
 
   if (filtroEstado)   queryCoord = queryCoord.eq('estado', filtroEstado);
-  if (filtroRegional) queryCoord = queryCoord.ilike('regional', '%' + filtroRegional + '%');
-  if (filtroDistrito) queryCoord = queryCoord.ilike('distrito', '%' + filtroDistrito + '%');
+  if (filtroRegional) queryCoord = queryCoord.ilike('regional', codigoDe(filtroRegional) + '%');
+  if (filtroDistrito) queryCoord = queryCoord.ilike('distrito', codigoDe(filtroDistrito) + '%');
   if (desdeMes)        queryCoord = queryCoord.gte('fecha', desdeMes);
 
   const { data: dataCoord } = await queryCoord;
