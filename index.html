@@ -518,6 +518,8 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
     .barra-etiqueta{width:180px;flex-shrink:0;color:#2d4a63;font-weight:600;font-size:12px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .barra-contenedor{flex:1;background:#edf3f8;border-radius:999px;height:22px;overflow:hidden;}
     .barra-relleno{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--azul),#2a8ad4);transition:width .4s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;}
+    .barra-relleno.color-fortaleza{background:linear-gradient(90deg,#2a6b1a,#5fae3d);}
+    .barra-relleno.color-mejora{background:linear-gradient(90deg,#b45309,#e2954a);}
     .barra-valor{font-size:11px;font-weight:800;color:#fff;white-space:nowrap;}
     .barra-vacia{font-size:13px;color:#8fa5bb;padding:8px 0;}
 
@@ -913,6 +915,32 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
             <div class="barras-wrap" id="graficaModalidad"></div>
           </div>
 
+        </div>
+
+        <!-- FORTALEZAS Y ASPECTOS DE MEJORA -->
+        <div class="dashboard-titulo" style="font-size:18px;margin-top:8px;">📊 Fortalezas y aspectos de mejora</div>
+        <p class="dashboard-sub" style="margin-top:-4px;">Calculado a partir de las escalas de valoración de los acompañamientos registrados (docentes y equipo de gestión). Solo se muestran indicadores/criterios con al menos algunas observaciones registradas.</p>
+
+        <div class="dash-dos-col">
+          <div class="grafica-card">
+            <div class="grafica-titulo">🟢 Docentes — Principales fortalezas</div>
+            <div class="barras-wrap" id="graficaFortalezasDocente"></div>
+          </div>
+          <div class="grafica-card">
+            <div class="grafica-titulo">🟠 Docentes — Aspectos de mejora</div>
+            <div class="barras-wrap" id="graficaMejorasDocente"></div>
+          </div>
+        </div>
+
+        <div class="dash-dos-col">
+          <div class="grafica-card">
+            <div class="grafica-titulo">🟢 Equipo de Gestión — Principales fortalezas</div>
+            <div class="barras-wrap" id="graficaFortalezasCoord"></div>
+          </div>
+          <div class="grafica-card">
+            <div class="grafica-titulo">🟠 Equipo de Gestión — Aspectos de mejora</div>
+            <div class="barras-wrap" id="graficaMejorasCoord"></div>
+          </div>
         </div>
 
         <!-- TOP REGIONALES -->
@@ -2091,6 +2119,7 @@ function detenerAutoguardado() {
 
 // ── DASHBOARD AVANZADO ────────────────────────────────────────────────────────
 let todosRegistros = [];
+let todosRegistrosCoord = [];
 
 async function cargarDashboard() {
   const uid = usuarioActual?.id;
@@ -2131,21 +2160,21 @@ async function cargarDashboard() {
   if (filtroRegional) query = query.ilike('regional', '%' + filtroRegional + '%');
   if (filtroDistrito) query = query.ilike('distrito', '%' + filtroDistrito + '%');
 
-  // Filtro de período
+  // Filtro de período (se calcula una vez y se aplica también a coordinadores)
+  let desdeMes = null;
   if (filtroMes) {
     const hoy = new Date();
-    let desde;
     if (filtroMes === 'mes') {
-      desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0,10);
+      desdeMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0,10);
     } else if (filtroMes === 'trimestre') {
-      desde = new Date(hoy.getFullYear(), Math.floor(hoy.getMonth()/3)*3, 1).toISOString().slice(0,10);
+      desdeMes = new Date(hoy.getFullYear(), Math.floor(hoy.getMonth()/3)*3, 1).toISOString().slice(0,10);
     } else if (filtroMes === 'semestre') {
-      desde = new Date(hoy.getFullYear(), hoy.getMonth() < 6 ? 0 : 6, 1).toISOString().slice(0,10);
+      desdeMes = new Date(hoy.getFullYear(), hoy.getMonth() < 6 ? 0 : 6, 1).toISOString().slice(0,10);
     } else if (filtroMes === 'anio') {
-      desde = hoy.getFullYear() + '-01-01';
+      desdeMes = hoy.getFullYear() + '-01-01';
     }
-    if (desde) query = query.gte('fecha', desde);
   }
+  if (desdeMes) query = query.gte('fecha', desdeMes);
 
   const { data } = await query;
   todosRegistros = data || [];
@@ -2186,6 +2215,33 @@ async function cargarDashboard() {
         <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td>
       </tr>`).join('');
   }
+
+  // ── Acompañamientos al Equipo de Gestión (misma demarcación y filtros) ──
+  let queryCoord = sb.from('acompanamientos_coordinador').select('*').order('fecha', { ascending: false });
+
+  if (esAdmin || rol === 'Técnico/a Nacional') {
+    // Ven todo
+  } else if (rol === 'Técnico/a Regional') {
+    if (regional) queryCoord = queryCoord.ilike('regional', '%' + regional.split(' - ').slice(1).join(' - ') + '%');
+  } else if (rol === 'Técnico/a Distrital') {
+    if (distrito) queryCoord = queryCoord.ilike('distrito', '%' + distrito.split(' - ').slice(1).join(' - ') + '%');
+  } else if (rol === 'Coordinador/a Pedagógico/a' || rol === 'Director/a de Centro') {
+    if (centro) queryCoord = queryCoord.eq('codigo_centro', centro);
+    else queryCoord = queryCoord.eq('usuario_id', uid);
+  } else {
+    queryCoord = queryCoord.eq('usuario_id', uid);
+  }
+
+  if (filtroEstado)   queryCoord = queryCoord.eq('estado', filtroEstado);
+  if (filtroRegional) queryCoord = queryCoord.ilike('regional', '%' + filtroRegional + '%');
+  if (filtroDistrito) queryCoord = queryCoord.ilike('distrito', '%' + filtroDistrito + '%');
+  if (desdeMes)        queryCoord = queryCoord.gte('fecha', desdeMes);
+
+  const { data: dataCoord } = await queryCoord;
+  todosRegistrosCoord = dataCoord || [];
+
+  // Fortalezas y aspectos de mejora (docentes + equipo de gestión)
+  renderResumenFortalezasMejoras();
 }
 
 function contarPor(registros, campo) {
@@ -2225,6 +2281,82 @@ function renderRegionales(datos) {
       <span class="regional-nombre">${nombre}</span>
       <span class="regional-num">${total}</span>
     </div>`).join('');
+}
+
+// ── FORTALEZAS Y ASPECTOS DE MEJORA ───────────────────────────────────────────
+// Docentes: escala 1=No evidenciado 2=Medianamente 3=Evidenciado 4=No aplica
+// Coordinadores: escala 1=Evidenciado 2=Medianamente 3=No evidenciado 4=No aplica
+// (son inversas entre sí, por eso se calculan por separado)
+
+function calcularResumenIndicadoresDocente(registros) {
+  const stats = {};
+  INDICADORES.filter(i => i.codigo).forEach(i => { stats[i.codigo] = { codigo: i.codigo, texto: i.texto, evid: 0, medio: 0, noEvid: 0, total: 0 }; });
+  registros.forEach(r => {
+    const ind = r.indicadores;
+    if (!ind) return;
+    Object.keys(stats).forEach(cod => {
+      const item = ind[cod];
+      if (!item || item.valor == null || item.valor === 4) return;
+      const s = stats[cod];
+      s.total++;
+      if (item.valor === 3) s.evid++;
+      else if (item.valor === 2) s.medio++;
+      else if (item.valor === 1) s.noEvid++;
+    });
+  });
+  return Object.values(stats)
+    .filter(s => s.total >= 3)
+    .map(s => ({ codigo: s.codigo, texto: s.texto, total: s.total,
+      pctEvid: (s.evid/s.total)*100, pctMejora: ((s.noEvid+s.medio)/s.total)*100 }));
+}
+
+function calcularResumenCriteriosCoord(registros) {
+  const stats = {};
+  CRITERIOS_COORD.filter(i => i.codigo).forEach(i => { stats[i.codigo] = { codigo: i.codigo, texto: i.texto, evid: 0, medio: 0, noEvid: 0, total: 0 }; });
+  registros.forEach(r => {
+    const crit = r.criterios;
+    if (!crit) return;
+    Object.keys(stats).forEach(cod => {
+      const item = crit[cod];
+      if (!item || item.valor == null || item.valor === 4) return;
+      const s = stats[cod];
+      s.total++;
+      if (item.valor === 1) s.evid++;
+      else if (item.valor === 2) s.medio++;
+      else if (item.valor === 3) s.noEvid++;
+    });
+  });
+  return Object.values(stats)
+    .filter(s => s.total >= 2)
+    .map(s => ({ codigo: s.codigo, texto: s.texto, total: s.total,
+      pctEvid: (s.evid/s.total)*100, pctMejora: ((s.noEvid+s.medio)/s.total)*100 }));
+}
+
+function renderBarrasIndicadores(contenedorId, datos, colorClase) {
+  const el = document.getElementById(contenedorId);
+  if (!el) return;
+  if (!datos.length) { el.innerHTML = '<div class="barra-vacia">Aún no hay suficientes registros para calcular esta vista.</div>'; return; }
+  el.innerHTML = datos.map(d => `
+    <div class="barra-fila">
+      <div class="barra-etiqueta" title="${d.codigo}. ${d.texto}">${d.codigo}. ${d.texto}</div>
+      <div class="barra-contenedor">
+        <div class="barra-relleno ${colorClase}" style="width:${Math.max(Math.round(d.pct),4)}%">
+          <span class="barra-valor">${d.pct.toFixed(0)}%</span>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderResumenFortalezasMejoras() {
+  const top = (arr, key) => [...arr].sort((a,b) => b[key]-a[key]).slice(0,5).map(s => ({ codigo: s.codigo, texto: s.texto, pct: s[key] }));
+
+  const resumenDocente = calcularResumenIndicadoresDocente(todosRegistros);
+  renderBarrasIndicadores('graficaFortalezasDocente', top(resumenDocente,'pctEvid'),   'color-fortaleza');
+  renderBarrasIndicadores('graficaMejorasDocente',    top(resumenDocente,'pctMejora'), 'color-mejora');
+
+  const resumenCoord = calcularResumenCriteriosCoord(todosRegistrosCoord);
+  renderBarrasIndicadores('graficaFortalezasCoord', top(resumenCoord,'pctEvid'),   'color-fortaleza');
+  renderBarrasIndicadores('graficaMejorasCoord',    top(resumenCoord,'pctMejora'), 'color-mejora');
 }
 
 function poblarDistritosDashboard(registros) {
