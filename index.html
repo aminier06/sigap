@@ -824,6 +824,12 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
               </select>
             </div>
             <div class="campo">
+              <label>Centro Educativo</label>
+              <select id="filtroCentro" onchange="cargarDashboard()">
+                <option value="">Todos los centros</option>
+              </select>
+            </div>
+            <div class="campo">
               <label>Área</label>
               <select id="filtroArea" onchange="cargarDashboard()">
                 <option value="">Todas las áreas</option>
@@ -2159,6 +2165,7 @@ async function cargarDashboard() {
   const filtroTipo     = document.getElementById('filtroTipo')?.value;
   const filtroRegional = document.getElementById('filtroRegional')?.value;
   const filtroDistrito = document.getElementById('filtroDistrito')?.value;
+  const filtroCentro   = document.getElementById('filtroCentro')?.value;
   const filtroMes      = document.getElementById('filtroMes')?.value;
 
   if (filtroEstado)   query = query.eq('estado', filtroEstado);
@@ -2170,6 +2177,7 @@ async function cargarDashboard() {
   // ("01 - Barahona"). El código sí es idéntico en ambos lados.
   if (filtroRegional) query = query.ilike('regional', codigoDe(filtroRegional) + '%');
   if (filtroDistrito) query = query.ilike('distrito', codigoDe(filtroDistrito) + '%');
+  if (filtroCentro)   query = query.eq('centro_educativo', filtroCentro);
 
   // Filtro de período (se calcula una vez y se aplica también a coordinadores)
   let desdeMes = null;
@@ -2246,10 +2254,14 @@ async function cargarDashboard() {
   if (filtroEstado)   queryCoord = queryCoord.eq('estado', filtroEstado);
   if (filtroRegional) queryCoord = queryCoord.ilike('regional', codigoDe(filtroRegional) + '%');
   if (filtroDistrito) queryCoord = queryCoord.ilike('distrito', codigoDe(filtroDistrito) + '%');
+  if (filtroCentro)   queryCoord = queryCoord.eq('centro_educativo', filtroCentro);
   if (desdeMes)        queryCoord = queryCoord.gte('fecha', desdeMes);
 
   const { data: dataCoord } = await queryCoord;
   todosRegistrosCoord = dataCoord || [];
+
+  // Poblar el filtro de Centro Educativo con los centros que ya tienen registros
+  await poblarCentrosDashboard(todosRegistros.concat(todosRegistrosCoord));
 
   // Fortalezas y aspectos de mejora (docentes + equipo de gestión)
   renderResumenFortalezasMejoras();
@@ -2385,6 +2397,34 @@ function poblarDistritosDashboard(registros) {
   }
 }
 
+// Puebla el filtro de Centro Educativo.
+// Si hay una regional o distrito seleccionado, trae el listado OFICIAL completo
+// desde la tabla `centros` (para que no se reduzca solo a los centros que ya
+// tienen registros, y no "se colapse" al elegir un centro específico).
+// Si no hay regional/distrito seleccionado, usa solo los centros que ya
+// tienen acompañamientos, para no cargar los más de 7,000 centros del sistema.
+async function poblarCentrosDashboard(registrosCombinados) {
+  const selCentro = document.getElementById('filtroCentro');
+  if (!selCentro) return;
+  const actual = selCentro.value;
+
+  const regCodigo  = codigoDe(document.getElementById('filtroRegional')?.value);
+  const distCodigo = codigoDe(document.getElementById('filtroDistrito')?.value);
+
+  let nombres;
+  if (regCodigo || distCodigo) {
+    let query = sb.from('centros').select('nombre').order('nombre');
+    query = distCodigo ? query.eq('distrito_codigo', distCodigo) : query.eq('regional_codigo', regCodigo);
+    const { data, error } = await query;
+    nombres = error ? [] : [...new Set((data || []).map(c => c.nombre))];
+  } else {
+    nombres = [...new Set(registrosCombinados.map(r => r.centro_educativo).filter(Boolean))].sort();
+  }
+
+  selCentro.innerHTML = '<option value="">Todos los centros</option>';
+  nombres.forEach(n => { const o = new Option(n, n); if (n === actual) o.selected = true; selCentro.appendChild(o); });
+}
+
 // When regional filter changes, reload distritos then dashboard
 document.addEventListener('DOMContentLoaded', () => {
   const selReg = document.getElementById('filtroRegional');
@@ -2397,7 +2437,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function limpiarFiltros() {
-  ['filtroMes','filtroRegional','filtroDistrito','filtroArea','filtroTipo','filtroEstado']
+  ['filtroMes','filtroRegional','filtroDistrito','filtroCentro','filtroArea','filtroTipo','filtroEstado']
     .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   cargarDashboard();
 }
