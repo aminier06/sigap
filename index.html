@@ -3805,7 +3805,7 @@ async function cargarHistorialDocente() {
           <div style="display:flex;align-items:center;gap:12px;padding:12px;background:#fff8f0;border:1px solid #fcd9a0;border-radius:12px;">
             <div style="font-size:20px;flex-shrink:0;">⚠️</div>
             <div style="flex:1;">
-              <div style="font-size:12px;font-weight:800;color:#8a5d00;">Indicador ${cod} — Aparece ${veces} vez${veces>1?'es':''} en nivel 1 o 2</div>
+              <div style="font-size:12px;font-weight:800;color:#8a5d00;">Indicador ${cod} — Aparece ${veces} ${veces>1?'veces':'vez'} en nivel 1 o 2</div>
               <div style="font-size:13px;color:#1c2b3a;margin-top:2px;">${indMap[cod]||cod}</div>
             </div>
           </div>`).join('')}
