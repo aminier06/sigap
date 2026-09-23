@@ -40,6 +40,7 @@ function copiarClave() {
 let usuariosPendientes = [];
 
 async function previsualizarCarga(input) {
+  if (!requiereAdministrador()) return;
   const file = input.files[0];
   if (!file) return;
 
@@ -132,6 +133,7 @@ async function previsualizarCarga(input) {
 }
 
 async function ejecutarCargaMasiva() {
+  if (!requiereAdministrador()) return;
   const validos = usuariosPendientes.filter(u => u.valido);
   if (!validos.length) return;
 
@@ -214,6 +216,7 @@ async function ejecutarCargaMasiva() {
 }
 
 function copiarLog() {
+  if (!requiereAdministrador()) return;
   const log = document.getElementById('logCarga').innerText;
   navigator.clipboard.writeText(log).then(() => mostrarNotif('Log copiado al portapapeles.'));
 }
@@ -229,6 +232,7 @@ function cancelarCarga() {
 
 // ── ELIMINAR USUARIO ──────────────────────────────────────────────────────────
 function confirmarEliminarUsuario(id, nombre) {
+  if (!requiereAdministrador()) return;
   document.getElementById('eliminarUsuarioId').value = id;
   document.getElementById('textoEliminarUsuario').innerHTML =
     `¿Está seguro de que desea eliminar a <strong>${nombre}</strong>? `+
@@ -242,6 +246,7 @@ function cerrarModalEliminar() {
 }
 
 async function ejecutarEliminarUsuario() {
+  if (!requiereAdministrador()) return;
   const id  = document.getElementById('eliminarUsuarioId').value;
   if (!id) return;
 
@@ -282,6 +287,7 @@ document.getElementById('modalEliminarUsuario').addEventListener('click', functi
 
 // ── EDITAR USUARIO ────────────────────────────────────────────────────────────
 function abrirModalEditar(u) {
+  if (!requiereAdministrador()) return;
   document.getElementById('editUserId').value = u.id;
   document.getElementById('editNombre').value = u.nombre || '';
   document.getElementById('editRol').value = u.rol || '';
@@ -294,6 +300,7 @@ function cerrarModalEditar() {
 }
 
 async function guardarEdicionUsuario() {
+  if (!requiereAdministrador()) return;
   const id     = document.getElementById('editUserId').value;
   const nombre = document.getElementById('editNombre').value.trim();
   const rol    = document.getElementById('editRol').value;
@@ -369,7 +376,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
     .menu-item:hover{background:var(--azul-claro);color:var(--azul-osc);}
     .menu-item.activo{background:var(--azul-claro);color:var(--azul-osc);border-left-color:var(--azul);font-weight:800;}
     .menu-icono{font-size:16px;width:20px;text-align:center;}
-    .menu-item.admin-only{display:none;}
+    .admin-only{display:none;}
 
     .contenido{flex:1;overflow-y:auto;padding:28px 32px 48px;}
     .panel{display:none;}
@@ -1900,6 +1907,40 @@ async function cargarPerfil() {
   return true;
 }
 
+
+function esAdministrador() {
+  return !!usuarioActual && perfilActual?.nivel === 'admin';
+}
+
+function requiereAdministrador() {
+  if (esAdministrador()) return true;
+  mostrarNotif('Solo los administradores pueden gestionar usuarios.', true);
+  return false;
+}
+
+function actualizarAccesoAdministracion() {
+  const permitido = esAdministrador();
+  ['menuAdmin', 'menuMasAdmin'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = permitido ? 'block' : 'none';
+  });
+  if (!permitido) {
+    const panel = document.getElementById('panel-adminUsuarios');
+    if (panel?.classList.contains('activo')) {
+      panel.classList.remove('activo');
+      document.getElementById('panel-dashboard')?.classList.add('activo');
+    }
+    ['modalEditarUsuario', 'modalEliminarUsuario', 'menuMas'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    const tabla = document.getElementById('cuerpoTablaUsuarios');
+    if (tabla) tabla.innerHTML = '';
+    const log = document.getElementById('logCarga');
+    if (log) log.textContent = '';
+  }
+}
+
 function mostrarApp() {
   document.getElementById('pantallaLogin').style.display = 'none';
   document.getElementById('appPrincipal').style.display = 'block';
@@ -1907,12 +1948,7 @@ function mostrarApp() {
   document.getElementById('topRol').textContent = perfilActual?.rol || '';
   document.getElementById('nombreAcompanante').value = perfilActual?.nombre || '';
   document.getElementById('rolAcompanante').value = perfilActual?.rol || '';
-  // Mostrar menú admin si corresponde
-  if (perfilActual?.nivel === 'admin') {
-    document.getElementById('menuAdmin').style.display = 'block';
-    const mma = document.getElementById('menuMasAdmin');
-    if (mma) mma.style.display = 'block';
-  }
+  actualizarAccesoAdministracion();
   document.getElementById('bienvenidaTitulo').textContent = 'Bienvenido/a, ' + (perfilActual?.nombre || '');
   document.getElementById('piePagina').style.display = 'block';
   document.getElementById('anioFooter').textContent = new Date().getFullYear();
@@ -1927,6 +1963,7 @@ function mostrarApp() {
 async function cerrarSesion() {
   await sb.auth.signOut();
   usuarioActual = null; perfilActual = null;
+  actualizarAccesoAdministracion();
   document.getElementById('appPrincipal').style.display = 'none';
   document.getElementById('pantallaLogin').style.display = 'flex';
   document.getElementById('piePagina').style.display = 'none';
@@ -1937,6 +1974,7 @@ async function cerrarSesion() {
 
 // ── NAVEGACIÓN ────────────────────────────────────────────────────────────────
 function mostrarPanel(id, el) {
+  if (id === 'adminUsuarios' && !requiereAdministrador()) return;
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('activo'));
   document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('activo'));
   document.getElementById('panel-' + id).classList.add('activo');
@@ -3218,6 +3256,7 @@ async function buscarCentroUsuario(codigo) {
 
 
 async function crearUsuario() {
+  if (!requiereAdministrador()) return;
   const nombre       = document.getElementById('nuNombre').value.trim();
   const email        = document.getElementById('nuEmail').value.trim();
   const clave        = document.getElementById('nuClave').value;
@@ -3273,6 +3312,7 @@ async function crearUsuario() {
 }
 
 async function cargarUsuarios() {
+  if (!requiereAdministrador()) return;
   const { data } = await sb.from('perfiles').select('*').order('nombre');
   const cuerpo = document.getElementById('cuerpoTablaUsuarios');
   if (!data || data.length === 0) { cuerpo.innerHTML='<tr><td colspan="6" style="text-align:center;color:#8fa5bb;padding:24px;">No hay usuarios registrados.</td></tr>'; return; }
@@ -3294,6 +3334,7 @@ async function cargarUsuarios() {
 }
 
 async function toggleUsuario(id, activo) {
+  if (!requiereAdministrador()) return;
   await sb.from('perfiles').update({ activo }).eq('id', id);
   mostrarNotif(activo ? 'Usuario activado.' : 'Usuario desactivado.');
   cargarUsuarios();
@@ -3359,6 +3400,7 @@ function copiarClave() {
 let usuariosPendientes = [];
 
 async function previsualizarCarga(input) {
+  if (!requiereAdministrador()) return;
   const file = input.files[0];
   if (!file) return;
 
@@ -3451,6 +3493,7 @@ async function previsualizarCarga(input) {
 }
 
 async function ejecutarCargaMasiva() {
+  if (!requiereAdministrador()) return;
   const validos = usuariosPendientes.filter(u => u.valido);
   if (!validos.length) return;
 
@@ -3533,6 +3576,7 @@ async function ejecutarCargaMasiva() {
 }
 
 function copiarLog() {
+  if (!requiereAdministrador()) return;
   const log = document.getElementById('logCarga').innerText;
   navigator.clipboard.writeText(log).then(() => mostrarNotif('Log copiado al portapapeles.'));
 }
@@ -3548,6 +3592,7 @@ function cancelarCarga() {
 
 // ── ELIMINAR USUARIO ──────────────────────────────────────────────────────────
 function confirmarEliminarUsuario(id, nombre) {
+  if (!requiereAdministrador()) return;
   document.getElementById('eliminarUsuarioId').value = id;
   document.getElementById('textoEliminarUsuario').innerHTML =
     `¿Está seguro de que desea eliminar a <strong>${nombre}</strong>? `+
@@ -3561,6 +3606,7 @@ function cerrarModalEliminar() {
 }
 
 async function ejecutarEliminarUsuario() {
+  if (!requiereAdministrador()) return;
   const id  = document.getElementById('eliminarUsuarioId').value;
   if (!id) return;
 
@@ -3601,6 +3647,7 @@ document.getElementById('modalEliminarUsuario').addEventListener('click', functi
 
 // ── EDITAR USUARIO ────────────────────────────────────────────────────────────
 function abrirModalEditar(u) {
+  if (!requiereAdministrador()) return;
   document.getElementById('editUserId').value = u.id;
   document.getElementById('editNombre').value = u.nombre || '';
   document.getElementById('editRol').value = u.rol || '';
@@ -3613,6 +3660,7 @@ function cerrarModalEditar() {
 }
 
 async function guardarEdicionUsuario() {
+  if (!requiereAdministrador()) return;
   const id     = document.getElementById('editUserId').value;
   const nombre = document.getElementById('editNombre').value.trim();
   const rol    = document.getElementById('editRol').value;
@@ -4390,6 +4438,7 @@ async function instalarPWA() {
 
 // ── MENÚ MÓVIL ────────────────────────────────────────────────────────────────
 function mostrarPanelMovil(id, el) {
+  if (id === 'adminUsuarios' && !requiereAdministrador()) return;
   document.querySelectorAll('.menu-movil-item').forEach(m => m.classList.remove('activo'));
   if (el) el.classList.add('activo');
   mostrarPanel(id, null);
