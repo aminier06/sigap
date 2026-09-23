@@ -769,7 +769,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
       </div>
       <div class="menu-grupo">
         <div class="menu-etiqueta">Consultas</div>
-        <div class="menu-item" onclick="mostrarPanel('registros',this)"><span class="menu-icono">📊</span> Mis registros <span id="badgeSync" style="display:none;margin-left:6px;background:#fef3c7;color:#8a5d00;border-radius:999px;padding:2px 7px;font-size:10px;font-weight:800;"></span></div>
+        <div class="menu-item" onclick="mostrarPanel('registros',this)"><span class="menu-icono">📊</span> Registros de mi demarcación <span id="badgeSync" style="display:none;margin-left:6px;background:#fef3c7;color:#8a5d00;border-radius:999px;padding:2px 7px;font-size:10px;font-weight:800;"></span></div>
       </div>
       <div class="menu-grupo">
         <div class="menu-etiqueta">Análisis</div>
@@ -1235,7 +1235,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
 
       <!-- MIS REGISTROS -->
       <div id="panel-registros" class="panel">
-        <div class="dashboard-titulo">Mis registros</div>
+        <div class="dashboard-titulo">Registros de mi demarcación</div>
         <p class="dashboard-sub">Historial de acompañamientos guardados.</p>
         <div class="tabla-wrap-outer">
           <table class="tabla-registros">
@@ -2102,15 +2102,13 @@ async function busquedaRapida(termino) {
 
     const esAdmin = perfilActual?.nivel === 'admin';
     const rol     = perfilActual?.rol || '';
-    let query = sb.from('acompañamientos')
-      .select('id,fecha,nombre_docente,centro_educativo,area_acompanada,grado,estado')
+    let query = filtrarDemarcacion(sb.from('acompañamientos')
+      .select('id,fecha,nombre_docente,centro_educativo,area_acompanada,grado,estado'))
       .or(`nombre_docente.ilike.%${termino}%,centro_educativo.ilike.%${termino}%,codigo_centro.ilike.%${termino}%`)
       .order('fecha', { ascending: false })
       .limit(8);
 
-    if (!esAdmin && rol !== 'Técnico/a Nacional') {
-      query = query.eq('usuario_id', usuarioActual.id);
-    }
+    
 
     const { data } = await query;
     const resultados = data || [];
@@ -2205,6 +2203,34 @@ let todosRegistrosCoord = [];
 
 // Extrae el código numérico inicial de un valor "01 - Barahona" o "01 – BARAHONA"
 // (funciona sin importar el tipo de guion o si el nombre está en mayúsculas).
+
+// Aplicar antes de ejecutar cada consulta de registros.
+function filtrarDemarcacion(query, perfiles = false) {
+  const p = perfilActual;
+  const denegar = () => query.limit(0);
+  if (!usuarioActual || !p) return denegar();
+  const rol = String(p.rol || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  if (rol === 'tecnico/a nacional') return query;
+  const codigo = (valor, longitud) => {
+    const m = String(valor || '').trim().match(/^(\d+)(?=\s|[-–—]|$)/);
+    return m && m[1].length <= longitud ? m[1].padStart(longitud, '0') : '';
+  };
+  const limitarCodigo = (columna, valor, longitud) => {
+    const cod = codigo(valor, longitud);
+    if (!cod) return denegar();
+    // Admite códigos solos y códigos seguidos de un nombre; no otros prefijos.
+    return query.or(columna + '.eq.' + cod + ',' + columna + '.like.' + cod + ' %,' + columna + '.like.' + cod + '-%,' + columna + '.like.' + cod + '–%,' + columna + '.like.' + cod + '—%');
+  };
+  if (rol === 'tecnico/a regional') return limitarCodigo('regional', p.regional, 2);
+  if (rol === 'tecnico/a distrital') return limitarCodigo('distrito', p.distrito, 4);
+  if (rol === 'coordinador/a pedagogico/a' || rol === 'director/a de centro') {
+    const centro = codigo(p.codigo_centro, 5);
+    return centro ? query.eq('codigo_centro', centro) : denegar();
+  }
+  if (p.nivel === 'admin') return query;
+  return denegar();
+}
+
 function codigoDe(valor) {
   const m = (valor || '').match(/^\d+/);
   return m ? m[0] : '';
@@ -2220,21 +2246,8 @@ async function cargarDashboard() {
   const centro   = perfilActual?.codigo_centro || '';
 
   // Construir query base según demarcación del usuario
-  let query = sb.from('acompañamientos').select('*').order('fecha', { ascending: false });
+  let query = filtrarDemarcacion(sb.from('acompañamientos').select('*')).order('fecha', { ascending: false });
 
-  if (esAdmin || rol === 'Técnico/a Nacional') {
-    // Ven todo — sin filtro adicional
-  } else if (rol === 'Técnico/a Regional') {
-    if (regional) query = query.ilike('regional', '%' + regional.split(' - ').slice(1).join(' - ') + '%');
-  } else if (rol === 'Técnico/a Distrital') {
-    if (distrito) query = query.ilike('distrito', '%' + distrito.split(' - ').slice(1).join(' - ') + '%');
-  } else if (rol === 'Coordinador/a Pedagógico/a' || rol === 'Director/a de Centro') {
-    if (centro) query = query.eq('codigo_centro', centro);
-    else query = query.eq('usuario_id', uid);
-  } else {
-    // Cualquier otro rol: solo sus propios registros
-    query = query.eq('usuario_id', uid);
-  }
 
   const filtroEstado   = document.getElementById('filtroEstado')?.value;
   const filtroArea     = document.getElementById('filtroArea')?.value;
@@ -2312,20 +2325,8 @@ async function cargarDashboard() {
   }
 
   // ── Acompañamientos al Equipo de Gestión (misma demarcación y filtros) ──
-  let queryCoord = sb.from('acompanamientos_coordinador').select('*').order('fecha', { ascending: false });
+  let queryCoord = filtrarDemarcacion(sb.from('acompanamientos_coordinador').select('*')).order('fecha', { ascending: false });
 
-  if (esAdmin || rol === 'Técnico/a Nacional') {
-    // Ven todo
-  } else if (rol === 'Técnico/a Regional') {
-    if (regional) queryCoord = queryCoord.ilike('regional', '%' + regional.split(' - ').slice(1).join(' - ') + '%');
-  } else if (rol === 'Técnico/a Distrital') {
-    if (distrito) queryCoord = queryCoord.ilike('distrito', '%' + distrito.split(' - ').slice(1).join(' - ') + '%');
-  } else if (rol === 'Coordinador/a Pedagógico/a' || rol === 'Director/a de Centro') {
-    if (centro) queryCoord = queryCoord.eq('codigo_centro', centro);
-    else queryCoord = queryCoord.eq('usuario_id', uid);
-  } else {
-    queryCoord = queryCoord.eq('usuario_id', uid);
-  }
 
   if (filtroEstado)   queryCoord = queryCoord.eq('estado', filtroEstado);
   if (filtroRegional) queryCoord = queryCoord.ilike('regional', codigoDe(filtroRegional) + '%');
@@ -2521,8 +2522,8 @@ function limpiarFiltros() {
 
 // ── MIS REGISTROS ─────────────────────────────────────────────────────────────
 async function cargarMisRegistros() {
-  // Mis registros: siempre solo los del usuario actual
-  const { data } = await sb.from('acompañamientos').select('*').eq('usuario_id', usuarioActual.id).order('created_at', { ascending: false });
+  // Registros visibles según la demarcación del perfil
+  const { data } = await filtrarDemarcacion(sb.from('acompañamientos').select('*')).order('created_at', { ascending: false });
   const registros = data || [];
   const cuerpo = document.getElementById('cuerpoMisRegistros');
   if (registros.length === 0) {
@@ -2534,13 +2535,13 @@ async function cargarMisRegistros() {
       <td>${r.nombre_docente||'—'}</td><td>${r.centro_educativo||'—'}</td>
       <td>${r.area_acompanada||'—'}</td><td>${r.grado||'—'}</td>
       <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td>
-      <td>${r.estado==='Borrador'?`<button class="btn-secundario btn-sm" onclick="eliminarRegistro('${r.id}')">Eliminar</button>`:'—'}</td>
+      <td>${r.estado==='Borrador' && r.usuario_id === usuarioActual?.id?`<button class="btn-secundario btn-sm" onclick="eliminarRegistro('${r.id}')">Eliminar</button>`:'—'}</td>
     </tr>`).join('');
 }
 
 async function eliminarRegistro(id) {
   if (!confirm('¿Eliminar este borrador?')) return;
-  await sb.from('acompañamientos').delete().eq('id', id);
+  await sb.from('acompañamientos').delete().eq('id', id).eq('usuario_id', usuarioActual.id).eq('estado', 'Borrador');
   mostrarNotif('Borrador eliminado.');
   cargarMisRegistros();
 }
@@ -2734,12 +2735,10 @@ async function cargarSeguimiento() {
   }
 
   // Cargar acompañamientos ejecutados del período
-  let qEjec = sb.from('acompañamientos').select('*')
+  let qEjec = filtrarDemarcacion(sb.from('acompañamientos').select('*'))
     .gte('fecha', desde).lte('fecha', hasta).eq('estado', 'Enviado')
     .order('fecha');
-  if (!esAdmin && rol !== 'Técnico/a Nacional') {
-    qEjec = qEjec.eq('usuario_id', usuarioActual.id);
-  }
+  
 
   const [{ data: planificados }, { data: ejecutados }] = await Promise.all([qPlan, qEjec]);
 
@@ -3381,8 +3380,8 @@ async function toggleUsuario(id, activo) {
 async function cargarTodosRegistros() {
   // Todos los registros: admin ve todos, usuario ve solo los suyos
   const esAdmin = perfilActual?.nivel === 'admin';
-  let query = sb.from('acompañamientos').select('*').order('created_at', { ascending: false });
-  if (!esAdmin) query = query.eq('usuario_id', usuarioActual.id);
+  let query = filtrarDemarcacion(sb.from('acompañamientos').select('*')).order('created_at', { ascending: false });
+  
   const { data, error } = await query;
   const cuerpo = document.getElementById('cuerpoAdminRegistros');
   if (error) { cuerpo.innerHTML='<tr><td colspan="8" style="text-align:center;color:#b42318;padding:24px;">Error al cargar: '+error.message+'</td></tr>'; return; }
@@ -3742,13 +3741,10 @@ async function buscarDocenteHistorial(termino) {
   clearTimeout(historialTimeout);
   historialTimeout = setTimeout(async () => {
     const esAdmin = perfilActual?.nivel === 'admin';
-    let query = sb.from('acompañamientos')
-      .select('nombre_docente,centro_educativo')
+    let query = filtrarDemarcacion(sb.from('acompañamientos')
+      .select('nombre_docente,centro_educativo'))
       .ilike('nombre_docente', `%${termino}%`)
       .limit(8);
-    if (!esAdmin && perfilActual?.rol !== 'Técnico/a Nacional')
-      query = query.eq('usuario_id', usuarioActual.id);
-
     const { data } = await query;
     const unicos = [...new Map((data||[]).map(d => [d.nombre_docente, d])).values()];
 
@@ -3779,14 +3775,11 @@ async function cargarHistorialDocente() {
   if (!nombre) { mostrarNotif('Ingrese el nombre del docente.', true); return; }
 
   const esAdmin = perfilActual?.nivel === 'admin';
-  let query = sb.from('acompañamientos')
-    .select('*')
+  let query = filtrarDemarcacion(sb.from('acompañamientos')
+    .select('*'))
     .ilike('nombre_docente', `%${nombre}%`)
     .eq('estado', 'Enviado')
     .order('fecha', { ascending: true });
-  if (!esAdmin && perfilActual?.rol !== 'Técnico/a Nacional')
-    query = query.eq('usuario_id', usuarioActual.id);
-
   const { data } = await query;
   const registros = data || [];
 
@@ -3928,9 +3921,9 @@ async function generarVistaPrevia() {
   if (!desde || !hasta) { mostrarNotif('Seleccione el período del reporte.', true); return; }
 
   const esAdmin = perfilActual?.nivel === 'admin';
-  let query = sb.from('acompañamientos').select('*')
+  let query = filtrarDemarcacion(sb.from('acompañamientos').select('*'))
     .gte('fecha', desde).lte('fecha', hasta).eq('estado', 'Enviado');
-  if (!esAdmin) query = query.eq('usuario_id', usuarioActual.id);
+  
 
   const { data } = await query;
   const registros = data || [];
@@ -4016,12 +4009,12 @@ async function verificarRezago() {
   const limite = fechaLimite.toISOString().slice(0,10);
 
   // Obtener todos los usuarios activos
-  const { data: usuarios } = await sb.from('perfiles').select('*').eq('activo', true)
+  const { data: usuarios } = await filtrarDemarcacion(sb.from('perfiles').select('*'), true).eq('activo', true)
     .neq('nivel', 'admin');
 
   // Obtener último acompañamiento por usuario
-  const { data: ultimos } = await sb.from('acompañamientos')
-    .select('usuario_id, fecha').eq('estado', 'Enviado')
+  const { data: ultimos } = await filtrarDemarcacion(sb.from('acompañamientos')
+    .select('usuario_id, fecha')).eq('estado', 'Enviado')
     .order('fecha', { ascending: false });
 
   const ultimoPorUsuario = {};
@@ -4139,8 +4132,7 @@ async function verificarCumplimientoCoord() {
   }
 
   // Obtener todos los coordinadores pedagógicos activos
-  const { data: coordinadores } = await sb.from('perfiles')
-    .select('*')
+  const { data: coordinadores } = await filtrarDemarcacion(sb.from('perfiles').select('*'), true)
     .eq('rol', 'Coordinador/a Pedagógico/a')
     .eq('activo', true);
 
@@ -4163,8 +4155,8 @@ async function verificarCumplimientoCoord() {
       .lte('fecha_prevista', hasta);
 
     // Ejecutados (acompañamientos enviados) en el período
-    const { data: ejecutados } = await sb.from('acompañamientos')
-      .select('id')
+    const { data: ejecutados } = await filtrarDemarcacion(sb.from('acompañamientos')
+      .select('id'))
       .eq('usuario_id', coord.id)
       .eq('estado', 'Enviado')
       .gte('fecha', desde)
