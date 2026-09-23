@@ -289,6 +289,10 @@ document.getElementById('modalEliminarUsuario').addEventListener('click', functi
 function abrirModalEditar(u) {
   if (!requiereAdministrador()) return;
   document.getElementById('editUserId').value = u.id;
+  document.getElementById('editEmail').value = u.email || '';
+  document.getElementById('btnResetUsuario').disabled = !u.email;
+  document.getElementById('mensajeResetUsuario').textContent = '';
+
   document.getElementById('editNombre').value = u.nombre || '';
   document.getElementById('editRol').value = u.rol || '';
   document.getElementById('editNivel').value = u.nivel || 'usuario';
@@ -2004,6 +2008,40 @@ function volverLogin() {
   document.getElementById('resetEmail').value = '';
 }
 
+
+async function resetearClaveUsuario() {
+  if (!requiereAdministrador()) return;
+  const id = document.getElementById('editUserId').value;
+  const email = document.getElementById('editEmail').value.trim();
+  const btn = document.getElementById('btnResetUsuario');
+  const msg = document.getElementById('mensajeResetUsuario');
+  if (btn.disabled) return;
+  if (!id || !email) {
+    msg.style.color = 'var(--rojo)';
+    msg.textContent = 'Este usuario no tiene un correo registrado.';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Enviando enlace…';
+  msg.textContent = '';
+  try {
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname
+    });
+    if (error) throw error;
+    if (document.getElementById('editUserId').value !== id) return;
+    msg.style.color = '#2a6b1a';
+    msg.textContent = 'Solicitud enviada. Indique al usuario que revise su correo y la carpeta de spam.';
+  } catch (error) {
+    if (document.getElementById('editUserId').value !== id) return;
+    msg.style.color = 'var(--rojo)';
+    msg.textContent = 'No se pudo enviar el enlace: ' + (error.message || 'Intente nuevamente.');
+  } finally {
+    if (document.getElementById('editUserId').value === id) btn.disabled = false;
+    btn.textContent = 'Resetear contraseña';
+  }
+}
+
 async function enviarReset() {
   const email = document.getElementById('resetEmail').value.trim();
   const msg   = document.getElementById('mensajeReset');
@@ -3649,6 +3687,10 @@ document.getElementById('modalEliminarUsuario').addEventListener('click', functi
 function abrirModalEditar(u) {
   if (!requiereAdministrador()) return;
   document.getElementById('editUserId').value = u.id;
+  document.getElementById('editEmail').value = u.email || '';
+  document.getElementById('btnResetUsuario').disabled = !u.email;
+  document.getElementById('mensajeResetUsuario').textContent = '';
+
   document.getElementById('editNombre').value = u.nombre || '';
   document.getElementById('editRol').value = u.rol || '';
   document.getElementById('editNivel').value = u.nivel || 'usuario';
@@ -4497,6 +4539,13 @@ if ('serviceWorker' in navigator) {
     <h3>✏️ Editar usuario</h3>
     <p>Modifique los datos del usuario y guarde los cambios.</p>
     <input type="hidden" id="editUserId" />
+    <div class="campo" style="margin-bottom:14px;">
+      <label for="editEmail">Correo del usuario</label>
+      <input type="email" id="editEmail" readonly />
+      <p style="font-size:12px;color:#617384;">El usuario recibirá un enlace por correo para elegir una nueva contraseña.</p>
+      <button type="button" class="btn-secundario" id="btnResetUsuario" onclick="resetearClaveUsuario()">Resetear contraseña</button>
+      <div id="mensajeResetUsuario" role="status" aria-live="polite" style="margin-top:8px;font-size:13px;"></div>
+    </div>
     <div class="grid g-2" style="margin-bottom:14px;">
       <div class="campo" style="grid-column:span 2">
         <label>Nombre completo</label>
