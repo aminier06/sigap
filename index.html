@@ -3527,14 +3527,12 @@ async function buscarCentroDist(codigo) {
       estado.textContent = '⚠️ Código no encontrado en el sistema.'; estado.style.color = '#b45309'; limpiar(); return;
     }
     document.getElementById('dCentroEducativo').value = data.nombre;
-    const regionalVal = data.regional_codigo + ' – ' + data.regional_nombre;
-    const distritoVal = data.distrito_codigo + ' – ' + data.distrito_nombre;
+    const regCodigo = String(data.regional_codigo || '').trim().slice(0, 2);
+    const distCodigo = String(data.distrito_codigo || '').trim().slice(0, 4);
     const selReg = document.getElementById('dRegional');
-    if (!Array.from(selReg.options).some(o=>o.value===regionalVal)) {
-      const o = document.createElement('option'); o.value=regionalVal; o.textContent=regionalVal; selReg.appendChild(o);
-    }
-    selReg.value = regionalVal;
-    cargarDistritosDist(distritoVal);
+    const regMatch = Array.from(selReg.options).find(o => o.value.trim().slice(0, 2) === regCodigo);
+    if (regMatch) selReg.value = regMatch.value;
+    cargarDistritosDist(distCodigo);
     document.getElementById('dSectorDist').value = data.sector || 'Urbano';
     estado.textContent = '✅ Centro encontrado.'; estado.style.color = '#2a6b1a';
   }, 400);
@@ -3665,15 +3663,13 @@ async function buscarCentroCoord(codigo) {
       estado.textContent = '⚠️ Código no encontrado en el sistema.'; estado.style.color = '#b45309'; limpiar(); return;
     }
     document.getElementById('cCentroEducativo').value = data.nombre;
-    const regionalVal = data.regional_codigo + ' – ' + data.regional_nombre;
-    const distritoVal = data.distrito_codigo + ' – ' + data.distrito_nombre;
+    const regCodigo = String(data.regional_codigo || '').trim().slice(0, 2);
+    const distCodigo = String(data.distrito_codigo || '').trim().slice(0, 4);
     const selReg = document.getElementById('cRegional');
-    if (!Array.from(selReg.options).some(o=>o.value===regionalVal)) {
-      const o = document.createElement('option'); o.value=regionalVal; o.textContent=regionalVal; selReg.appendChild(o);
-    }
-    selReg.value = regionalVal;
-    cargarDistritosCoord(distritoVal);
-    document.getElementById('cSectorCentro').value = data.sector;
+    const regMatch = Array.from(selReg.options).find(o => o.value.trim().slice(0, 2) === regCodigo);
+    if (regMatch) selReg.value = regMatch.value;
+    cargarDistritosCoord(distCodigo);
+    document.getElementById('cSectorCentro').value = data.sector || '';
     estado.textContent = '✅ Centro encontrado.'; estado.style.color = '#2a6b1a';
   }, 400);
 }
@@ -3785,30 +3781,48 @@ function cargarDistritosDocente(preselect) {
   }
 }
 
+// Busca la lista de distritos tolerando cualquier separador (guión corto, largo, espacio)
+function listaDistritosPara(regVal) {
+  if (!regVal) return [];
+  // Coincidencia exacta primero
+  if (DISTRITOS_POR_REGIONAL[regVal]) return DISTRITOS_POR_REGIONAL[regVal];
+  // Busca por prefijo numérico (primeros 2 dígitos)
+  const codigo = regVal.trim().slice(0, 2);
+  const clave = Object.keys(DISTRITOS_POR_REGIONAL).find(k => k.trim().slice(0, 2) === codigo);
+  return clave ? DISTRITOS_POR_REGIONAL[clave] : [];
+}
+
 function cargarDistritosCoord(preselect) {
   const reg = document.getElementById('cRegional').value;
   const sel = document.getElementById('cDistrito');
   sel.innerHTML = '<option value="">Seleccione distrito</option>';
-  const lista = DISTRITOS_POR_REGIONAL[reg] || [];
-  lista.forEach(d => {
+  listaDistritosPara(reg).forEach(d => {
     const o = document.createElement('option');
-    o.value = d; o.textContent = d;
-    sel.appendChild(o);
+    o.value = d; o.textContent = d; sel.appendChild(o);
   });
-  if (preselect) sel.value = preselect;
+  if (preselect) {
+    // Acepta preselect con cualquier separador: busca por prefijo de 4 dígitos
+    const pre4 = preselect.trim().slice(0, 4);
+    const match = Array.from(sel.options).find(o => o.value.trim().slice(0, 4) === pre4);
+    if (match) sel.value = match.value;
+    else { const o = document.createElement('option'); o.value=preselect; o.textContent=preselect; sel.appendChild(o); sel.value=preselect; }
+  }
 }
 
 function cargarDistritosDist(preselect) {
   const reg = document.getElementById('dRegional').value;
   const sel = document.getElementById('dDistrito');
   sel.innerHTML = '<option value="">Seleccione distrito</option>';
-  const lista = DISTRITOS_POR_REGIONAL[reg] || [];
-  lista.forEach(d => {
+  listaDistritosPara(reg).forEach(d => {
     const o = document.createElement('option');
-    o.value = d; o.textContent = d;
-    sel.appendChild(o);
+    o.value = d; o.textContent = d; sel.appendChild(o);
   });
-  if (preselect) sel.value = preselect;
+  if (preselect) {
+    const pre4 = preselect.trim().slice(0, 4);
+    const match = Array.from(sel.options).find(o => o.value.trim().slice(0, 4) === pre4);
+    if (match) sel.value = match.value;
+    else { const o = document.createElement('option'); o.value=preselect; o.textContent=preselect; sel.appendChild(o); sel.value=preselect; }
+  }
 }
 
 // ── DEMARCACIÓN AL CREAR USUARIO ─────────────────────────────────────────────
