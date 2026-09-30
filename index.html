@@ -1281,6 +1281,23 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
               <div class="campo"><label for="dRolAcompanante">Rol del acompañante</label>
                 <input type="text" id="dRolAcompanante" name="dRolAcompanante" required></div>
             </div>
+            <div class="grid g-4">
+              <div class="campo">
+                <label for="dCodigoCentro">Código del centro</label>
+                <input type="text" id="dCodigoCentro" name="dCodigoCentro"
+                  placeholder="Ej. 02334"
+                  oninput="buscarCentroDist(this.value)"
+                  autocomplete="off" maxlength="10"
+                  style="font-size:16px;font-weight:700;letter-spacing:1px;" />
+                <div id="dEstadoBusquedaCentro" style="font-size:12px;min-height:16px;margin-top:3px;color:#617384;"></div>
+              </div>
+              <div class="campo" style="grid-column:span 3">
+                <label for="dCentroEducativo">Centro educativo</label>
+                <input type="text" id="dCentroEducativo" name="dCentroEducativo" disabled
+                  placeholder="Se completa automáticamente al ingresar el código"
+                  style="background:#f8fbff;color:#2d4a63;" />
+              </div>
+            </div>
             <div class="grid g-3">
               <div class="campo"><label for="dRegional">Regional</label>
                 <select id="dRegional" name="dRegional" onchange="cargarDistritosDist()" required style="background:#f0f7ff;">
@@ -1366,10 +1383,18 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
             <div id="resumenIndicadoresDist"></div>
             <div id="porcentajesNivelesDist" style="margin-top:12px;"></div>
           </div>
-          <!-- SUGERENCIAS -->
+          <!-- SUGERENCIAS CON CHECKBOXES -->
           <div class="seccion-form" id="seccionSugerenciasDist" style="display:none;">
-            <div class="seccion-titulo">Sugerencias de acuerdos</div>
-            <div id="listaSugerenciasDist"></div>
+            <div class="sugerencias-acuerdos">
+              <h3>Acuerdos sugeridos según la escala</h3>
+              <p>Sugerencias automáticas para indicadores en nivel 1 o 2.</p>
+              <div class="lista-sugerencias" id="listaSugerenciasDist"></div>
+              <div class="acciones-sugerencias">
+                <button type="button" class="btn-secundario" onclick="agregarAcuerdosSeleccionadosDist()">Agregar seleccionados</button>
+                <button type="button" class="btn-secundario" onclick="document.querySelectorAll('#listaSugerenciasDist .sugerencia-check').forEach(c=>c.checked=true)">Seleccionar todas</button>
+                <button type="button" class="btn-secundario" onclick="document.querySelectorAll('#listaSugerenciasDist .sugerencia-check').forEach(c=>c.checked=false)">Limpiar selección</button>
+              </div>
+            </div>
           </div>
           <!-- OBSERVACIONES Y ACUERDOS -->
           <div class="seccion-form">
@@ -1380,9 +1405,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
           </div>
           <div class="seccion-form">
             <div class="seccion-titulo">Acuerdos establecidos</div>
-            <div id="listaAcuerdosDist"></div>
-            <button type="button" class="btn-secundario" onclick="agregarAcuerdosDist()" style="margin-top:8px;">+ Agregar acuerdo</button>
-            <input type="hidden" id="dAcuerdosDist" name="dAcuerdosDist">
+            <textarea id="dAcuerdosDist" name="dAcuerdosDist" rows="5" placeholder="Los acuerdos aparecen aquí al agregarlos desde las sugerencias, o escríbalos directamente…" style="width:100%;padding:10px;border:1px solid #c8daea;border-radius:8px;font-size:13px;resize:vertical;"></textarea>
           </div>
           <!-- FIRMAS -->
           <div class="seccion-form">
@@ -3447,13 +3470,13 @@ function crearTablaIndicadoresDist() {
 function actualizarResumenDist() {
   const codigos = INDICADORES_DIST.filter(i=>i.codigo).map(i=>i.codigo);
   let ev=0,med=0,noEv=0,na=0;
-  const sugeridos = [];
+  const sugerencias = [];
   codigos.forEach(c => {
     const sel = document.querySelector(`input[name="val_${c}"]:checked`);
     if (!sel) return;
     const v = parseInt(sel.value);
-    if (v===1) { noEv++; if (SUGERENCIAS_DIST[c]) sugeridos.push(SUGERENCIAS_DIST[c]); }
-    else if (v===2) { med++; if (SUGERENCIAS_DIST[c]) sugeridos.push(SUGERENCIAS_DIST[c]); }
+    if (v===1) { noEv++; if (SUGERENCIAS_DIST[c]) sugerencias.push({...SUGERENCIAS_DIST[c], codigo:c, nivel:v}); }
+    else if (v===2) { med++; if (SUGERENCIAS_DIST[c]) sugerencias.push({...SUGERENCIAS_DIST[c], codigo:c, nivel:v}); }
     else if (v===3) ev++;
     else if (v===4) na++;
   });
@@ -3470,32 +3493,64 @@ function actualizarResumenDist() {
   const sec = document.getElementById('seccionSugerenciasDist');
   const lista = document.getElementById('listaSugerenciasDist');
   if (sec && lista) {
-    if (sugeridos.length) {
-      sec.style.display = '';
-      lista.innerHTML = sugeridos.map(s=>`<div class="sugerencia-item"><span class="sugerencia-badge">${s.b}</span>${s.t}</div>`).join('');
-    } else { sec.style.display = 'none'; lista.innerHTML = ''; }
+    sec.style.display = sugerencias.length ? '' : 'none';
+    lista.innerHTML = sugerencias.length === 0
+      ? '<div class="sugerencia-vacia">No hay sugerencias activas.</div>'
+      : sugerencias.map(s=>`<div class="sugerencia-item"><input type="checkbox" class="sugerencia-check" data-texto="${s.t}" style="margin-top:3px;accent-color:var(--azul);width:18px;height:18px;flex-shrink:0;"><div><div class="sugerencia-codigo">Indicador ${s.codigo} — Nivel ${s.nivel} — ${s.b}</div><div class="sugerencia-texto">${s.t}</div></div></div>`).join('');
   }
 }
 
-function agregarAcuerdosDist() {
-  const lista = document.getElementById('listaAcuerdosDist');
-  if (!lista) return;
-  const idx = lista.children.length + 1;
-  const div = document.createElement('div'); div.style.cssText='display:flex;gap:8px;align-items:center;margin-bottom:6px;';
-  div.innerHTML=`<span style="font-size:12px;color:#8fa5bb;min-width:20px">${idx}.</span>
-    <input type="text" style="flex:1;padding:7px 10px;border:1px solid #c8daea;border-radius:6px;font-size:13px;" placeholder="Acuerdo establecido…">
-    <button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;color:#c0392b;font-size:16px;cursor:pointer;">✕</button>`;
-  lista.appendChild(div);
+function agregarAcuerdosSeleccionadosDist() {
+  const checks = document.querySelectorAll('#listaSugerenciasDist .sugerencia-check:checked');
+  if (!checks.length) { mostrarNotif('Seleccione al menos una sugerencia.'); return; }
+  const campo = document.getElementById('dAcuerdosDist');
+  const textos = Array.from(checks).map(c => '• ' + c.dataset.texto);
+  campo.value = (campo.value.trim() ? campo.value.trim() + '\n' : '') + textos.join('\n');
+  mostrarNotif('Acuerdos agregados.');
+}
+
+// buscarCentroDist — autocompleta centro en el instrumento de técnico distrital
+let buscarTimeoutDist = null;
+async function buscarCentroDist(codigo) {
+  const estado = document.getElementById('dEstadoBusquedaCentro');
+  const limpiar = () => {
+    ['dCentroEducativo','dSectorDist'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+    ['dRegional','dDistrito'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  };
+  codigo = codigo.trim();
+  if (codigo.length < 4) { estado.textContent = ''; limpiar(); return; }
+  clearTimeout(buscarTimeoutDist);
+  buscarTimeoutDist = setTimeout(async () => {
+    estado.textContent = 'Buscando…'; estado.style.color = '#617384';
+    const { data, error } = await sb.from('centros').select('*').eq('codigo', codigo).maybeSingle();
+    if (error || !data) {
+      estado.textContent = '⚠️ Código no encontrado en el sistema.'; estado.style.color = '#b45309'; limpiar(); return;
+    }
+    document.getElementById('dCentroEducativo').value = data.nombre;
+    const regionalVal = data.regional_codigo + ' – ' + data.regional_nombre;
+    const distritoVal = data.distrito_codigo + ' – ' + data.distrito_nombre;
+    const selReg = document.getElementById('dRegional');
+    if (!Array.from(selReg.options).some(o=>o.value===regionalVal)) {
+      const o = document.createElement('option'); o.value=regionalVal; o.textContent=regionalVal; selReg.appendChild(o);
+    }
+    selReg.value = regionalVal;
+    cargarDistritosDist(distritoVal);
+    document.getElementById('dSectorDist').value = data.sector || 'Urbano';
+    estado.textContent = '✅ Centro encontrado.'; estado.style.color = '#2a6b1a';
+  }, 400);
 }
 
 function limpiarFormularioDist() {
   if (!confirm('¿Limpiar todo el formulario del técnico distrital?')) return;
   document.getElementById('formAcompDist').reset();
+  document.getElementById('dNombreAcompanante').value = perfilActual?.nombre || '';
+  document.getElementById('dRolAcompanante').value = perfilActual?.rol || '';
   crearTablaIndicadoresDist();
-  document.getElementById('resumenIndicadoresDist').innerHTML = '';
-  document.getElementById('listaSugerenciasDist').innerHTML = '';
-  document.getElementById('listaAcuerdosDist').innerHTML = '';
+  ['resumenIndicadoresDist','porcentajesNivelesDist','listaSugerenciasDist'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.innerHTML = '';
+  });
   document.getElementById('seccionSugerenciasDist').style.display = 'none';
+  document.getElementById('dEstadoBusquedaCentro').textContent = '';
 }
 
 async function guardarBorradorDist() { mostrarNotif('Borrador guardado localmente.'); }
@@ -3511,11 +3566,12 @@ async function enviarFormularioDist(event) {
       const sel = document.querySelector(`input[name="val_${i.codigo}"]:checked`);
       valores[i.codigo] = sel ? parseInt(sel.value) : null;
     });
-    const acuerdosInputs = document.querySelectorAll('#listaAcuerdosDist input[type=text]');
-    const acuerdos = Array.from(acuerdosInputs).map(i=>i.value.trim()).filter(Boolean).join('\n');
+    const acuerdos = (document.getElementById('dAcuerdosDist')?.value || '').trim();
     const payload = {
       nombre_acompanante: fd.get('dNombreAcompanante'),
       rol_acompanante: fd.get('dRolAcompanante'),
+      codigo_centro: fd.get('dCodigoCentro'),
+      centro_educativo: fd.get('dCentroEducativo'),
       regional: fd.get('dRegional'),
       distrito: fd.get('dDistrito'),
       nombre_docente: fd.get('dNombreTecnico'),
