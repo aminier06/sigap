@@ -380,7 +380,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
     .menu-item:hover{background:var(--azul-claro);color:var(--azul-osc);}
     .menu-item.activo{background:var(--azul-claro);color:var(--azul-osc);border-left-color:var(--azul);font-weight:800;}
     .menu-icono{font-size:16px;width:20px;text-align:center;}
-    .admin-only{display:none;}
+    .menu-item.admin-only{display:none;}
 
     .contenido{flex:1;overflow-y:auto;padding:28px 32px 48px;}
     .panel{display:none;}
@@ -1025,13 +1025,15 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
               <div class="grid g-3 fila-linea">
                 <div class="campo">
                   <label for="regional">Regional</label>
-                  <input type="text" id="regional" name="regional" disabled
-                    placeholder="Autocompletado" style="background:#f0f7ff;" />
+                  <select id="regional" name="regional" onchange="cargarDistritosDocente()" style="background:#f0f7ff;">
+                    <option value="">Seleccione regional</option>
+                  </select>
                 </div>
                 <div class="campo">
                   <label for="distrito">Distrito educativo</label>
-                  <input type="text" id="distrito" name="distrito" disabled
-                    placeholder="Autocompletado" style="background:#f0f7ff;" />
+                  <select id="distrito" name="distrito" style="background:#f0f7ff;">
+                    <option value="">Seleccione distrito</option>
+                  </select>
                 </div>
                 <div class="campo">
                   <label for="sectorCentro">Sector</label>
@@ -1136,8 +1138,12 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
       <div id="panel-formCoord" class="panel">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
           <div>
-            <div class="form-titulo">Instrumento de Acompañamiento al Equipo de Gestión</div>
+            <div class="form-titulo">Instrumento de Acompañamiento al Coordinador Pedagógico</div>
             <p class="form-sub">Nivel Primario — Ministerio de Educación (MINERD)</p>
+          </div>
+          <div id="indicadorAutoguardadoCoord"
+            style="font-size:12px;color:#2a6b1a;background:#d8ead0;border-radius:8px;
+                   padding:6px 12px;opacity:0;transition:opacity .5s;white-space:nowrap;align-self:center;">
           </div>
         </div>
         <form id="formAcompCoord" onsubmit="enviarFormularioCoord(event)">
@@ -1147,86 +1153,111 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
             <div class="bloque-cuerpo">
               <div class="subtitulo">Datos del acompañante</div>
               <div class="grid g-3">
-                <div class="campo"><label>Nombre del acompañante</label><input type="text" id="nombreAcompananteCoord" name="nombreAcompananteCoord" disabled /></div>
-                <div class="campo"><label>Rol</label><input type="text" id="rolAcompananteCoord" name="rolAcompananteCoord" disabled /></div>
+                <div class="campo"><label>Nombre del acompañante</label><input type="text" id="cNombreAcompanante" name="cNombreAcompanante" disabled /></div>
+                <div class="campo"><label>Rol</label><input type="text" id="cRolAcompanante" name="cRolAcompanante" disabled /></div>
               </div>
 
               <div class="subtitulo fila-linea">Datos del centro educativo</div>
               <div class="grid g-4">
                 <div class="campo">
-                  <label for="codigoCentroCoord">Código del centro</label>
-                  <input type="text" id="codigoCentroCoord" name="codigoCentroCoord"
+                  <label for="cCodigoCentro">Código del centro</label>
+                  <input type="text" id="cCodigoCentro" name="cCodigoCentro"
                     placeholder="Ej. 02334"
                     oninput="buscarCentroCoord(this.value)"
                     autocomplete="off"
                     maxlength="10"
                     style="font-size:16px;font-weight:700;letter-spacing:1px;" />
-                  <div id="estadoBusquedaCentroCoord" style="font-size:12px;min-height:16px;margin-top:3px;color:#617384;"></div>
+                  <div id="cEstadoBusquedaCentro" style="font-size:12px;min-height:16px;margin-top:3px;color:#617384;"></div>
                 </div>
                 <div class="campo" style="grid-column:span 3">
-                  <label for="centroEducativoCoord">Centro educativo</label>
-                  <input type="text" id="centroEducativoCoord" name="centroEducativoCoord" disabled
+                  <label for="cCentroEducativo">Centro educativo</label>
+                  <input type="text" id="cCentroEducativo" name="cCentroEducativo" disabled
                     placeholder="Se completa automáticamente al ingresar el código"
                     style="background:#f0f7ff;font-weight:600;" />
                 </div>
               </div>
               <div class="grid g-3 fila-linea">
                 <div class="campo">
-                  <label for="regionalCoord">Regional</label>
-                  <input type="text" id="regionalCoord" name="regionalCoord" disabled
-                    placeholder="Autocompletado" style="background:#f0f7ff;" />
+                  <label for="cRegional">Regional</label>
+                  <select id="cRegional" name="cRegional" onchange="cargarDistritosCoord()" style="background:#f0f7ff;">
+                    <option value="">Seleccione regional</option>
+                  </select>
                 </div>
                 <div class="campo">
-                  <label for="distritoCoord">Distrito educativo</label>
-                  <input type="text" id="distritoCoord" name="distritoCoord" disabled
-                    placeholder="Autocompletado" style="background:#f0f7ff;" />
+                  <label for="cDistrito">Distrito educativo</label>
+                  <select id="cDistrito" name="cDistrito" style="background:#f0f7ff;">
+                    <option value="">Seleccione distrito</option>
+                  </select>
                 </div>
                 <div class="campo">
-                  <label for="sectorCentroCoord">Sector</label>
-                  <input type="text" id="sectorCentroCoord" name="sectorCentroCoord" disabled
+                  <label for="cSectorCentro">Sector</label>
+                  <input type="text" id="cSectorCentro" name="cSectorCentro" disabled
                     placeholder="Autocompletado" style="background:#f0f7ff;" />
                 </div>
               </div>
-              <div class="grid g-2 fila-linea">
-                <div class="campo"><label>Zona</label><div class="opciones"><label class="opcion"><input type="radio" name="zonaCoord" value="Urbana"> Urbana</label><label class="opcion"><input type="radio" name="zonaCoord" value="Rural"> Rural</label></div></div>
-              </div>
 
-              <div class="subtitulo fila-linea">Datos del equipo de gestión</div>
+              <div class="subtitulo fila-linea">Datos del coordinador acompañado</div>
               <div class="grid g-3">
-                <div class="campo"><label for="nombreDirector">Director(a) del centro</label><input type="text" id="nombreDirector" name="nombreDirector" /></div>
-                <div class="campo"><label for="nombreCoordinador">Coordinador(a) pedagógico(a)</label><input type="text" id="nombreCoordinador" name="nombreCoordinador" /></div>
+                <div class="campo"><label for="cNombreCoord">Nombre del coordinador</label><input type="text" id="cNombreCoord" name="cNombreCoord" /></div>
+                <div class="campo"><label for="cCedulaCoord">Cédula</label><input type="text" id="cCedulaCoord" name="cCedulaCoord" placeholder="000-0000000-0" /></div>
+                <div class="campo">
+                  <label for="cGradoAcademicoCoord">Grado académico</label>
+                  <select id="cGradoAcademicoCoord" name="cGradoAcademicoCoord">
+                    <option value="">Seleccione</option>
+                    <option>Licenciatura</option><option>Especialidad</option><option>Maestría</option><option>Doctorado</option>
+                  </select>
+                </div>
               </div>
+              <div class="grid g-3 fila-linea">
+                <div class="campo"><label for="cAniosExpCoord">Años de experiencia</label><input type="number" id="cAniosExpCoord" name="cAniosExpCoord" min="0" /></div>
+                <div class="campo"><label for="cFechaCoord">Fecha</label><input type="date" id="cFechaCoord" name="cFechaCoord" /></div>
+                <div class="campo">
+                  <label>Tipo de acompañamiento</label>
+                  <div class="opciones">
+                    <label class="opcion"><input type="radio" name="cTipoAcomp" value="Diagnóstico"> Diagnóstico</label>
+                    <label class="opcion"><input type="radio" name="cTipoAcomp" value="Focalizado"> Focalizado</label>
+                    <label class="opcion"><input type="radio" name="cTipoAcomp" value="De seguimiento"> De seguimiento</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-              <div class="subtitulo fila-linea">Fecha y horario del acompañamiento</div>
-              <div class="grid g-3">
-                <div class="campo"><label for="fechaCoord">Fecha</label><input type="date" id="fechaCoord" name="fechaCoord" /></div>
-                <div class="campo"><label for="horaInicioCoord">Hora de inicio</label><input type="time" id="horaInicioCoord" name="horaInicioCoord" /></div>
-                <div class="campo"><label for="horaTerminoCoord">Hora de término</label><input type="time" id="horaTerminoCoord" name="horaTerminoCoord" /></div>
-              </div>
+          <div class="bloque">
+            <div class="bloque-cuerpo">
+              <div class="campo"><label for="cFocoCoord">Describa el foco o propósito del acompañamiento</label><textarea id="cFocoCoord" name="cFocoCoord"></textarea></div>
             </div>
           </div>
 
           <div class="bloque">
             <div class="bloque-titulo">Escala de Estimación</div>
             <div class="bloque-cuerpo">
-              <div class="nota-escala">Marque con un cotejo ( ✓ ) según corresponda:<br><strong>1.</strong> Evidenciado &nbsp;&nbsp; <strong>2.</strong> Medianamente evidenciado &nbsp;&nbsp; <strong>3.</strong> No evidenciado &nbsp;&nbsp; <strong>4.</strong> No aplica</div>
-              <div class="tabla-wrap"><table class="indicadores"><thead><tr><th class="col-codigo">#</th><th class="col-indicador">Criterios</th><th class="col-valor">1</th><th class="col-valor">2</th><th class="col-valor">3</th><th class="col-valor">4</th><th class="col-obs">Observaciones</th></tr></thead><tbody id="tablaIndicadoresCoord"></tbody></table></div>
-              <div class="resumen-automatico"><h3>Resumen automático de criterios por nivel</h3><div class="chips-resumen" id="resumenIndicadoresCoord"></div><div class="porcentajes-niveles" id="porcentajesNivelesCoord"></div></div>
-              <div class="sugerencias-acuerdos"><h3>Acuerdos sugeridos según la escala</h3><p>Sugerencias automáticas para criterios en nivel 2 o 3.</p><div class="lista-sugerencias" id="listaSugerenciasAcuerdosCoord"></div><div class="acciones-sugerencias"><button type="button" class="btn-secundario" onclick="agregarAcuerdosSeleccionadosCoord()">Agregar seleccionados</button><button type="button" class="btn-secundario" onclick="seleccionarTodasSugerenciasCoord()">Seleccionar todas</button><button type="button" class="btn-secundario" onclick="limpiarSeleccionSugerenciasCoord()">Limpiar selección</button></div></div>
+              <div class="nota-escala">Lea cada indicador y marque el nivel correspondiente:<br><strong>1.</strong> No evidenciado &nbsp;&nbsp; <strong>2.</strong> Medianamente evidenciado &nbsp;&nbsp; <strong>3.</strong> Evidenciado &nbsp;&nbsp; <strong>4.</strong> No Aplica</div>
+              <div class="tabla-wrap"><table class="indicadores"><thead><tr><th class="col-codigo">#</th><th class="col-indicador">Indicadores</th><th class="col-valor">1</th><th class="col-valor">2</th><th class="col-valor">3</th><th class="col-valor">4</th><th class="col-obs">Observaciones</th></tr></thead><tbody id="tablaIndicadoresCoord"></tbody></table></div>
+              <div class="resumen-automatico"><h3>Resumen automático de indicadores por nivel</h3><div class="chips-resumen" id="resumenIndicadoresCoord"></div><div class="porcentajes-niveles" id="porcentajesNivelesCoord"></div></div>
+              <div class="sugerencias-acuerdos"><h3>Acuerdos sugeridos según la escala</h3><p>Sugerencias automáticas para indicadores en nivel 1 o 2.</p><div class="lista-sugerencias" id="listaSugerenciasCoord"></div><div class="acciones-sugerencias"><button type="button" class="btn-secundario" onclick="agregarAcuerdosCoord()">Agregar seleccionados</button><button type="button" class="btn-secundario" onclick="document.querySelectorAll('#listaSugerenciasCoord .sugerencia-check').forEach(c=>c.checked=true)">Seleccionar todas</button><button type="button" class="btn-secundario" onclick="document.querySelectorAll('#listaSugerenciasCoord .sugerencia-check').forEach(c=>c.checked=false)">Limpiar selección</button></div></div>
+            </div>
+          </div>
+
+          <div class="bloque">
+            <div class="bloque-titulo">Observaciones generales</div>
+            <div class="bloque-cuerpo">
+              <div class="campo"><label for="cObservacionesCoord">Observaciones generales del acompañamiento</label><textarea id="cObservacionesCoord" name="cObservacionesCoord" style="min-height:120px;"></textarea></div>
             </div>
           </div>
 
           <div class="bloque">
             <div class="bloque-titulo">Acuerdos / Compromisos</div>
             <div class="bloque-cuerpo">
-              <div class="campo"><label for="acuerdosCoord">Acuerdos / Compromisos</label><textarea id="acuerdosCoord" name="acuerdosCoord" style="min-height:200px;"></textarea></div>
-              <div class="firmas" style="grid-template-columns:1fr 1fr 1fr;"><div class="firma"><div class="linea"></div><div>Director(a) del Centro</div></div><div class="firma"><div class="linea"></div><div>Coordinador(a) Pedagógico(a)</div></div><div class="firma"><div class="linea"></div><div>Técnico(a) Acompañante &nbsp;·&nbsp; <strong>SELLO</strong></div></div></div>
+              <div class="campo"><label for="cAcuerdosCoord">Acuerdos / Compromisos</label><textarea id="cAcuerdosCoord" name="cAcuerdosCoord" style="min-height:200px;"></textarea></div>
+              <div class="firmas"><div class="firma"><div class="linea"></div><div>Nombre del/la coordinador(a) pedagógico(a)</div></div><div class="firma"><div class="linea"></div><div>Nombre del director(a) del centro</div></div></div>
+              <div class="firmas"><div class="firma"><div class="linea"></div><div>Nombre del técnico(a) distrital &nbsp;·&nbsp; <strong>SELLO</strong></div></div><div class="firma"><div class="linea"></div><div>Nombre del técnico(a) regional</div></div></div>
             </div>
           </div>
 
           <div class="acciones">
             <button type="button" class="btn-primario" onclick="window.print()">🖨️ Imprimir / PDF</button>
-            <button type="button" class="btn-secundario" id="btnBorradorCoord" onclick="guardarBorradorCoord()">💾 Guardar borrador</button>
+            <button type="button" class="btn-secundario" onclick="guardarBorradorCoord()">💾 Guardar borrador</button>
             <button type="submit" class="btn-primario" id="btnEnviarCoord">✅ Enviar registro</button>
             <button type="button" class="btn-peligro" onclick="limpiarFormularioCoord()">🗑️ Limpiar</button>
           </div>
@@ -1958,9 +1989,14 @@ function mostrarApp() {
   document.getElementById('anioFooter').textContent = new Date().getFullYear();
   document.querySelector('.contenido').style.paddingBottom = '52px';
   crearTablaIndicadores();
-  document.getElementById('nombreAcompananteCoord').value = perfilActual?.nombre || '';
-  document.getElementById('rolAcompananteCoord').value = perfilActual?.rol || '';
   crearTablaIndicadoresCoord();
+  inicializarSelectsRegionales();
+  if (perfilActual) {
+    const cn = document.getElementById('cNombreAcompanante');
+    const cr = document.getElementById('cRolAcompanante');
+    if (cn) cn.value = perfilActual.nombre || '';
+    if (cr) cr.value = perfilActual.rol || '';
+  }
   cargarDashboard();
 }
 
@@ -2325,7 +2361,7 @@ async function cargarDashboard() {
   }
 
   // ── Acompañamientos al Equipo de Gestión (misma demarcación y filtros) ──
-  let queryCoord = filtrarDemarcacion(sb.from('acompanamientos_coordinador').select('*')).order('fecha', { ascending: false });
+  let queryCoord = filtrarDemarcacion(sb.from('acompañamientos').select('*')).eq('tipo_instrumento','coordinador').order('fecha', { ascending: false });
 
 
   if (filtroEstado)   queryCoord = queryCoord.eq('estado', filtroEstado);
@@ -2412,9 +2448,9 @@ function calcularResumenIndicadoresDocente(registros) {
 
 function calcularResumenCriteriosCoord(registros) {
   const stats = {};
-  CRITERIOS_COORD.filter(i => i.codigo).forEach(i => { stats[i.codigo] = { codigo: i.codigo, texto: i.texto, evid: 0, medio: 0, noEvid: 0, total: 0 }; });
+  INDICADORES_COORD.filter(i => i.codigo).forEach(i => { stats[i.codigo] = { codigo: i.codigo, texto: i.texto, evid: 0, medio: 0, noEvid: 0, total: 0 }; });
   registros.forEach(r => {
-    const crit = r.criterios;
+    const crit = r.indicadores || r.criterios;
     if (!crit) return;
     Object.keys(stats).forEach(cod => {
       const item = crit[cod];
@@ -2850,8 +2886,14 @@ async function buscarCentro(codigo) {
       return;
     }
     document.getElementById('centroEducativo').value = data.nombre;
-    document.getElementById('regional').value = data.regional_codigo + ' – ' + data.regional_nombre;
-    document.getElementById('distrito').value = data.distrito_codigo + ' – ' + data.distrito_nombre;
+    const regionalVal = data.regional_codigo + ' – ' + data.regional_nombre;
+    const distritoVal = data.distrito_codigo + ' – ' + data.distrito_nombre;
+    const selReg = document.getElementById('regional');
+    if (!Array.from(selReg.options).some(o=>o.value===regionalVal)) {
+      const o = document.createElement('option'); o.value=regionalVal; o.textContent=regionalVal; selReg.appendChild(o);
+    }
+    selReg.value = regionalVal;
+    cargarDistritosDocente(distritoVal);
     document.getElementById('sectorCentro').value = data.sector;
     estado.textContent = '✅ Centro encontrado.';
     estado.style.color = '#2a6b1a';
@@ -2936,10 +2978,11 @@ const INDICADORES = [
   {codigo:'1.1',texto:'Cuenta con una planificación que responde a las estrategias orientadas desde el Nivel Primario.'},
   {codigo:'1.2',texto:'Muestra una planificación diaria actualizada, orientada al desarrollo de las competencias del grado y propias del área acompañada, tomando como base la planificación de unidad.'},
   {codigo:'1.3',texto:'Toma en cuenta las guías didácticas de su ciclo para la realización de la planificación diaria como se orientó desde el Nivel Primario.'},
-  {codigo:'1.4',texto:'Existe coherencia entre la intención pedagógica y las actividades elaboradas para cada uno de los momentos de la clase.'},
-  {codigo:'1.5',texto:'Se observan estrategias y actividades diferenciadas para atender a la diversidad del aula.'},
-  {codigo:'1.6',texto:'Elabora actividades de evaluación alineadas con la intención pedagógica e instrumentos para registrar los aprendizajes obtenidos por los estudiantes.'},
-  {codigo:'1.7',texto:'Se evidencia en la planificación diaria recursos didácticos previamente seleccionados en función al desarrollo de los contenidos a desarrollar y la intención pedagógica.'},
+  {codigo:'1.4',texto:'La secuencia didáctica que está trabajando se corresponde con la sugerida en la calendarización de la Dirección de Educación Primaria para el período en curso.'},
+  {codigo:'1.5',texto:'Existe coherencia entre la intención pedagógica y las actividades elaboradas para cada uno de los momentos de la clase.'},
+  {codigo:'1.6',texto:'Se observan estrategias y actividades diferenciadas para atender a la diversidad del aula.'},
+  {codigo:'1.7',texto:'Elabora actividades de evaluación alineadas con la intención pedagógica e instrumentos para registrar los aprendizajes obtenidos por los estudiantes.'},
+  {codigo:'1.8',texto:'Se evidencia en la planificación diaria recursos didácticos previamente seleccionados en función al desarrollo de los contenidos a desarrollar y la intención pedagógica.'},
   {tipo:'seccion',titulo:'2. Momentos de la práctica pedagógica'},
   {tipo:'subseccion',titulo:'Actividades de inicio'},
   {codigo:'2.1',texto:'Realiza la retroalimentación del tema anterior utilizando estrategias innovadoras.'},
@@ -2960,11 +3003,13 @@ const INDICADORES = [
   {tipo:'subseccion',titulo:'Actividades de cierre'},
   {codigo:'2.15',texto:'Realiza una actividad o ejercicio de evaluación alineada con la intención pedagógica, usando alguna técnica o instrumento de evaluación para registrar los aprendizajes obtenidos por los estudiantes.'},
   {codigo:'2.16',texto:'Realiza el cierre pedagógico de la clase retomando la intención pedagógica presentada y socializada al inicio de la clase.'},
-  {tipo:'seccion',titulo:'3. Aspectos a tomar en cuenta'},
-  {codigo:'3.1',texto:'El docente muestra evidencia de la realización de evaluaciones sistemáticas y periódicas para determinar el nivel de avance de los estudiantes en el aprendizaje.'},
-  {codigo:'3.2',texto:'El docente hace un uso correcto del registro de grado completando todos los aspectos que tiene que haber trabajado al momento del acompañamiento.'},
-  {codigo:'3.3',texto:'Los cuadernos de los niños están organizados y hay evidencias de un trabajo sistemático mostrando coherencia entre lo planificado por el docente y lo trabajado por los estudiantes.'},
-  {codigo:'3.4',texto:'Los portafolios de los estudiantes están organizados y tienen evidencias de las evaluaciones y producciones de los estudiantes que permiten visualizar la evolución de sus aprendizajes.'},
+  {tipo:'seccion',titulo:'3. Aspectos a tomar en cuenta (Ordenanza 04-2023)'},
+  {codigo:'3.1',texto:'Tiene el registro de grado actualizado con las calificaciones de los indicadores de logro del período en curso, según lo establece la Ordenanza 04-2023.'},
+  {codigo:'3.2',texto:'Las calificaciones registradas son coherentes con las evidencias de los cuadernos y producciones de los estudiantes.'},
+  {codigo:'3.3',texto:'Las evaluaciones aplicadas en el período en curso están registradas y pueden mostrarse al momento del acompañamiento.'},
+  {codigo:'3.4',texto:'Los estudiantes que requirieron recuperación pedagógica están identificados y tienen registrado el proceso y resultado.'},
+  {codigo:'3.5',texto:'Los cuadernos de los estudiantes están organizados y muestran coherencia entre lo planificado por el docente y lo trabajado en el aula.'},
+  {codigo:'3.6',texto:'Los portafolios de los estudiantes contienen producciones que evidencian el progreso en las competencias del grado.'},
   {tipo:'seccion',titulo:'4. Una mirada reflexiva de la clase acompañada'},
   {codigo:'4.1',texto:'El docente logra identificar sus fortalezas a partir de las preguntas reflexivas realizadas por el acompañante.'},
   {codigo:'4.2',texto:'Logra identificar las oportunidades de mejora a partir de las preguntas reflexivas realizadas por el acompañante.'},
@@ -2976,10 +3021,11 @@ const SUGERENCIAS = {
   '1.1':{b:'Planificación',t:'Elaborar la planificación alineada con las estrategias orientadas desde el Nivel Primario.'},
   '1.2':{b:'Planificación',t:'Actualizar la planificación diaria tomando como base la planificación de unidad y las competencias del grado y del área.'},
   '1.3':{b:'Planificación',t:'Incorporar de manera sistemática las guías didácticas del ciclo en la planificación diaria.'},
-  '1.4':{b:'Planificación',t:'Revisar la coherencia entre la intención pedagógica y las actividades previstas para cada momento de la clase.'},
-  '1.5':{b:'Planificación',t:'Incluir estrategias diferenciadas para atender la diversidad del aula.'},
-  '1.6':{b:'Planificación',t:'Diseñar actividades e instrumentos de evaluación alineados con la intención pedagógica.'},
-  '1.7':{b:'Planificación',t:'Seleccionar previamente los recursos didácticos según el contenido y la intención pedagógica.'},
+  '1.4':{b:'Planificación',t:'Ajustar la secuencia didáctica trabajada para que se corresponda con la calendarización de la Dirección de Educación Primaria para el período en curso.'},
+  '1.5':{b:'Planificación',t:'Revisar la coherencia entre la intención pedagógica y las actividades previstas para cada momento de la clase.'},
+  '1.6':{b:'Planificación',t:'Incluir estrategias diferenciadas para atender la diversidad del aula.'},
+  '1.7':{b:'Planificación',t:'Diseñar actividades e instrumentos de evaluación alineados con la intención pedagógica.'},
+  '1.8':{b:'Planificación',t:'Seleccionar previamente los recursos didácticos según el contenido y la intención pedagógica.'},
   '2.1':{b:'Inicio',t:'Implementar estrategias innovadoras para la retroalimentación del tema anterior.'},
   '2.2':{b:'Inicio',t:'Comunicar explícitamente la intención pedagógica al inicio de cada clase.'},
   '2.3':{b:'Inicio',t:'Incorporar actividades para explorar los conocimientos previos de los estudiantes.'},
@@ -2996,10 +3042,12 @@ const SUGERENCIAS = {
   '2.14':{b:'Desarrollo',t:'Organizar mejor el tiempo destinado a inicio, desarrollo y cierre de la clase.'},
   '2.15':{b:'Cierre',t:'Aplicar actividades de evaluación alineadas con la intención pedagógica y registrar los resultados obtenidos.'},
   '2.16':{b:'Cierre',t:'Realizar cierres pedagógicos que retomen la intención y los aprendizajes desarrollados en la clase.'},
-  '3.1':{b:'Evaluación',t:'Realizar evaluaciones sistemáticas y periódicas para dar seguimiento al avance de cada estudiante.'},
-  '3.2':{b:'Evaluación',t:'Mantener actualizado el registro de grado conforme a los aspectos trabajados.'},
-  '3.3':{b:'Evaluación',t:'Organizar los cuadernos de los estudiantes de manera coherente con la planificación y el trabajo de aula.'},
-  '3.4':{b:'Evaluación',t:'Fortalecer el uso del portafolio como evidencia de evaluación y seguimiento del aprendizaje.'},
+  '3.1':{b:'Registro y evaluación',t:'Mantener el registro de grado actualizado con las calificaciones de los indicadores de logro del período en curso, conforme a la Ordenanza 04-2023.'},
+  '3.2':{b:'Registro y evaluación',t:'Asegurar que las calificaciones del registro de grado sean coherentes con las evidencias en cuadernos y producciones de los estudiantes.'},
+  '3.3':{b:'Registro y evaluación',t:'Organizar y tener disponibles las evaluaciones aplicadas en el período en curso al momento del acompañamiento.'},
+  '3.4':{b:'Recuperación pedagógica',t:'Identificar a los estudiantes que requieren recuperación pedagógica, documentar el proceso y registrar los resultados conforme a la Ordenanza 04-2023.'},
+  '3.5':{b:'Evidencias de aprendizaje',t:'Organizar los cuadernos de los estudiantes de manera coherente con la planificación y el trabajo de aula.'},
+  '3.6':{b:'Evidencias de aprendizaje',t:'Fortalecer el uso del portafolio como evidencia de progreso en las competencias del grado.'},
 };
 
 function crearTablaIndicadores() {
@@ -3053,59 +3101,109 @@ function agregarAcuerdosSeleccionados(){
 function seleccionarTodasSugerencias(){document.querySelectorAll('.sugerencia-check').forEach(c=>c.checked=true);}
 function limpiarSeleccionSugerencias(){document.querySelectorAll('.sugerencia-check').forEach(c=>c.checked=false);}
 
-// ── INSTRUMENTO AL EQUIPO DE GESTIÓN (COORDINADOR) ───────────────────────────
-// Criterios 10-18 del Instrumento para acompañamiento (Dirección de Educación
-// Primaria), separados en su propio instrumento para el equipo de gestión.
-// Escala: 1=Evidenciado 2=Medianamente evidenciado 3=No evidenciado 4=No aplica
-const CRITERIOS_COORD = [
-  {tipo:'seccion',titulo:'Acompañamiento de parte del equipo de gestión a la práctica pedagógica'},
-  {codigo:'10',texto:'El director y coordinador cuentan con cronograma de acompañamiento actualizado y muestran evidencias de acompañamiento realizado a la práctica pedagógica (cronograma, instrumentos de acompañamiento, seguimiento a acuerdos contraídos con el docente).'},
-  {codigo:'11',texto:'El equipo de gestión cuenta con plan de trabajo preventivo con miras a la Evaluación Diagnóstica Nacional a realizarse este año escolar en tercer grado y para quinto grado (futuros evaluados en el año 2027).'},
-  {codigo:'12',texto:'El equipo de gestión ha incluido dentro de sus planes acciones para atender estudiantes en sobreedad, de acuerdo con la Orden Departamental 29-2024 que establece el protocolo de la Unidad Distrital de Evaluación y Servicios Académicos.'},
-  {codigo:'13',texto:'El equipo de gestión y docentes están desarrollando proyectos de Educación Ambiental este año escolar y muestran evidencia de estos.'},
-  {codigo:'14',texto:'El equipo de gestión cuenta con evidencia de acompañamiento y preselección a los docentes alfabetizadores, de acuerdo con la Orden Departamental 42-2024 que establece la premiación a los docentes alfabetizadores.'},
-  {codigo:'15',texto:'El equipo de gestión cuenta con evidencia de implementación de los protocolos de transición de inicial a primaria y de primaria a secundaria.'},
-  {tipo:'seccion',titulo:'Resultados de aprendizajes reflejados en la evaluación de seguimiento'},
-  {codigo:'16',texto:'Tienen las pruebas corregidas debidamente, los resultados de las evaluaciones sistematizados y evidencia del análisis de esos resultados con sus docentes.'},
-  {codigo:'17',texto:'Presentan planes de mejora y/o de acción elaborados en coordinación con los docentes, con actividades adecuadas para dar respuesta a las oportunidades de mejora detectadas en las evaluaciones.'},
-  {codigo:'18',texto:'Los planes muestran proyecciones de metas con miras al avance y la mejora continua de los aprendizajes.'},
+// ── INDICADORES COORDINADOR ───────────────────────────────────────────────────
+const INDICADORES_COORD = [
+  {tipo:'seccion',titulo:'1. Planificación del acompañamiento'},
+  {codigo:'C1.1',texto:'Cuenta con un plan de acompañamiento para el período que incluye docentes priorizados según necesidades identificadas.'},
+  {codigo:'C1.2',texto:'El cronograma de acompañamientos está actualizado y refleja los realizados y los pendientes.'},
+  {codigo:'C1.3',texto:'Demuestra conocimiento del instrumento de acompañamiento y sus indicadores antes de iniciar la observación.'},
+  {codigo:'C1.4',texto:'Coordina con el director la visita al aula con anticipación y define roles.'},
+  {codigo:'C1.5',texto:'Verifica el cumplimiento de los acuerdos establecidos en el acompañamiento anterior antes de iniciar el nuevo.'},
+  {tipo:'seccion',titulo:'2. Observación de la clase'},
+  {codigo:'C2.1',texto:'Observa la clase completa (o el tiempo acordado) sin interrumpir el proceso de enseñanza.'},
+  {codigo:'C2.2',texto:'Registra evidencias concretas y objetivas durante la observación, sin emitir juicios de valor en el momento.'},
+  {codigo:'C2.3',texto:'Contrasta lo observado con la planificación diaria del docente.'},
+  {codigo:'C2.4',texto:'Examina cuadernos o producciones de estudiantes como parte de la observación.'},
+  {tipo:'seccion',titulo:'3. Retroalimentación y reflexión pedagógica'},
+  {codigo:'C3.1',texto:'Realiza la retroalimentación el mismo día del acompañamiento o al siguiente.'},
+  {codigo:'C3.2',texto:'Inicia el diálogo con preguntas reflexivas que permiten al docente identificar sus fortalezas.'},
+  {codigo:'C3.3',texto:'Fundamenta las sugerencias en evidencias concretas registradas durante la observación.'},
+  {codigo:'C3.4',texto:'Vincula la retroalimentación con los documentos curriculares oficiales (guías, secuencias, calendarización).'},
+  {codigo:'C3.5',texto:'Construye acuerdos de mejora junto con el docente, estableciendo responsable, fecha y evidencia esperada.'},
+  {tipo:'seccion',titulo:'4. Formación y desarrollo docente'},
+  {codigo:'C4.1',texto:'Facilita o coordina espacios de formación grupal para abordar necesidades comunes identificadas.'},
+  {codigo:'C4.2',texto:'Promueve el intercambio de buenas prácticas entre los docentes del centro.'},
+  {codigo:'C4.3',texto:'Da seguimiento a la aplicación en el aula de los aprendizajes de la formación (CON BASE / CRECE).'},
+  {codigo:'C4.4',texto:'Identifica docentes que requieren apoyo diferenciado y lo gestiona con el equipo de gestión o técnico distrital.'},
+  {tipo:'seccion',titulo:'5. Gestión de información y reporte'},
+  {codigo:'C5.1',texto:'Registra los acompañamientos en SIGAP de forma oportuna y completa.'},
+  {codigo:'C5.2',texto:'Elabora informes periódicos que sintetizan hallazgos, avances y alertas del centro.'},
+  {codigo:'C5.3',texto:'Comparte los hallazgos con el director del centro y el técnico distrital.'},
+  {codigo:'C5.4',texto:'Utiliza los datos de acompañamientos anteriores para priorizar y ajustar su plan.'},
+  {tipo:'seccion',titulo:'6. Evaluación, SIREV y plan de acción'},
+  {codigo:'C6.1',texto:'Verifica que las evaluaciones aplicadas por los docentes están completas, correctamente organizadas y corresponden al período establecido.'},
+  {codigo:'C6.2',texto:'Revisa y valida los resultados de las evaluaciones antes de su registro en SIREV, asegurando la coherencia y veracidad de los datos.'},
+  {codigo:'C6.3',texto:'Garantiza que el registro en SIREV se realiza en los plazos establecidos y con datos desagregados por grado y sección.'},
+  {codigo:'C6.4',texto:'Analiza con el equipo de gestión los resultados por área, grado y grupo de estudiantes.'},
+  {codigo:'C6.5',texto:'A partir del análisis de SIREV, elabora o actualiza el plan de acción del centro con metas, responsables y fechas.'},
+  {codigo:'C6.6',texto:'Da seguimiento al cumplimiento del plan de acción en visitas posteriores y documenta los avances.'},
+  {tipo:'seccion',titulo:'7. Registros, recuperación pedagógica y Ordenanza 04-2023'},
+  {codigo:'C7.1',texto:'Verifica que los docentes tienen el registro de grado actualizado y completo en todos los períodos trabajados, conforme a la Ordenanza 04-2023.'},
+  {codigo:'C7.2',texto:'Comprueba la coherencia entre las calificaciones del registro de grado y las evidencias en cuadernos y portafolios de los estudiantes.'},
+  {codigo:'C7.3',texto:'Identifica a los estudiantes que requieren recuperación pedagógica y verifica que el docente ha diseñado e implementado las acciones correspondientes.'},
+  {codigo:'C7.4',texto:'Da seguimiento a los resultados de la recuperación pedagógica y verifica su registro en el instrumento oficial.'},
+  {codigo:'C7.5',texto:'Verifica que las familias reciben los informes de aprendizaje en los períodos establecidos por la ordenanza.'},
 ];
 
 const SUGERENCIAS_COORD = {
-  '10':{b:'Gestión pedagógica',t:'Actualizar el cronograma de acompañamiento y documentar las evidencias de acompañamiento a la práctica pedagógica.'},
-  '11':{b:'Gestión pedagógica',t:'Elaborar un plan de trabajo preventivo orientado a la Evaluación Diagnóstica Nacional de tercer y quinto grado.'},
-  '12':{b:'Gestión pedagógica',t:'Incluir en la planificación acciones para atender a los estudiantes en sobreedad, conforme a la Orden Departamental 29-2024.'},
-  '13':{b:'Gestión pedagógica',t:'Impulsar y documentar el desarrollo de proyectos de Educación Ambiental en el centro.'},
-  '14':{b:'Gestión pedagógica',t:'Registrar la evidencia de acompañamiento y preselección de los docentes alfabetizadores, según la Orden Departamental 42-2024.'},
-  '15':{b:'Gestión pedagógica',t:'Documentar la implementación de los protocolos de transición entre inicial-primaria y primaria-secundaria.'},
-  '16':{b:'Resultados de aprendizaje',t:'Sistematizar la corrección de pruebas y el análisis de resultados con los docentes.'},
-  '17':{b:'Resultados de aprendizaje',t:'Elaborar planes de mejora o de acción coordinados con los docentes según las oportunidades detectadas.'},
-  '18':{b:'Resultados de aprendizaje',t:'Incorporar en los planes proyecciones de metas orientadas a la mejora continua de los aprendizajes.'},
+  'C1.1':{b:'Planificación',t:'Elaborar un plan de acompañamiento para el período que incluya docentes priorizados según las necesidades identificadas.'},
+  'C1.2':{b:'Planificación',t:'Actualizar el cronograma de acompañamientos reflejando los realizados y los pendientes.'},
+  'C1.3':{b:'Planificación',t:'Revisar el instrumento de acompañamiento y sus indicadores antes de cada visita al aula.'},
+  'C1.4':{b:'Planificación',t:'Coordinar previamente con el director la visita al aula y definir los roles de cada uno.'},
+  'C1.5':{b:'Seguimiento',t:'Revisar los acuerdos establecidos en el acompañamiento anterior como primer paso de cada visita.'},
+  'C2.1':{b:'Observación',t:'Observar la clase completa o el tiempo acordado sin interrumpir el proceso de enseñanza.'},
+  'C2.2':{b:'Observación',t:'Registrar evidencias concretas y objetivas durante la observación, reservando los juicios para la retroalimentación.'},
+  'C2.3':{b:'Observación',t:'Contrastar lo observado en el aula con la planificación diaria del docente.'},
+  'C2.4':{b:'Observación',t:'Incluir la revisión de cuadernos o producciones de estudiantes como parte sistemática de la observación.'},
+  'C3.1':{b:'Retroalimentación',t:'Realizar la retroalimentación el mismo día del acompañamiento o al día siguiente.'},
+  'C3.2':{b:'Retroalimentación',t:'Iniciar el diálogo de retroalimentación con preguntas reflexivas que permitan al docente identificar sus propias fortalezas.'},
+  'C3.3':{b:'Retroalimentación',t:'Fundamentar todas las sugerencias en evidencias concretas registradas durante la observación.'},
+  'C3.4':{b:'Retroalimentación',t:'Vincular la retroalimentación con los documentos curriculares oficiales vigentes.'},
+  'C3.5':{b:'Acuerdos',t:'Construir acuerdos de mejora junto con el docente, especificando responsable, fecha y evidencia esperada.'},
+  'C4.1':{b:'Formación',t:'Facilitar o coordinar espacios de formación grupal para atender necesidades comunes identificadas en los acompañamientos.'},
+  'C4.2':{b:'Formación',t:'Crear espacios para el intercambio de buenas prácticas entre los docentes del centro.'},
+  'C4.3':{b:'Formación',t:'Dar seguimiento sistemático a la aplicación en el aula de los aprendizajes de CON BASE o CRECE.'},
+  'C4.4':{b:'Formación',t:'Identificar docentes que requieren apoyo diferenciado y gestionarlo con el equipo de gestión o el técnico distrital.'},
+  'C5.1':{b:'Registro',t:'Registrar los acompañamientos en SIGAP de forma oportuna y completa después de cada visita.'},
+  'C5.2':{b:'Reporte',t:'Elaborar informes periódicos que sinteticen hallazgos, avances y alertas del centro.'},
+  'C5.3':{b:'Reporte',t:'Compartir los hallazgos de los acompañamientos con el director del centro y el técnico distrital.'},
+  'C5.4':{b:'Análisis',t:'Utilizar los datos de acompañamientos anteriores para priorizar y ajustar el plan del período.'},
+  'C6.1':{b:'Evaluación',t:'Verificar que las evaluaciones de todos los docentes estén completas, organizadas y correspondan al período establecido.'},
+  'C6.2':{b:'SIREV',t:'Revisar y validar los resultados de las evaluaciones antes de registrarlos en SIREV, asegurando coherencia y veracidad.'},
+  'C6.3':{b:'SIREV',t:'Garantizar que el registro en SIREV se realice en los plazos establecidos con datos desagregados por grado y sección.'},
+  'C6.4':{b:'Análisis',t:'Analizar con el equipo de gestión los resultados por área, grado y grupo de estudiantes.'},
+  'C6.5':{b:'Plan de acción',t:'Elaborar o actualizar el plan de acción del centro a partir del análisis de SIREV, con metas, responsables y fechas.'},
+  'C6.6':{b:'Plan de acción',t:'Dar seguimiento al cumplimiento del plan de acción en cada visita posterior y documentar los avances.'},
+  'C7.1':{b:'Registro de grado',t:'Verificar que todos los docentes tienen el registro de grado actualizado en los períodos trabajados, conforme a la Ordenanza 04-2023.'},
+  'C7.2':{b:'Coherencia',t:'Comprobar la coherencia entre las calificaciones del registro de grado y las evidencias en cuadernos y portafolios.'},
+  'C7.3':{b:'Recuperación',t:'Identificar estudiantes que requieren recuperación pedagógica y verificar que el docente ha diseñado e implementado las acciones.'},
+  'C7.4':{b:'Recuperación',t:'Dar seguimiento a los resultados de la recuperación pedagógica y verificar su registro en el instrumento oficial.'},
+  'C7.5':{b:'Familia',t:'Verificar que las familias reciben los informes de aprendizaje en los períodos establecidos por la Ordenanza 04-2023.'},
 };
 
 function crearTablaIndicadoresCoord() {
   const tabla = document.getElementById('tablaIndicadoresCoord');
   if (!tabla) return;
   tabla.innerHTML = '';
-  CRITERIOS_COORD.forEach(item => {
+  INDICADORES_COORD.forEach(item => {
     if (item.tipo === 'seccion') { const tr = document.createElement('tr'); tr.className='fila-seccion'; tr.innerHTML='<td colspan="7">'+item.titulo+'</td>'; tabla.appendChild(tr); return; }
     const tr = document.createElement('tr');
     let radios = '';
-    [1,2,3,4].forEach(v => { radios += '<td class="col-valor"><label class="valoracion"><input type="radio" name="valc_'+item.codigo+'" value="'+v+'"></label></td>'; });
-    tr.innerHTML = '<td class="col-codigo">'+item.codigo+'</td><td class="col-indicador">'+item.texto+'</td>'+radios+'<td class="col-obs"><textarea name="obsc_'+item.codigo+'" placeholder="Observaciones…" style="min-height:68px;"></textarea></td>';
+    [1,2,3,4].forEach(v => { radios += '<td class="col-valor"><label class="valoracion"><input type="radio" name="val_'+item.codigo+'" value="'+v+'"></label></td>'; });
+    tr.innerHTML = '<td class="col-codigo">'+item.codigo+'</td><td class="col-indicador">'+item.texto+'</td>'+radios+'<td class="col-obs"><textarea name="obs_'+item.codigo+'" placeholder="Observaciones…" style="min-height:68px;"></textarea></td>';
     tabla.appendChild(tr);
   });
-  document.querySelectorAll('input[type="radio"][name^="valc_"]').forEach(el => el.addEventListener('change', actualizarResumenCoord));
+  document.querySelectorAll('#tablaIndicadoresCoord input[type="radio"]').forEach(el => el.addEventListener('change', actualizarResumenCoord));
 }
 
 function actualizarResumenCoord() {
   const totales={1:0,2:0,3:0,4:0};
-  const totalInd = CRITERIOS_COORD.filter(i=>i.codigo).length;
+  const totalInd = INDICADORES_COORD.filter(i=>i.codigo).length;
   const sugerencias=[];
-  CRITERIOS_COORD.forEach(item => {
+  INDICADORES_COORD.forEach(item => {
     if (!item.codigo) return;
-    const sel = document.querySelector('input[name="valc_'+item.codigo+'"]:checked');
-    if (sel) { const n=sel.value; totales[n]++; if((n==='2'||n==='3')&&SUGERENCIAS_COORD[item.codigo]) sugerencias.push({codigo:item.codigo,nivel:n,...SUGERENCIAS_COORD[item.codigo]}); }
+    const sel = document.querySelector('input[name="val_'+item.codigo+'"]:checked');
+    if (sel) { const n=sel.value; totales[n]++; if((n==='1'||n==='2')&&SUGERENCIAS_COORD[item.codigo]) sugerencias.push({codigo:item.codigo,nivel:n,...SUGERENCIAS_COORD[item.codigo]}); }
   });
   const respondidos=totales[1]+totales[2]+totales[3]+totales[4];
   const base=totalInd-totales[4];
@@ -3114,117 +3212,107 @@ function actualizarResumenCoord() {
     ['Nivel 1: '+totales[1],'Nivel 2: '+totales[2],'Nivel 3: '+totales[3],'Nivel 4 (N/A): '+totales[4],'Sin responder: '+(totalInd-respondidos),'Total: '+totalInd]
     .map(t=>'<div class="chip-resumen">'+t+'</div>').join('');
   document.getElementById('porcentajesNivelesCoord').innerHTML=
-    [['Evidenciado',1],['Medianamente evidenciado',2],['No evidenciado',3]].map(([lbl,n])=>
+    [['No evidenciado',1],['Medianamente evidenciado',2],['Evidenciado',3]].map(([lbl,n])=>
       `<div class="porcentaje-box"><div class="nivel">${lbl}</div><div class="valor">${pct(totales[n])}%</div><div class="detalle">${totales[n]} de ${base} observados</div></div>`).join('');
-  const lista=document.getElementById('listaSugerenciasAcuerdosCoord');
+  const lista=document.getElementById('listaSugerenciasCoord');
   if (!lista) return;
   lista.innerHTML=sugerencias.length===0
     ?'<div class="sugerencia-vacia">No hay sugerencias activas.</div>'
-    :sugerencias.map(s=>`<div class="sugerencia-item"><input type="checkbox" class="sugerencia-check-coord" data-texto="${s.t}" style="margin-top:3px;accent-color:var(--azul);width:18px;height:18px;flex-shrink:0;"><div><div class="sugerencia-codigo">Criterio ${s.codigo} — Nivel ${s.nivel} — ${s.b}</div><div class="sugerencia-texto">${s.t}</div></div></div>`).join('');
+    :sugerencias.map(s=>`<div class="sugerencia-item"><input type="checkbox" class="sugerencia-check" data-texto="${s.t}" style="margin-top:3px;accent-color:var(--azul);width:18px;height:18px;flex-shrink:0;"><div><div class="sugerencia-codigo">Indicador ${s.codigo} — Nivel ${s.nivel} — ${s.b}</div><div class="sugerencia-texto">${s.t}</div></div></div>`).join('');
 }
 
-function agregarAcuerdosSeleccionadosCoord(){
-  const checks=document.querySelectorAll('.sugerencia-check-coord:checked');
+function agregarAcuerdosCoord(){
+  const checks=document.querySelectorAll('#listaSugerenciasCoord .sugerencia-check:checked');
   if(!checks.length){mostrarNotif('Seleccione al menos una sugerencia.');return;}
-  const campo=document.getElementById('acuerdosCoord');
+  const campo=document.getElementById('cAcuerdosCoord');
   const textos=Array.from(checks).map(c=>'• '+c.dataset.texto);
   campo.value=(campo.value.trim()?campo.value.trim()+'\n':'')+textos.join('\n');
   mostrarNotif('Acuerdos agregados.');
 }
-function seleccionarTodasSugerenciasCoord(){document.querySelectorAll('.sugerencia-check-coord').forEach(c=>c.checked=true);}
-function limpiarSeleccionSugerenciasCoord(){document.querySelectorAll('.sugerencia-check-coord').forEach(c=>c.checked=false);}
 
-// Autocompletar centro para el instrumento de equipo de gestión
+// Autocompletar centro para el instrumento de coordinador
 let buscarTimeoutCoord = null;
 async function buscarCentroCoord(codigo) {
-  const estado = document.getElementById('estadoBusquedaCentroCoord');
+  const estado = document.getElementById('cEstadoBusquedaCentro');
   const limpiar = () => {
-    ['centroEducativoCoord','regionalCoord','distritoCoord','sectorCentroCoord'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = '';
-    });
+    ['cCentroEducativo','cSectorCentro'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+    ['cRegional','cDistrito'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   };
   codigo = codigo.trim();
   if (codigo.length < 4) { estado.textContent = ''; limpiar(); return; }
   clearTimeout(buscarTimeoutCoord);
   buscarTimeoutCoord = setTimeout(async () => {
-    estado.textContent = 'Buscando…';
-    estado.style.color = '#617384';
+    estado.textContent = 'Buscando…'; estado.style.color = '#617384';
     const { data, error } = await sb.from('centros').select('*').eq('codigo', codigo).maybeSingle();
     if (error || !data) {
-      estado.textContent = '⚠️ Código no encontrado en el sistema.';
-      estado.style.color = '#b45309';
-      limpiar();
-      return;
+      estado.textContent = '⚠️ Código no encontrado en el sistema.'; estado.style.color = '#b45309'; limpiar(); return;
     }
-    document.getElementById('centroEducativoCoord').value = data.nombre;
-    document.getElementById('regionalCoord').value = data.regional_codigo + ' – ' + data.regional_nombre;
-    document.getElementById('distritoCoord').value = data.distrito_codigo + ' – ' + data.distrito_nombre;
-    document.getElementById('sectorCentroCoord').value = data.sector;
-    estado.textContent = '✅ Centro encontrado.';
-    estado.style.color = '#2a6b1a';
+    document.getElementById('cCentroEducativo').value = data.nombre;
+    const regionalVal = data.regional_codigo + ' – ' + data.regional_nombre;
+    const distritoVal = data.distrito_codigo + ' – ' + data.distrito_nombre;
+    const selReg = document.getElementById('cRegional');
+    if (!Array.from(selReg.options).some(o=>o.value===regionalVal)) {
+      const o = document.createElement('option'); o.value=regionalVal; o.textContent=regionalVal; selReg.appendChild(o);
+    }
+    selReg.value = regionalVal;
+    cargarDistritosCoord(distritoVal);
+    document.getElementById('cSectorCentro').value = data.sector;
+    estado.textContent = '✅ Centro encontrado.'; estado.style.color = '#2a6b1a';
   }, 400);
-}
-
-async function enviarFormularioCoord(e) {
-  e.preventDefault();
-  const btn = document.getElementById('btnEnviarCoord');
-  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Enviando…';
-  await guardarRegistroCoord('Enviado');
-  btn.disabled = false; btn.textContent = '✅ Enviar registro';
-}
-
-async function guardarBorradorCoord() {
-  const btn = document.getElementById('btnBorradorCoord');
-  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Guardando…';
-  await guardarRegistroCoord('Borrador');
-  btn.disabled = false; btn.textContent = '💾 Guardar borrador';
-}
-
-async function guardarRegistroCoord(estado) {
-  const v = id => (document.getElementById(id)||{}).value || '';
-  const r = name => { const el = document.querySelector('input[name="'+name+'"]:checked'); return el?el.value:''; };
-
-  const criteriosData = {};
-  CRITERIOS_COORD.forEach(item => {
-    if (!item.codigo) return;
-    const sel = document.querySelector('input[name="valc_'+item.codigo+'"]:checked');
-    const obs = document.querySelector('textarea[name="obsc_'+item.codigo+'"]');
-    criteriosData[item.codigo] = { valor: sel ? parseInt(sel.value) : null, observacion: obs ? obs.value : '' };
-  });
-
-  const registro = {
-    usuario_id: usuarioActual.id,
-    nombre_acompanante: v('nombreAcompananteCoord'),
-    rol_acompanante: v('rolAcompananteCoord'),
-    regional: v('regionalCoord'),
-    distrito: v('distritoCoord'),
-    centro_educativo: v('centroEducativoCoord'),
-    codigo_centro: v('codigoCentroCoord'),
-    sector: v('sectorCentroCoord'),
-    zona: r('zonaCoord'),
-    nombre_director: v('nombreDirector'),
-    nombre_coordinador: v('nombreCoordinador'),
-    fecha: v('fechaCoord') || null,
-    hora_inicio: v('horaInicioCoord') || null,
-    hora_termino: v('horaTerminoCoord') || null,
-    criterios: criteriosData,
-    acuerdos: v('acuerdosCoord'),
-    estado,
-  };
-
-  const { error } = await sb.from('acompanamientos_coordinador').insert(registro);
-  if (error) { mostrarNotif('Error al guardar: ' + error.message, true); return; }
-  mostrarNotif(estado === 'Enviado' ? 'Registro enviado correctamente.' : 'Borrador guardado.');
-  if (estado === 'Enviado') limpiarFormularioCoord();
 }
 
 function limpiarFormularioCoord() {
   document.getElementById('formAcompCoord').reset();
-  document.getElementById('nombreAcompananteCoord').value = perfilActual?.nombre || '';
-  document.getElementById('rolAcompananteCoord').value = perfilActual?.rol || '';
+  document.getElementById('cNombreAcompanante').value = perfilActual?.nombre || '';
+  document.getElementById('cRolAcompanante').value = perfilActual?.rol || '';
   crearTablaIndicadoresCoord();
-  ['resumenIndicadoresCoord','porcentajesNivelesCoord','listaSugerenciasAcuerdosCoord'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+  ['resumenIndicadoresCoord','porcentajesNivelesCoord','listaSugerenciasCoord'].forEach(id => document.getElementById(id).innerHTML = '');
+}
+
+async function guardarBorradorCoord() {
+  mostrarNotif('Borrador guardado localmente.');
+}
+
+async function enviarFormularioCoord(event) {
+  event.preventDefault();
+  const v = id => (document.getElementById(id)||{}).value || '';
+  const r = name => { const el = document.querySelector('input[name="'+name+'"]:checked'); return el?el.value:''; };
+  const indicadoresData = {};
+  INDICADORES_COORD.forEach(item => {
+    if (!item.codigo) return;
+    const sel = document.querySelector('input[name="val_'+item.codigo+'"]:checked');
+    const obs = document.querySelector('textarea[name="obs_'+item.codigo+'"]');
+    indicadoresData[item.codigo] = { valor: sel ? parseInt(sel.value) : null, observacion: obs ? obs.value : '' };
+  });
+  const registro = {
+    usuario_id: usuarioActual.id,
+    nombre_acompanante: v('cNombreAcompanante'),
+    rol_acompanante: v('cRolAcompanante'),
+    regional: v('cRegional'),
+    distrito: v('cDistrito'),
+    centro_educativo: v('cCentroEducativo'),
+    codigo_centro: v('cCodigoCentro'),
+    sector: v('cSectorCentro'),
+    nombre_docente: v('cNombreCoord'),
+    cedula_docente: v('cCedulaCoord'),
+    tipo_acompanamiento: r('cTipoAcomp'),
+    fecha: v('cFechaCoord'),
+    foco: v('cFocoCoord'),
+    observaciones: v('cObservacionesCoord'),
+    acuerdos: v('cAcuerdosCoord'),
+    indicadores: indicadoresData,
+    tipo_instrumento: 'coordinador',
+    estado: 'Enviado',
+  };
+  const btn = document.getElementById('btnEnviarCoord');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  const { error } = await sb.from('acompañamientos').insert([registro]);
+  btn.disabled = false; btn.textContent = '✅ Enviar registro';
+  if (error) { mostrarNotif('Error al guardar: ' + error.message, true); return; }
+  mostrarNotif('Registro enviado correctamente.');
+  limpiarFormularioCoord();
+  mostrarPanel('registros', null);
+  cargarMisRegistros();
 }
 
 // ── ADMIN: USUARIOS ───────────────────────────────────────────────────────────
@@ -3244,6 +3332,53 @@ function cargarDistritosUsuario() {
       sel.appendChild(o);
     });
   }
+}
+
+// ── REGIONALES/DISTRITOS EN FORMULARIOS ──────────────────────────────────────
+function inicializarSelectsRegionales() {
+  ['regional','cRegional'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = '<option value="">Seleccione regional</option>';
+    Object.keys(DISTRITOS_POR_REGIONAL).forEach(r => {
+      const o = document.createElement('option');
+      o.value = r; o.textContent = r;
+      sel.appendChild(o);
+    });
+    if (current) sel.value = current;
+  });
+}
+
+function cargarDistritosDocente(preselect) {
+  const reg = document.getElementById('regional').value;
+  const sel = document.getElementById('distrito');
+  sel.innerHTML = '<option value="">Seleccione distrito</option>';
+  const lista = DISTRITOS_POR_REGIONAL[reg] || [];
+  lista.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d; o.textContent = d;
+    sel.appendChild(o);
+  });
+  if (preselect) {
+    if (!lista.includes(preselect)) {
+      const o = document.createElement('option'); o.value=preselect; o.textContent=preselect; sel.appendChild(o);
+    }
+    sel.value = preselect;
+  }
+}
+
+function cargarDistritosCoord(preselect) {
+  const reg = document.getElementById('cRegional').value;
+  const sel = document.getElementById('cDistrito');
+  sel.innerHTML = '<option value="">Seleccione distrito</option>';
+  const lista = DISTRITOS_POR_REGIONAL[reg] || [];
+  lista.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d; o.textContent = d;
+    sel.appendChild(o);
+  });
+  if (preselect) sel.value = preselect;
 }
 
 // ── DEMARCACIÓN AL CREAR USUARIO ─────────────────────────────────────────────
