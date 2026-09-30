@@ -761,6 +761,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
         <div class="menu-etiqueta">Acompañamiento</div>
         <div class="menu-item" onclick="mostrarPanel('formDocente',this)"><span class="menu-icono">📋</span> Acomp. a Docentes</div>
         <div class="menu-item" id="menuItemCoord" onclick="mostrarPanel('formCoord',this)"><span class="menu-icono">📝</span> Acomp. a Coordinadores</div>
+        <div class="menu-item" id="menuItemDist" onclick="mostrarPanel('formDist',this)"><span class="menu-icono">🏫</span> Acomp. a Técnico Distrital</div>
       </div>
       <div class="menu-grupo">
         <div class="menu-etiqueta">Planificación</div>
@@ -1260,6 +1261,142 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
             <button type="button" class="btn-secundario" onclick="guardarBorradorCoord()">💾 Guardar borrador</button>
             <button type="submit" class="btn-primario" id="btnEnviarCoord">✅ Enviar registro</button>
             <button type="button" class="btn-peligro" onclick="limpiarFormularioCoord()">🗑️ Limpiar</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ACOMPAÑAMIENTO A TÉCNICO DISTRITAL -->
+      <div id="panel-formDist" class="panel">
+        <div class="form-cabecera">
+          <div class="form-titulo">Instrumento de Acompañamiento al Técnico/a Distrital</div>
+          <div class="form-subtitulo">Dirección de Educación Primaria · MINERD</div>
+        </div>
+        <form id="formAcompDist" onsubmit="enviarFormularioDist(event)">
+          <!-- DATOS GENERALES -->
+          <div class="seccion-form">
+            <div class="seccion-titulo">Datos generales</div>
+            <div class="grid g-2">
+              <div class="campo"><label for="dNombreAcompanante">Nombre del técnico/a acompañante</label>
+                <input type="text" id="dNombreAcompanante" name="dNombreAcompanante" required></div>
+              <div class="campo"><label for="dRolAcompanante">Rol del acompañante</label>
+                <input type="text" id="dRolAcompanante" name="dRolAcompanante" required></div>
+            </div>
+            <div class="grid g-3">
+              <div class="campo"><label for="dRegional">Regional</label>
+                <select id="dRegional" name="dRegional" onchange="cargarDistritosDist()" required style="background:#f0f7ff;">
+                  <option value="">Seleccione regional</option>
+                </select></div>
+              <div class="campo"><label for="dDistrito">Distrito educativo</label>
+                <select id="dDistrito" name="dDistrito" required style="background:#f0f7ff;">
+                  <option value="">Seleccione distrito</option>
+                </select></div>
+              <div class="campo"><label for="dSectorDist">Sector</label>
+                <select id="dSectorDist" name="dSectorDist">
+                  <option value="Urbano">Urbano</option>
+                  <option value="Rural">Rural</option>
+                  <option value="Periurbano">Periurbano</option>
+                </select></div>
+            </div>
+          </div>
+          <!-- DATOS DEL TÉCNICO ACOMPAÑADO -->
+          <div class="seccion-form">
+            <div class="seccion-titulo">Datos del técnico/a distrital acompañado/a</div>
+            <div class="grid g-2">
+              <div class="campo"><label for="dNombreTecnico">Nombre completo</label>
+                <input type="text" id="dNombreTecnico" name="dNombreTecnico" required></div>
+              <div class="campo"><label for="dCedulaTecnico">Cédula</label>
+                <input type="text" id="dCedulaTecnico" name="dCedulaTecnico" maxlength="13" placeholder="000-0000000-0"></div>
+            </div>
+            <div class="grid g-3">
+              <div class="campo"><label for="dGradoAcadDist">Grado académico</label>
+                <select id="dGradoAcadDist" name="dGradoAcadDist">
+                  <option value="Licenciatura">Licenciatura</option>
+                  <option value="Especialidad">Especialidad</option>
+                  <option value="Maestría">Maestría</option>
+                  <option value="Doctorado">Doctorado</option>
+                </select></div>
+              <div class="campo"><label for="dAniosExpDist">Años de experiencia</label>
+                <input type="number" id="dAniosExpDist" name="dAniosExpDist" min="0" max="50"></div>
+              <div class="campo"><label for="dFechaDist">Fecha del acompañamiento</label>
+                <input type="date" id="dFechaDist" name="dFechaDist" required></div>
+            </div>
+            <div class="campo" style="margin-top:8px;">
+              <label>Tipo de acompañamiento</label>
+              <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:6px;">
+                <label style="font-weight:400;display:flex;align-items:center;gap:6px;"><input type="radio" name="dTipoAcomp" value="In situ" checked> In situ</label>
+                <label style="font-weight:400;display:flex;align-items:center;gap:6px;"><input type="radio" name="dTipoAcomp" value="Virtual"> Virtual</label>
+                <label style="font-weight:400;display:flex;align-items:center;gap:6px;"><input type="radio" name="dTipoAcomp" value="Combinado"> Combinado</label>
+              </div>
+            </div>
+          </div>
+          <!-- FOCO -->
+          <div class="seccion-form">
+            <div class="seccion-titulo">Foco del acompañamiento</div>
+            <div class="campo">
+              <textarea id="dFocoDist" name="dFocoDist" rows="3" placeholder="Describa brevemente el propósito principal de este acompañamiento…"></textarea>
+            </div>
+          </div>
+          <!-- INSTRUMENTO -->
+          <div class="seccion-form">
+            <div class="seccion-titulo">Instrumento de observación</div>
+            <div class="escala-leyenda">
+              <span><b>1</b> No evidenciado</span>
+              <span><b>2</b> Medianamente evidenciado</span>
+              <span><b>3</b> Evidenciado</span>
+              <span><b>4</b> No aplica</span>
+            </div>
+            <div class="tabla-wrap">
+              <table class="tabla-instrumento">
+                <thead><tr>
+                  <th style="width:44px">#</th>
+                  <th>Indicador</th>
+                  <th style="width:42px">1</th>
+                  <th style="width:42px">2</th>
+                  <th style="width:42px">3</th>
+                  <th style="width:42px">4</th>
+                  <th style="width:180px">Observación</th>
+                </tr></thead>
+                <tbody id="tablaIndicadoresDist"></tbody>
+              </table>
+            </div>
+          </div>
+          <!-- RESUMEN -->
+          <div class="seccion-form">
+            <div class="seccion-titulo">Resumen de resultados</div>
+            <div id="resumenIndicadoresDist"></div>
+            <div id="porcentajesNivelesDist" style="margin-top:12px;"></div>
+          </div>
+          <!-- SUGERENCIAS -->
+          <div class="seccion-form" id="seccionSugerenciasDist" style="display:none;">
+            <div class="seccion-titulo">Sugerencias de acuerdos</div>
+            <div id="listaSugerenciasDist"></div>
+          </div>
+          <!-- OBSERVACIONES Y ACUERDOS -->
+          <div class="seccion-form">
+            <div class="seccion-titulo">Observaciones generales</div>
+            <div class="campo">
+              <textarea id="dObservacionesDist" name="dObservacionesDist" rows="4" placeholder="Fortalezas identificadas, aspectos a mejorar, contexto relevante…"></textarea>
+            </div>
+          </div>
+          <div class="seccion-form">
+            <div class="seccion-titulo">Acuerdos establecidos</div>
+            <div id="listaAcuerdosDist"></div>
+            <button type="button" class="btn-secundario" onclick="agregarAcuerdosDist()" style="margin-top:8px;">+ Agregar acuerdo</button>
+            <input type="hidden" id="dAcuerdosDist" name="dAcuerdosDist">
+          </div>
+          <!-- FIRMAS -->
+          <div class="seccion-form">
+            <div class="seccion-titulo">Firmas</div>
+            <div class="firmas">
+              <div class="firma"><div class="linea"></div><div>Nombre del técnico/a distrital &nbsp;·&nbsp; <strong>SELLO</strong></div></div>
+              <div class="firma"><div class="linea"></div><div>Nombre del técnico/a regional</div></div>
+            </div>
+          </div>
+          <div class="acciones">
+            <button type="button" class="btn-primario" onclick="window.print()">🖨️ Imprimir / PDF</button>
+            <button type="button" class="btn-secundario" onclick="guardarBorradorDist()">💾 Guardar borrador</button>
+            <button type="submit" class="btn-primario" id="btnEnviarDist">✅ Enviar registro</button>
+            <button type="button" class="btn-peligro" onclick="limpiarFormularioDist()">🗑️ Limpiar</button>
           </div>
         </form>
       </div>
@@ -1960,6 +2097,13 @@ function puedeAcompañarCoord() {
          rol.includes('distrital') || perfilActual.nivel === 'admin';
 }
 
+function puedeAcompañarDist() {
+  if (!perfilActual) return false;
+  const rol = (perfilActual.rol || '').toLowerCase();
+  return rol.includes('nacional') || rol.includes('regional') ||
+         perfilActual.nivel === 'admin';
+}
+
 function actualizarAccesoAdministracion() {
   const permitido = esAdministrador();
   ['menuAdmin', 'menuMasAdmin'].forEach(id => {
@@ -1975,6 +2119,20 @@ function actualizarAccesoAdministracion() {
   });
   if (!puedeCoord) {
     const panel = document.getElementById('panel-formCoord');
+    if (panel?.classList.contains('activo')) {
+      panel.classList.remove('activo');
+      document.getElementById('panel-dashboard')?.classList.add('activo');
+    }
+  }
+
+  // Acomp. a Técnico Distrital: visible para Regional, Nacional y Admin
+  const puedeDist = puedeAcompañarDist();
+  ['menuItemDist', 'menuMasDist'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = puedeDist ? '' : 'none';
+  });
+  if (!puedeDist) {
+    const panel = document.getElementById('panel-formDist');
     if (panel?.classList.contains('activo')) {
       panel.classList.remove('activo');
       document.getElementById('panel-dashboard')?.classList.add('activo');
@@ -2011,12 +2169,17 @@ function mostrarApp() {
   document.querySelector('.contenido').style.paddingBottom = '52px';
   crearTablaIndicadores();
   crearTablaIndicadoresCoord();
+  crearTablaIndicadoresDist();
   inicializarSelectsRegionales();
   if (perfilActual) {
     const cn = document.getElementById('cNombreAcompanante');
     const cr = document.getElementById('cRolAcompanante');
     if (cn) cn.value = perfilActual.nombre || '';
     if (cr) cr.value = perfilActual.rol || '';
+    const dn = document.getElementById('dNombreAcompanante');
+    const dr = document.getElementById('dRolAcompanante');
+    if (dn) dn.value = perfilActual.nombre || '';
+    if (dr) dr.value = perfilActual.rol || '';
   }
   cargarDashboard();
 }
@@ -3202,6 +3365,183 @@ const SUGERENCIAS_COORD = {
   'C7.5':{b:'Familia',t:'Verificar que las familias reciben los informes de aprendizaje en los períodos establecidos por la Ordenanza 04-2023.'},
 };
 
+// ========== INSTRUMENTO TÉCNICO DISTRITAL ==========
+const INDICADORES_DIST = [
+  {tipo:'seccion',titulo:'1. Planificación y organización del acompañamiento'},
+  {codigo:'D1.1',texto:'Cuenta con un plan de acompañamiento distrital que incluye centros priorizados según las necesidades identificadas.'},
+  {codigo:'D1.2',texto:'El cronograma de visitas está actualizado y refleja los acompañamientos realizados y pendientes por centro.'},
+  {codigo:'D1.3',texto:'Verifica el cumplimiento de los acuerdos del acompañamiento anterior antes de iniciar el nuevo.'},
+  {codigo:'D1.4',texto:'Coordina con el coordinador pedagógico la agenda de la visita con anticipación.'},
+  {tipo:'seccion',titulo:'2. Acompañamiento al coordinador pedagógico'},
+  {codigo:'D2.1',texto:'Observa y evalúa cómo el coordinador conduce el acompañamiento a los docentes.'},
+  {codigo:'D2.2',texto:'Valora la calidad de la retroalimentación que el coordinador brinda a los docentes.'},
+  {codigo:'D2.3',texto:'Verifica que el coordinador registra los acompañamientos de forma oportuna y completa en SIGAP.'},
+  {codigo:'D2.4',texto:'Apoya al coordinador en la elaboración o ajuste de su plan de acompañamiento según los hallazgos del centro.'},
+  {tipo:'seccion',titulo:'3. Apoyo pedagógico y formación'},
+  {codigo:'D3.1',texto:'Identifica necesidades de formación comunes en el distrito y las comunica a la Regional.'},
+  {codigo:'D3.2',texto:'Da seguimiento a la aplicación en los centros de los aprendizajes de las jornadas de formación (CON BASE / CRECE).'},
+  {codigo:'D3.3',texto:'Promueve el intercambio de buenas prácticas entre coordinadores de distintos centros del distrito.'},
+  {codigo:'D3.4',texto:'Acompaña a los coordinadores en la articulación pedagógica con los programas nacionales de primaria.'},
+  {tipo:'seccion',titulo:'4. Gestión de información, SIGAP y reporte'},
+  {codigo:'D4.1',texto:'Registra sus propios acompañamientos en SIGAP de forma oportuna y completa.'},
+  {codigo:'D4.2',texto:'Verifica que los coordinadores del distrito registran sus acompañamientos a docentes en SIGAP.'},
+  {codigo:'D4.3',texto:'Elabora informes periódicos que sintetizan hallazgos, avances y alertas del distrito.'},
+  {codigo:'D4.4',texto:'Comparte los hallazgos con el director distrital y el técnico regional.'},
+  {codigo:'D4.5',texto:'Utiliza los datos de acompañamientos anteriores para priorizar los centros a visitar.'},
+  {tipo:'seccion',titulo:'5. Evaluación, SIREV y planes de acción'},
+  {codigo:'D5.1',texto:'Verifica que todos los centros del distrito completan el registro en SIREV en los plazos establecidos.'},
+  {codigo:'D5.2',texto:'Analiza los resultados de SIREV del distrito por centro, grado y área para identificar tendencias.'},
+  {codigo:'D5.3',texto:'Acompaña a los coordinadores en la elaboración o actualización del plan de acción a partir del análisis de SIREV.'},
+  {codigo:'D5.4',texto:'Da seguimiento al cumplimiento de los planes de acción de los centros del distrito.'},
+  {tipo:'seccion',titulo:'6. Registros, recuperación pedagógica y Ordenanza 04-2023'},
+  {codigo:'D6.1',texto:'Verifica que los centros del distrito aplican los lineamientos de la Ordenanza 04-2023 sobre el registro de grado y los cuatro períodos de evaluación.'},
+  {codigo:'D6.2',texto:'Comprueba que los coordinadores dan seguimiento a la recuperación pedagógica en sus centros.'},
+  {codigo:'D6.3',texto:'Verifica que las familias reciben los informes de aprendizaje en los períodos establecidos.'},
+];
+
+const SUGERENCIAS_DIST = {
+  'D1.1':{b:'Planificación',t:'Elaborar un plan de acompañamiento distrital que incluya centros priorizados según las necesidades identificadas.'},
+  'D1.2':{b:'Planificación',t:'Actualizar el cronograma de visitas reflejando los acompañamientos realizados y los pendientes.'},
+  'D1.3':{b:'Seguimiento',t:'Revisar los acuerdos del acompañamiento anterior como primer paso de cada visita.'},
+  'D1.4':{b:'Planificación',t:'Coordinar con anticipación la agenda de la visita con el coordinador pedagógico.'},
+  'D2.1':{b:'Acomp. al coordinador',t:'Observar y evaluar cómo el coordinador conduce el acompañamiento a los docentes durante la visita.'},
+  'D2.2':{b:'Retroalimentación',t:'Valorar la calidad de la retroalimentación que el coordinador brinda a los docentes y orientar mejoras.'},
+  'D2.3':{b:'SIGAP',t:'Verificar que el coordinador registra los acompañamientos de forma oportuna y completa en SIGAP.'},
+  'D2.4':{b:'Planificación',t:'Apoyar al coordinador en la elaboración o ajuste de su plan de acompañamiento según los hallazgos del centro.'},
+  'D3.1':{b:'Formación',t:'Identificar necesidades de formación comunes en el distrito y comunicarlas a la Regional.'},
+  'D3.2':{b:'Formación',t:'Dar seguimiento sistemático a la aplicación en los centros de los aprendizajes de CON BASE o CRECE.'},
+  'D3.3':{b:'Formación',t:'Crear espacios para el intercambio de buenas prácticas entre coordinadores de distintos centros del distrito.'},
+  'D3.4':{b:'Articulación',t:'Acompañar a los coordinadores en la articulación con los programas nacionales de primaria.'},
+  'D4.1':{b:'Registro',t:'Registrar los acompañamientos propios en SIGAP de forma oportuna y completa tras cada visita.'},
+  'D4.2':{b:'SIGAP',t:'Verificar que todos los coordinadores del distrito registran sus acompañamientos a docentes en SIGAP.'},
+  'D4.3':{b:'Reporte',t:'Elaborar informes periódicos que sinteticen hallazgos, avances y alertas del distrito.'},
+  'D4.4':{b:'Reporte',t:'Compartir los hallazgos con el director distrital y el técnico regional.'},
+  'D4.5':{b:'Análisis',t:'Utilizar los datos de acompañamientos anteriores para priorizar los centros a visitar en el próximo período.'},
+  'D5.1':{b:'SIREV',t:'Verificar que todos los centros del distrito completan el registro en SIREV en los plazos establecidos.'},
+  'D5.2':{b:'Análisis',t:'Analizar los resultados de SIREV del distrito por centro, grado y área para identificar tendencias.'},
+  'D5.3':{b:'Plan de acción',t:'Acompañar a los coordinadores en la elaboración o actualización del plan de acción a partir del análisis de SIREV.'},
+  'D5.4':{b:'Plan de acción',t:'Dar seguimiento al cumplimiento de los planes de acción de los centros del distrito.'},
+  'D6.1':{b:'Ordenanza 04-2023',t:'Verificar que los centros aplican los lineamientos de la Ordenanza 04-2023 sobre el registro de grado y los cuatro períodos.'},
+  'D6.2':{b:'Recuperación',t:'Comprobar que los coordinadores dan seguimiento a la recuperación pedagógica en sus centros.'},
+  'D6.3':{b:'Familia',t:'Verificar que las familias reciben los informes de aprendizaje en los períodos establecidos.'},
+};
+
+function crearTablaIndicadoresDist() {
+  const tabla = document.getElementById('tablaIndicadoresDist');
+  if (!tabla) return;
+  tabla.innerHTML = '';
+  INDICADORES_DIST.forEach(item => {
+    if (item.tipo === 'seccion') {
+      const tr = document.createElement('tr'); tr.className='fila-seccion';
+      tr.innerHTML='<td colspan="7">'+item.titulo+'</td>'; tabla.appendChild(tr); return;
+    }
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="text-align:center;font-size:12px;color:#8fa5bb">${item.codigo}</td>
+      <td>${item.texto}</td>
+      ${[1,2,3,4].map(v=>`<td style="text-align:center"><input type="radio" name="val_${item.codigo}" value="${v}" onchange="actualizarResumenDist()"></td>`).join('')}
+      <td><input type="text" class="obs-input" placeholder="Observación…" name="obs_${item.codigo}"></td>`;
+    tabla.appendChild(tr);
+  });
+}
+
+function actualizarResumenDist() {
+  const codigos = INDICADORES_DIST.filter(i=>i.codigo).map(i=>i.codigo);
+  let ev=0,med=0,noEv=0,na=0;
+  const sugeridos = [];
+  codigos.forEach(c => {
+    const sel = document.querySelector(`input[name="val_${c}"]:checked`);
+    if (!sel) return;
+    const v = parseInt(sel.value);
+    if (v===1) { noEv++; if (SUGERENCIAS_DIST[c]) sugeridos.push(SUGERENCIAS_DIST[c]); }
+    else if (v===2) { med++; if (SUGERENCIAS_DIST[c]) sugeridos.push(SUGERENCIAS_DIST[c]); }
+    else if (v===3) ev++;
+    else if (v===4) na++;
+  });
+  const total = ev+med+noEv;
+  const pct = total>0 ? Math.round((ev/total)*100) : 0;
+  const el = document.getElementById('resumenIndicadoresDist');
+  if (el) el.innerHTML = `<div class="resumen-grid">
+    <div class="resumen-item evidenciado"><span>${ev}</span><small>Evidenciado</small></div>
+    <div class="resumen-item medio"><span>${med}</span><small>Med. evidenciado</small></div>
+    <div class="resumen-item no-evidenciado"><span>${noEv}</span><small>No evidenciado</small></div>
+    <div class="resumen-item na"><span>${na}</span><small>No aplica</small></div>
+    <div class="resumen-item pct"><span>${pct}%</span><small>Evidenciado</small></div>
+  </div>`;
+  const sec = document.getElementById('seccionSugerenciasDist');
+  const lista = document.getElementById('listaSugerenciasDist');
+  if (sec && lista) {
+    if (sugeridos.length) {
+      sec.style.display = '';
+      lista.innerHTML = sugeridos.map(s=>`<div class="sugerencia-item"><span class="sugerencia-badge">${s.b}</span>${s.t}</div>`).join('');
+    } else { sec.style.display = 'none'; lista.innerHTML = ''; }
+  }
+}
+
+function agregarAcuerdosDist() {
+  const lista = document.getElementById('listaAcuerdosDist');
+  if (!lista) return;
+  const idx = lista.children.length + 1;
+  const div = document.createElement('div'); div.style.cssText='display:flex;gap:8px;align-items:center;margin-bottom:6px;';
+  div.innerHTML=`<span style="font-size:12px;color:#8fa5bb;min-width:20px">${idx}.</span>
+    <input type="text" style="flex:1;padding:7px 10px;border:1px solid #c8daea;border-radius:6px;font-size:13px;" placeholder="Acuerdo establecido…">
+    <button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;color:#c0392b;font-size:16px;cursor:pointer;">✕</button>`;
+  lista.appendChild(div);
+}
+
+function limpiarFormularioDist() {
+  if (!confirm('¿Limpiar todo el formulario del técnico distrital?')) return;
+  document.getElementById('formAcompDist').reset();
+  crearTablaIndicadoresDist();
+  document.getElementById('resumenIndicadoresDist').innerHTML = '';
+  document.getElementById('listaSugerenciasDist').innerHTML = '';
+  document.getElementById('listaAcuerdosDist').innerHTML = '';
+  document.getElementById('seccionSugerenciasDist').style.display = 'none';
+}
+
+async function guardarBorradorDist() { mostrarNotif('Borrador guardado localmente.'); }
+
+async function enviarFormularioDist(event) {
+  event.preventDefault();
+  const btn = document.getElementById('btnEnviarDist');
+  btn.disabled = true; btn.textContent = 'Enviando…';
+  try {
+    const fd = new FormData(document.getElementById('formAcompDist'));
+    const valores = {};
+    INDICADORES_DIST.filter(i=>i.codigo).forEach(i => {
+      const sel = document.querySelector(`input[name="val_${i.codigo}"]:checked`);
+      valores[i.codigo] = sel ? parseInt(sel.value) : null;
+    });
+    const acuerdosInputs = document.querySelectorAll('#listaAcuerdosDist input[type=text]');
+    const acuerdos = Array.from(acuerdosInputs).map(i=>i.value.trim()).filter(Boolean).join('\n');
+    const payload = {
+      nombre_acompanante: fd.get('dNombreAcompanante'),
+      rol_acompanante: fd.get('dRolAcompanante'),
+      regional: fd.get('dRegional'),
+      distrito: fd.get('dDistrito'),
+      nombre_docente: fd.get('dNombreTecnico'),
+      cedula: fd.get('dCedulaTecnico'),
+      fecha: fd.get('dFechaDist'),
+      tipo_acompanamiento: fd.get('dTipoAcomp'),
+      foco: fd.get('dFocoDist'),
+      observaciones: fd.get('dObservacionesDist'),
+      acuerdos,
+      valores_json: JSON.stringify(valores),
+      tipo_instrumento: 'tecnico_distrital',
+      usuario_id: usuarioActual?.id,
+      estado: 'enviado'
+    };
+    const { error } = await sb.from('acompañamientos').insert([payload]);
+    if (error) throw error;
+    mostrarNotif('Acompañamiento al técnico distrital enviado correctamente.');
+    limpiarFormularioDist();
+  } catch(e) {
+    mostrarNotif('Error al enviar: ' + e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = '✅ Enviar registro';
+  }
+}
+// ========== FIN INSTRUMENTO TÉCNICO DISTRITAL ==========
+
 function crearTablaIndicadoresCoord() {
   const tabla = document.getElementById('tablaIndicadoresCoord');
   if (!tabla) return;
@@ -3357,7 +3697,7 @@ function cargarDistritosUsuario() {
 
 // ── REGIONALES/DISTRITOS EN FORMULARIOS ──────────────────────────────────────
 function inicializarSelectsRegionales() {
-  ['regional','cRegional'].forEach(id => {
+  ['regional','cRegional','dRegional'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
     const current = sel.value;
@@ -3392,6 +3732,19 @@ function cargarDistritosDocente(preselect) {
 function cargarDistritosCoord(preselect) {
   const reg = document.getElementById('cRegional').value;
   const sel = document.getElementById('cDistrito');
+  sel.innerHTML = '<option value="">Seleccione distrito</option>';
+  const lista = DISTRITOS_POR_REGIONAL[reg] || [];
+  lista.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d; o.textContent = d;
+    sel.appendChild(o);
+  });
+  if (preselect) sel.value = preselect;
+}
+
+function cargarDistritosDist(preselect) {
+  const reg = document.getElementById('dRegional').value;
+  const sel = document.getElementById('dDistrito');
   sel.innerHTML = '<option value="">Seleccione distrito</option>';
   const lista = DISTRITOS_POR_REGIONAL[reg] || [];
   lista.forEach(d => {
@@ -4755,6 +5108,10 @@ if ('serviceWorker' in navigator) {
     <div id="menuMasCoord" onclick="mostrarPanelMovil('formCoord',null);toggleMenuMas()"
       style="padding:14px 20px;font-size:14px;font-weight:700;color:#2d4a63;border-bottom:1px solid #f0f5fa;">
       📝 Acomp. Coordinadores
+    </div>
+    <div id="menuMasDist" onclick="mostrarPanelMovil('formDist',null);toggleMenuMas()"
+      style="padding:14px 20px;font-size:14px;font-weight:700;color:#2d4a63;border-bottom:1px solid #f0f5fa;">
+      🏫 Acomp. Técnico Distrital
     </div>
     <div id="menuMasAdmin" style="display:none;">
       <div onclick="mostrarPanelMovil('adminUsuarios',null);toggleMenuMas()"
