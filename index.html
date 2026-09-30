@@ -952,11 +952,11 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
 
         <div class="dash-dos-col">
           <div class="grafica-card">
-            <div class="grafica-titulo">🟢 Equipo de Gestión — Principales fortalezas</div>
+            <div class="grafica-titulo">🟢 Coordinadores Pedagógicos — Principales fortalezas</div>
             <div class="barras-wrap" id="graficaFortalezasCoord"></div>
           </div>
           <div class="grafica-card">
-            <div class="grafica-titulo">🟠 Equipo de Gestión — Aspectos de mejora</div>
+            <div class="grafica-titulo">🟠 Coordinadores Pedagógicos — Aspectos de mejora</div>
             <div class="barras-wrap" id="graficaMejorasCoord"></div>
           </div>
         </div>
@@ -2567,7 +2567,7 @@ async function cargarDashboard() {
       </tr>`).join('');
   }
 
-  // ── Acompañamientos al Equipo de Gestión (misma demarcación y filtros) ──
+  // ── Acompañamientos a Coordinadores Pedagógicos (misma demarcación y filtros) ──
   let queryCoord = filtrarDemarcacion(sb.from('acompañamientos').select('*')).eq('tipo_instrumento','coordinador').order('fecha', { ascending: false });
 
 
