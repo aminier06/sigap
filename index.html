@@ -760,7 +760,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
       <div class="menu-grupo">
         <div class="menu-etiqueta">Acompañamiento</div>
         <div class="menu-item" onclick="mostrarPanel('formDocente',this)"><span class="menu-icono">📋</span> Acomp. a Docentes</div>
-        <div class="menu-item" onclick="mostrarPanel('formCoord',this)"><span class="menu-icono">📝</span> Acomp. a Coordinadores</div>
+        <div class="menu-item" id="menuItemCoord" onclick="mostrarPanel('formCoord',this)"><span class="menu-icono">📝</span> Acomp. a Coordinadores</div>
       </div>
       <div class="menu-grupo">
         <div class="menu-etiqueta">Planificación</div>
@@ -1953,12 +1953,33 @@ function requiereAdministrador() {
   return false;
 }
 
+function puedeAcompañarCoord() {
+  if (!perfilActual) return false;
+  const rol = (perfilActual.rol || '').toLowerCase();
+  return rol.includes('nacional') || rol.includes('regional') ||
+         rol.includes('distrital') || perfilActual.nivel === 'admin';
+}
+
 function actualizarAccesoAdministracion() {
   const permitido = esAdministrador();
   ['menuAdmin', 'menuMasAdmin'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = permitido ? 'block' : 'none';
   });
+
+  // Acomp. a Coordinadores: visible para Distrital, Regional, Nacional y Admin
+  const puedeCoord = puedeAcompañarCoord();
+  ['menuItemCoord', 'menuMasCoord'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = puedeCoord ? '' : 'none';
+  });
+  if (!puedeCoord) {
+    const panel = document.getElementById('panel-formCoord');
+    if (panel?.classList.contains('activo')) {
+      panel.classList.remove('activo');
+      document.getElementById('panel-dashboard')?.classList.add('activo');
+    }
+  }
   if (!permitido) {
     const panel = document.getElementById('panel-adminUsuarios');
     if (panel?.classList.contains('activo')) {
@@ -4731,7 +4752,7 @@ if ('serviceWorker' in navigator) {
       style="padding:14px 20px;font-size:14px;font-weight:700;color:#2d4a63;border-bottom:1px solid #f0f5fa;">
       📈 Seguimiento
     </div>
-    <div onclick="mostrarPanelMovil('formCoord',null);toggleMenuMas()"
+    <div id="menuMasCoord" onclick="mostrarPanelMovil('formCoord',null);toggleMenuMas()"
       style="padding:14px 20px;font-size:14px;font-weight:700;color:#2d4a63;border-bottom:1px solid #f0f5fa;">
       📝 Acomp. Coordinadores
     </div>
