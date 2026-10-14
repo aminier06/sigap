@@ -1004,7 +1004,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
           <div class="card-stat">
             <div class="icono">👨‍🏫</div>
             <div class="numero" id="statDocentes">—</div>
-            <div class="etiqueta">Docentes acompañados</div>
+            <div class="etiqueta">Personas acompañadas</div>
           </div>
           <div class="card-stat">
             <div class="icono">📅</div>
@@ -1074,7 +1074,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
             <div class="grafica-titulo">Últimos acompañamientos registrados</div>
             <div class="tabla-wrap-outer">
               <table class="tabla-registros" style="box-shadow:none;">
-                <thead><tr><th>Fecha</th><th>Docente</th><th>Área</th><th>Centro</th><th>Estado</th></tr></thead>
+                <thead><tr><th>Fecha</th><th>Acompañado</th><th>Área / Detalle</th><th>Centro</th><th>Estado</th></tr></thead>
                 <tbody id="cuerpoTablaRecientes"><tr><td colspan="5" style="text-align:center;color:#8fa5bb;padding:16px;">Cargando…</td></tr></tbody>
               </table>
             </div>
@@ -2707,56 +2707,66 @@ async function cargarDashboard() {
   const hoy = new Date();
   const mesActual = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0');
 
-  // Tarjetas resumen
+  // Separar por tipo para estadísticas específicas
+  const regDocentes = todosRegistros.filter(r => !r.tipo_instrumento || r.tipo_instrumento === 'docente');
+  const regCoord    = todosRegistros.filter(r => r.tipo_instrumento === 'coordinador');
+  const regDist     = todosRegistros.filter(r => r.tipo_instrumento === 'tecnico_distrital');
+  todosRegistrosCoord = regCoord; // mantener compatibilidad con renderResumenFortalezasMejoras
+
+  // Tarjetas resumen (todos los tipos)
   document.getElementById('statTotal').textContent     = todosRegistros.length;
   document.getElementById('statEnviados').textContent  = todosRegistros.filter(r => r.estado === 'Enviado').length;
   document.getElementById('statBorradores').textContent= todosRegistros.filter(r => r.estado === 'Borrador').length;
   document.getElementById('statCentros').textContent   = new Set(todosRegistros.map(r => r.centro_educativo).filter(Boolean)).size;
-  document.getElementById('statDocentes').textContent  = new Set(todosRegistros.map(r => r.nombre_docente).filter(Boolean)).size;
+  // "Acompañados" = docentes + coordinadores + técnicos (nombre del campo varía según tipo)
+  const nombresAcompañados = new Set([
+    ...todosRegistros.map(r => r.nombre_docente).filter(Boolean),
+    ...todosRegistros.map(r => r.nombre_coordinador).filter(Boolean),
+    ...todosRegistros.map(r => r.nombre_tecnico).filter(Boolean),
+  ]);
+  document.getElementById('statDocentes').textContent  = nombresAcompañados.size;
   document.getElementById('statMes').textContent       = todosRegistros.filter(r => r.fecha && r.fecha.startsWith(mesActual)).length;
 
-  // Poblar filtros dinámicos (solo la primera vez)
+  // Poblar filtros dinámicos
   poblarDistritosDashboard(todosRegistros);
 
-  // Gráficas
-  renderBarras('graficaAreas',    contarPor(todosRegistros, 'area_acompanada'));
+  // Gráficas (basadas en acompañamientos a docentes donde aplica el área/grado)
+  renderBarras('graficaAreas',    contarPor(regDocentes, 'area_acompanada'));
   renderBarras('graficaTipos',    contarPor(todosRegistros, 'tipo_acompanamiento'));
-  renderBarras('graficaGrados',   contarPor(todosRegistros, 'grado'), true);
-  renderBarras('graficaModalidad',contarPor(todosRegistros, 'modalidad'));
+  renderBarras('graficaGrados',   contarPor(regDocentes, 'grado'), true);
+  renderBarras('graficaModalidad',contarPor(regDocentes, 'modalidad'));
 
   // Tabla de regionales
   renderRegionales(contarPor(todosRegistros, 'regional'));
 
-  // Últimos registros
+  // Últimos registros (todos los tipos, mostrando nombre según instrumento)
   const cuerpo = document.getElementById('cuerpoTablaRecientes');
   if (todosRegistros.length === 0) {
     cuerpo.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8fa5bb;padding:16px;">No hay registros con los filtros seleccionados.</td></tr>';
   } else {
-    cuerpo.innerHTML = todosRegistros.slice(0,8).map(r => `
-      <tr>
+    cuerpo.innerHTML = todosRegistros.slice(0,10).map(r => {
+      const tipo = r.tipo_instrumento || 'docente';
+      const etiquetaTipo = tipo === 'coordinador' ? '👤 Coord.' : tipo === 'tecnico_distrital' ? '🔧 Téc. Dist.' : '🎓 Docente';
+      const nombre = tipo === 'coordinador'
+        ? (r.nombre_coordinador || r.nombre_docente || '—')
+        : tipo === 'tecnico_distrital'
+          ? (r.nombre_tecnico || r.nombre_docente || '—')
+          : (r.nombre_docente || '—');
+      const detalle = tipo === 'docente'
+        ? (r.area_acompanada || '—')
+        : (r.cargo_coordinador || r.distrito || '—');
+      return `<tr>
         <td>${r.fecha||'—'}</td>
-        <td>${r.nombre_docente||'—'}</td>
-        <td style="font-size:12px;">${r.area_acompanada||'—'}</td>
+        <td>${nombre}<br><span style="font-size:11px;color:#8fa5bb;">${etiquetaTipo}</span></td>
+        <td style="font-size:12px;">${detalle}</td>
         <td style="font-size:12px;">${r.centro_educativo||'—'}</td>
         <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
   }
 
-  // ── Acompañamientos a Coordinadores Pedagógicos (misma demarcación y filtros) ──
-  let queryCoord = filtrarDemarcacion(sb.from('acompañamientos').select('*')).eq('tipo_instrumento','coordinador').order('fecha', { ascending: false });
-
-
-  if (filtroEstado)   queryCoord = queryCoord.eq('estado', filtroEstado);
-  if (filtroRegional) queryCoord = queryCoord.ilike('regional', codigoDe(filtroRegional) + '%');
-  if (filtroDistrito) queryCoord = queryCoord.ilike('distrito', codigoDe(filtroDistrito) + '%');
-  if (filtroCentro)   queryCoord = queryCoord.eq('centro_educativo', filtroCentro);
-  if (desdeMes)        queryCoord = queryCoord.gte('fecha', desdeMes);
-
-  const { data: dataCoord } = await queryCoord;
-  todosRegistrosCoord = dataCoord || [];
-
   // Poblar el filtro de Centro Educativo con los centros que ya tienen registros
-  await poblarCentrosDashboard(todosRegistros.concat(todosRegistrosCoord));
+  await poblarCentrosDashboard(todosRegistros);
 
   // Fortalezas y aspectos de mejora (docentes + equipo de gestión)
   renderResumenFortalezasMejoras();
