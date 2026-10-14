@@ -771,6 +771,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
       <div class="menu-grupo">
         <div class="menu-etiqueta">Consultas</div>
         <div class="menu-item" onclick="mostrarPanel('registros',this)"><span class="menu-icono">📊</span> Registros de mi demarcación <span id="badgeSync" style="display:none;margin-left:6px;background:#fef3c7;color:#8a5d00;border-radius:999px;padding:2px 7px;font-size:10px;font-weight:800;"></span></div>
+        <div class="menu-item" id="menuItemTecCoord" onclick="mostrarPanel('seguimientoTecnicos',this)" style="display:none"><span class="menu-icono">🔍</span> Seguimiento de técnicos</div>
       </div>
       <div class="menu-grupo">
         <div class="menu-etiqueta">Análisis</div>
@@ -1889,7 +1890,9 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
                 <option value="">Seleccione</option>
                 <option value="Técnico/a Nacional">Técnico/a Nacional</option>
                 <option value="Técnico/a Regional">Técnico/a Regional</option>
+                <option value="Técnico/a Coordinador/a Regional">Técnico/a Coordinador/a Regional</option>
                 <option value="Técnico/a Distrital">Técnico/a Distrital</option>
+                <option value="Técnico/a Coordinador/a Distrital">Técnico/a Coordinador/a Distrital</option>
                 <option value="Coordinador/a Pedagógico/a">Coordinador/a Pedagógico/a</option>
                 <option value="Director/a de Centro">Director/a de Centro</option>
                 <option value="Administrador/a">Administrador/a</option>
@@ -2043,6 +2046,54 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
         </div>
       </div>
 
+      <!-- SEGUIMIENTO DE TÉCNICOS -->
+      <div id="panel-seguimientoTecnicos" class="panel">
+        <div class="dashboard-titulo">Seguimiento de técnicos</div>
+        <p class="dashboard-sub">Acompañamientos y planificaciones de los técnicos en tu jurisdicción.</p>
+
+        <div class="filtros-bar" style="margin-bottom:18px;">
+          <div class="filtros-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;">
+            <div class="campo">
+              <label>Desde</label>
+              <input type="date" id="stDesde">
+            </div>
+            <div class="campo">
+              <label>Hasta</label>
+              <input type="date" id="stHasta">
+            </div>
+            <div class="campo">
+              <label>Tipo de vista</label>
+              <select id="stTipo">
+                <option value="acompañamientos">Acompañamientos</option>
+                <option value="planificaciones">Planificaciones</option>
+              </select>
+            </div>
+            <div class="campo" style="display:flex;align-items:flex-end;">
+              <button class="btn-primario" onclick="cargarSeguimientoTecnicos()">Consultar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tarjetas resumen -->
+        <div id="stCards" style="display:none;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-bottom:20px;" class="cards-grid">
+          <div class="card-stat"><div class="card-stat-num" id="stTotalTec">—</div><div class="card-stat-lbl">Técnicos activos</div></div>
+          <div class="card-stat"><div class="card-stat-num" id="stTotalReg">—</div><div class="card-stat-lbl">Registros encontrados</div></div>
+          <div class="card-stat"><div class="card-stat-num" id="stEnviados">—</div><div class="card-stat-lbl">Enviados</div></div>
+          <div class="card-stat"><div class="card-stat-num" id="stBorradores">—</div><div class="card-stat-lbl">Borradores</div></div>
+        </div>
+
+        <div class="tabla-wrap-outer">
+          <table class="tabla-registros">
+            <thead id="stCabecera">
+              <tr><th>Fecha</th><th>Técnico</th><th>Rol</th><th>Regional</th><th>Distrito</th><th>Centro</th><th>Docente / Foco</th><th>Estado</th></tr>
+            </thead>
+            <tbody id="stCuerpo">
+              <tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:32px;">Selecciona un rango de fechas y pulsa <strong>Consultar</strong>.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </main>
   </div>
 </div>
@@ -2127,6 +2178,15 @@ function puedeAcompañarDist() {
          perfilActual.nivel === 'admin';
 }
 
+function puedeVerSeguimientoTecnicos() {
+  if (!perfilActual) return false;
+  const rol = (perfilActual.rol || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  return rol === 'tecnico/a coordinador/a regional' ||
+         rol === 'tecnico/a coordinador/a distrital' ||
+         rol === 'tecnico/a nacional' ||
+         perfilActual.nivel === 'admin';
+}
+
 function actualizarAccesoAdministracion() {
   const permitido = esAdministrador();
   ['menuAdmin', 'menuMasAdmin'].forEach(id => {
@@ -2161,6 +2221,21 @@ function actualizarAccesoAdministracion() {
       document.getElementById('panel-dashboard')?.classList.add('activo');
     }
   }
+
+  // Seguimiento de técnicos: visible para Téc. Coord. Regional/Distrital, Nacional y Admin
+  const puedeTecCoord = puedeVerSeguimientoTecnicos();
+  ['menuItemTecCoord', 'menuMasTecCoord'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = puedeTecCoord ? '' : 'none';
+  });
+  if (!puedeTecCoord) {
+    const panel = document.getElementById('panel-seguimientoTecnicos');
+    if (panel?.classList.contains('activo')) {
+      panel.classList.remove('activo');
+      document.getElementById('panel-dashboard')?.classList.add('activo');
+    }
+  }
+
   if (!permitido) {
     const panel = document.getElementById('panel-adminUsuarios');
     if (panel?.classList.contains('activo')) {
@@ -2464,8 +2539,8 @@ function filtrarDemarcacion(query, perfiles = false) {
     // Admite códigos solos y códigos seguidos de un nombre; no otros prefijos.
     return query.or(columna + '.eq.' + cod + ',' + columna + '.like.' + cod + ' %,' + columna + '.like.' + cod + '-%,' + columna + '.like.' + cod + '–%,' + columna + '.like.' + cod + '—%');
   };
-  if (rol === 'tecnico/a regional') return limitarCodigo('regional', p.regional, 2);
-  if (rol === 'tecnico/a distrital') return limitarCodigo('distrito', p.distrito, 4);
+  if (rol === 'tecnico/a regional' || rol === 'tecnico/a coordinador/a regional') return limitarCodigo('regional', p.regional, 2);
+  if (rol === 'tecnico/a distrital' || rol === 'tecnico/a coordinador/a distrital') return limitarCodigo('distrito', p.distrito, 4);
   if (rol === 'coordinador/a pedagogico/a' || rol === 'director/a de centro') {
     const centro = codigo(p.codigo_centro, 5);
     return centro ? query.eq('codigo_centro', centro) : denegar();
@@ -3065,6 +3140,140 @@ async function cargarSeguimiento() {
     filas.length ? filas.join('') : '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Sin datos en el período seleccionado.</td></tr>';
 
   document.getElementById('tablaSeguimientoWrap').style.display = 'block';
+}
+
+// ── SEGUIMIENTO DE TÉCNICOS ───────────────────────────────────────────────────
+async function cargarSeguimientoTecnicos() {
+  const desde = document.getElementById('stDesde').value;
+  const hasta = document.getElementById('stHasta').value;
+  const tipo  = document.getElementById('stTipo').value;
+  const cuerpo = document.getElementById('stCuerpo');
+  const cabecera = document.getElementById('stCabecera');
+
+  if (!desde || !hasta) { mostrarNotif('Selecciona un rango de fechas primero.', true); return; }
+
+  cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Cargando…</td></tr>';
+  document.getElementById('stCards').style.display = 'none';
+
+  const p  = perfilActual;
+  const rol = String(p?.rol || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+  // Roles de técnico puro (no coordinadores, no nacionales)
+  const rolesTecnico = ['tecnico/a regional', 'tecnico/a distrital'];
+
+  // Helper para extraer prefijo numérico
+  const prefijo = (valor, longitud) => {
+    const m = String(valor || '').trim().match(/^(\d+)/);
+    return m ? m[1].slice(0, longitud).padStart(longitud, '0') : '';
+  };
+
+  let datos = [];
+
+  if (tipo === 'acompañamientos') {
+    // Cabecera para acompañamientos
+    cabecera.innerHTML = '<tr><th>Fecha</th><th>Técnico</th><th>Rol</th><th>Regional</th><th>Distrito</th><th>Centro</th><th>Docente / Foco</th><th>Estado</th></tr>';
+
+    // Query base: acompañamientos de técnicos en la jurisdicción
+    let query = sb.from('acompañamientos').select('*')
+      .gte('fecha', desde).lte('fecha', hasta)
+      .in('rol_acompanante', ['Técnico/a Regional', 'Técnico/a Distrital',
+          'Técnico/a Coordinador/a Regional', 'Técnico/a Coordinador/a Distrital'])
+      .order('fecha', { ascending: false });
+
+    // Limitar por jurisdicción
+    if (rol === 'tecnico/a coordinador/a distrital') {
+      const cod = prefijo(p.distrito, 4);
+      if (!cod) { cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:red;padding:24px;">Tu perfil no tiene distrito configurado.</td></tr>'; return; }
+      query = query.or('distrito.eq.' + cod + ',distrito.like.' + cod + ' %,distrito.like.' + cod + '-%,distrito.like.' + cod + '–%');
+    } else if (rol === 'tecnico/a coordinador/a regional') {
+      const cod = prefijo(p.regional, 2);
+      if (!cod) { cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:red;padding:24px;">Tu perfil no tiene regional configurada.</td></tr>'; return; }
+      query = query.or('regional.eq.' + cod + ',regional.like.' + cod + ' %,regional.like.' + cod + '-%,regional.like.' + cod + '–%');
+    }
+    // Nacional y admin: sin filtro adicional
+
+    const { data, error } = await query;
+    if (error) { mostrarNotif('Error al consultar: ' + error.message, true); return; }
+    datos = data || [];
+
+    const tecnicos = [...new Set(datos.map(r => r.usuario_id))];
+    document.getElementById('stTotalTec').textContent = tecnicos.length;
+    document.getElementById('stTotalReg').textContent = datos.length;
+    document.getElementById('stEnviados').textContent = datos.filter(r => r.estado === 'Enviado').length;
+    document.getElementById('stBorradores').textContent = datos.filter(r => r.estado !== 'Enviado').length;
+    document.getElementById('stCards').style.display = 'grid';
+
+    cuerpo.innerHTML = datos.length
+      ? datos.map(r => `<tr>
+          <td>${r.fecha || '—'}</td>
+          <td style="font-size:12px;">${r.nombre_acompanante || '—'}</td>
+          <td style="font-size:11px;color:#8fa5bb;">${r.rol_acompanante || '—'}</td>
+          <td style="font-size:12px;">${r.regional || '—'}</td>
+          <td style="font-size:12px;">${r.distrito || '—'}</td>
+          <td style="font-size:12px;">${r.centro_educativo || '—'}</td>
+          <td style="font-size:12px;">${r.nombre_docente || r.foco || '—'}</td>
+          <td><span class="badge ${r.estado === 'Enviado' ? 'badge-verde' : 'badge-amarillo'}">${r.estado || 'Borrador'}</span></td>
+        </tr>`).join('')
+      : '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Sin registros en el período.</td></tr>';
+
+  } else {
+    // Planificaciones
+    cabecera.innerHTML = '<tr><th>Fecha prevista</th><th>Técnico</th><th>Regional</th><th>Distrito</th><th>Centro</th><th>Docente</th><th>Foco</th><th>Estado</th></tr>';
+
+    // Para planificaciones necesitamos cruzar con perfiles para filtrar por jurisdicción
+    // Primero obtenemos IDs de técnicos en la jurisdicción
+    let queryPerf = sb.from('perfiles').select('id,nombre,rol,regional,distrito')
+      .in('rol', ['Técnico/a Regional', 'Técnico/a Distrital']);
+
+    if (rol === 'tecnico/a coordinador/a distrital') {
+      const cod = prefijo(p.distrito, 4);
+      if (!cod) { cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:red;padding:24px;">Tu perfil no tiene distrito configurado.</td></tr>'; return; }
+      queryPerf = queryPerf.or('distrito.eq.' + cod + ',distrito.like.' + cod + ' %,distrito.like.' + cod + '-%,distrito.like.' + cod + '–%');
+    } else if (rol === 'tecnico/a coordinador/a regional') {
+      const cod = prefijo(p.regional, 2);
+      if (!cod) { cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:red;padding:24px;">Tu perfil no tiene regional configurada.</td></tr>'; return; }
+      queryPerf = queryPerf.or('regional.eq.' + cod + ',regional.like.' + cod + ' %,regional.like.' + cod + '-%,regional.like.' + cod + '–%');
+    }
+
+    const { data: perfilesTec, error: errPerf } = await queryPerf;
+    if (errPerf) { mostrarNotif('Error al obtener técnicos: ' + errPerf.message, true); return; }
+    const ids = (perfilesTec || []).map(x => x.id);
+    const mapaPerf = Object.fromEntries((perfilesTec || []).map(x => [x.id, x]));
+
+    if (!ids.length) {
+      cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">No se encontraron técnicos en tu jurisdicción.</td></tr>';
+      return;
+    }
+
+    const { data: planes, error: errPlan } = await sb.from('planificaciones').select('*')
+      .in('usuario_id', ids)
+      .gte('fecha_prevista', desde).lte('fecha_prevista', hasta)
+      .order('fecha_prevista');
+    if (errPlan) { mostrarNotif('Error: ' + errPlan.message, true); return; }
+    datos = planes || [];
+
+    document.getElementById('stTotalTec').textContent = ids.length;
+    document.getElementById('stTotalReg').textContent = datos.length;
+    document.getElementById('stEnviados').textContent = datos.filter(r => r.estado === 'Ejecutado').length;
+    document.getElementById('stBorradores').textContent = datos.filter(r => r.estado !== 'Ejecutado').length;
+    document.getElementById('stCards').style.display = 'grid';
+
+    cuerpo.innerHTML = datos.length
+      ? datos.map(r => {
+          const perf = mapaPerf[r.usuario_id] || {};
+          return `<tr>
+            <td>${r.fecha_prevista || '—'}</td>
+            <td style="font-size:12px;">${perf.nombre || r.usuario_id || '—'}</td>
+            <td style="font-size:12px;">${perf.regional || '—'}</td>
+            <td style="font-size:12px;">${perf.distrito || '—'}</td>
+            <td style="font-size:12px;">${r.centro_educativo || '—'}</td>
+            <td style="font-size:12px;">${r.nombre_docente || '—'}</td>
+            <td style="font-size:12px;">${r.foco || '—'}</td>
+            <td><span class="badge ${r.estado === 'Ejecutado' ? 'badge-verde' : 'badge-amarillo'}">${r.estado || 'Pendiente'}</span></td>
+          </tr>`;
+        }).join('')
+      : '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Sin planificaciones en el período.</td></tr>';
+  }
 }
 
 // ── AUTOCOMPLETAR CENTRO ──────────────────────────────────────────────────────
@@ -3850,9 +4059,9 @@ function toggleDemarcacion() {
   bloqueDist.classList.add('oculto');
   bloqueCent.classList.add('oculto');
 
-  if (rol === 'Técnico/a Regional') {
+  if (rol === 'Técnico/a Regional' || rol === 'Técnico/a Coordinador/a Regional') {
     bloqueReg.classList.remove('oculto');
-  } else if (rol === 'Técnico/a Distrital') {
+  } else if (rol === 'Técnico/a Distrital' || rol === 'Técnico/a Coordinador/a Distrital') {
     bloqueReg.classList.remove('oculto');
     bloqueDist.classList.remove('oculto');
   } else if (rol === 'Coordinador/a Pedagógico/a' || rol === 'Director/a de Centro') {
@@ -5140,7 +5349,9 @@ if ('serviceWorker' in navigator) {
         <select id="editRol">
           <option value="Técnico/a Nacional">Técnico/a Nacional</option>
           <option value="Técnico/a Regional">Técnico/a Regional</option>
+          <option value="Técnico/a Coordinador/a Regional">Técnico/a Coordinador/a Regional</option>
           <option value="Técnico/a Distrital">Técnico/a Distrital</option>
+          <option value="Técnico/a Coordinador/a Distrital">Técnico/a Coordinador/a Distrital</option>
           <option value="Coordinador/a Pedagógico/a">Coordinador/a Pedagógico/a</option>
           <option value="Director/a de Centro">Director/a de Centro</option>
           <option value="Administrador/a">Administrador/a</option>
@@ -5195,6 +5406,10 @@ if ('serviceWorker' in navigator) {
     <div id="menuMasDist" onclick="mostrarPanelMovil('formDist',null);toggleMenuMas()"
       style="padding:14px 20px;font-size:14px;font-weight:700;color:#2d4a63;border-bottom:1px solid #f0f5fa;">
       🏫 Acomp. Técnico Distrital
+    </div>
+    <div id="menuMasTecCoord" onclick="mostrarPanelMovil('seguimientoTecnicos',null);toggleMenuMas()"
+      style="display:none;padding:14px 20px;font-size:14px;font-weight:700;color:#2d4a63;border-bottom:1px solid #f0f5fa;">
+      🔍 Seguimiento de técnicos
     </div>
     <div id="menuMasAdmin" style="display:none;">
       <div onclick="mostrarPanelMovil('adminUsuarios',null);toggleMenuMas()"
