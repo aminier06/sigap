@@ -409,6 +409,24 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
     .badge-azul{background:#dff0fb;color:#0d4a7a;}
     .badge-rojo{background:#fee2e2;color:#b42318;}
 
+    /* VISOR DE REGISTRO */
+    .vr-bloque{border:1px solid #dce9f5;border-radius:10px;margin-bottom:14px;overflow:hidden;}
+    .vr-titulo{background:#f7fafd;font-weight:800;font-size:13px;padding:10px 16px;border-bottom:1px solid #dce9f5;color:#1a3a52;}
+    .vr-grid{display:grid;}
+    .vr-campo{padding:9px 16px;border-bottom:1px solid #f0f5fa;display:grid;grid-template-columns:190px 1fr;gap:8px;align-items:start;}
+    .vr-campo:last-child{border-bottom:none;}
+    .vr-label{font-size:11px;color:#617384;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding-top:2px;}
+    .vr-valor{font-size:13px;color:#1a3a52;font-weight:600;white-space:pre-wrap;word-break:break-word;}
+    .vr-tabla-ind{width:100%;border-collapse:collapse;font-size:12px;}
+    .vr-tabla-ind th{background:#f7fafd;padding:8px 10px;text-align:left;border-bottom:1px solid #dce9f5;font-size:11px;font-weight:700;color:#617384;text-transform:uppercase;}
+    .vr-tabla-ind td{padding:7px 10px;border-bottom:1px solid #f5f8fc;vertical-align:top;}
+    .vr-tabla-ind tr:last-child td{border-bottom:none;}
+    .vr-sec{background:#e8f0fa;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:7px 10px;color:#1a3a52;}
+    @media(max-width:600px){
+      .vr-campo{grid-template-columns:1fr;gap:2px;}
+      .vr-label{font-size:10px;}
+    }
+
     /* BOTONES */
     .btn-primario{background:var(--azul);color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:14px;font-weight:800;cursor:pointer;transition:background .15s;}
     .btn-primario:hover{background:var(--azul-osc);}
@@ -2847,14 +2865,23 @@ async function cargarMisRegistros() {
   if (registros.length === 0) {
     cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">No hay registros guardados.</td></tr>'; return;
   }
+  // Guardar registros en variable global para acceso desde verRegistro por id
+  window._misRegistrosList = registros;
   cuerpo.innerHTML = registros.map(r => `
-    <tr>
+    <tr onclick="verRegistroById('${r.id}')" style="cursor:pointer;" title="Clic para ver el formulario completo">
       <td>${r.fecha||'—'}</td><td>${r.tipo_acompanamiento||'—'}</td>
       <td>${r.nombre_docente||'—'}</td><td>${r.centro_educativo||'—'}</td>
       <td>${r.area_acompanada||'—'}</td><td>${r.grado||'—'}</td>
       <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td>
-      <td>${r.estado==='Borrador' && r.usuario_id === usuarioActual?.id?`<button class="btn-secundario btn-sm" onclick="eliminarRegistro('${r.id}')">Eliminar</button>`:'—'}</td>
+      <td onclick="event.stopPropagation()">${r.estado==='Borrador' && r.usuario_id === usuarioActual?.id
+        ? `<button class="btn-secundario btn-sm" onclick="eliminarRegistro('${r.id}')">Eliminar</button>`
+        : '<span style="font-size:13px;color:#8fa5bb;">👁 Ver</span>'}</td>
     </tr>`).join('');
+}
+
+function verRegistroById(id) {
+  const r = (window._misRegistrosList || []).find(x => x.id === id);
+  if (r) verRegistro(r);
 }
 
 async function eliminarRegistro(id) {
@@ -3203,8 +3230,9 @@ async function cargarSeguimientoTecnicos() {
     document.getElementById('stBorradores').textContent = datos.filter(r => r.estado !== 'Enviado').length;
     document.getElementById('stCards').style.display = 'grid';
 
+    window._stRegistrosList = datos;
     cuerpo.innerHTML = datos.length
-      ? datos.map(r => `<tr>
+      ? datos.map(r => `<tr onclick="verRegistroST('${r.id}')" style="cursor:pointer;" title="Ver formulario completo">
           <td>${r.fecha || '—'}</td>
           <td style="font-size:12px;">${r.nombre_acompanante || '—'}</td>
           <td style="font-size:11px;color:#8fa5bb;">${r.rol_acompanante || '—'}</td>
@@ -4187,8 +4215,9 @@ async function cargarTodosRegistros() {
   const cuerpo = document.getElementById('cuerpoAdminRegistros');
   if (error) { cuerpo.innerHTML='<tr><td colspan="8" style="text-align:center;color:#b42318;padding:24px;">Error al cargar: '+error.message+'</td></tr>'; return; }
   if (!data || data.length === 0) { cuerpo.innerHTML='<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">No hay registros.</td></tr>'; return; }
+  window._adminRegistrosList = data;
   cuerpo.innerHTML = data.map(r => `
-    <tr>
+    <tr onclick="verRegistroAdmin('${r.id}')" style="cursor:pointer;" title="Clic para ver el formulario completo">
       <td>${r.fecha||'—'}</td>
       <td>${r.nombre_acompanante||'—'}</td>
       <td>${r.rol_acompanante||'—'}</td>
@@ -4198,6 +4227,16 @@ async function cargarTodosRegistros() {
       <td>${r.area_acompanada||'—'}</td>
       <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td>
     </tr>`).join('');
+}
+
+function verRegistroAdmin(id) {
+  const r = (window._adminRegistrosList || []).find(x => x.id === id);
+  if (r) verRegistro(r);
+}
+
+function verRegistroST(id) {
+  const r = (window._stRegistrosList || []).find(x => x.id === id);
+  if (r) verRegistro(r);
 }
 
 // ── NOTIFICACIÓN ──────────────────────────────────────────────────────────────
@@ -5454,6 +5493,214 @@ if ('serviceWorker' in navigator) {
     Desarrollado por <strong style="color:#617384;">Aneudy Minier</strong>
     &nbsp;·&nbsp; © <span id="anioFooter"></span>
   </div>
+
+<!-- MODAL VISOR DE REGISTRO ─────────────────────────────────────────────── -->
+<div id="modalVerRegistro" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
+  z-index:500;overflow-y:auto;padding:20px 12px;" onclick="if(event.target===this)cerrarVerRegistro()">
+  <div style="max-width:860px;margin:0 auto;background:#fff;border-radius:14px;
+    box-shadow:0 8px 40px rgba(0,0,0,.18);overflow:hidden;">
+
+    <!-- Cabecera del modal -->
+    <div style="display:flex;justify-content:space-between;align-items:center;
+      padding:18px 24px;border-bottom:1px solid #dce9f5;background:#f7fafd;">
+      <div>
+        <div id="vrTitulo" style="font-size:17px;font-weight:800;color:#1a3a52;">Registro de acompañamiento</div>
+        <div id="vrSubtitulo" style="font-size:12px;color:#617384;margin-top:2px;">Solo lectura</div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <span id="vrBadgeEstado" class="badge" style="font-size:13px;"></span>
+        <button onclick="imprimirRegistro()" class="btn-secundario btn-sm" style="white-space:nowrap;">🖨️ Imprimir</button>
+        <button onclick="cerrarVerRegistro()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#617384;padding:0 4px;line-height:1;">✕</button>
+      </div>
+    </div>
+
+    <!-- Cuerpo del modal -->
+    <div id="vrCuerpo" style="padding:24px;"></div>
+
+  </div>
+</div>
+
+<script>
+// ── VISOR DE REGISTRO ─────────────────────────────────────────────────────────
+
+function cerrarVerRegistro() {
+  document.getElementById('modalVerRegistro').style.display = 'none';
+}
+
+function imprimirRegistro() {
+  const contenido = document.getElementById('vrCuerpo').innerHTML;
+  const titulo = document.getElementById('vrTitulo').textContent;
+  const ventana = window.open('', '_blank');
+  ventana.document.write(`<!doctype html><html><head><meta charset="utf-8">
+    <title>${titulo}</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:13px;color:#1a3a52;margin:24px;}
+      .vr-bloque{border:1px solid #dce9f5;border-radius:10px;margin-bottom:16px;overflow:hidden;}
+      .vr-titulo{background:#f7fafd;font-weight:800;font-size:13px;padding:10px 16px;border-bottom:1px solid #dce9f5;}
+      .vr-grid{display:grid;gap:0;padding:0;}
+      .vr-campo{padding:9px 16px;border-bottom:1px solid #f0f5fa;display:grid;grid-template-columns:200px 1fr;gap:8px;}
+      .vr-campo:last-child{border-bottom:none;}
+      .vr-label{font-size:11px;color:#617384;font-weight:700;text-transform:uppercase;letter-spacing:.4px;align-self:start;padding-top:1px;}
+      .vr-valor{font-size:13px;color:#1a3a52;font-weight:600;white-space:pre-wrap;}
+      .vr-tabla-ind{width:100%;border-collapse:collapse;font-size:12px;}
+      .vr-tabla-ind th{background:#f7fafd;padding:7px 10px;text-align:left;border-bottom:1px solid #dce9f5;font-size:11px;}
+      .vr-tabla-ind td{padding:7px 10px;border-bottom:1px solid #f5f8fc;vertical-align:top;}
+      .vr-tabla-ind tr:last-child td{border-bottom:none;}
+      .vr-sec{background:#e8f0fa;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:6px 10px;}
+      .badge-verde{background:#d1fae5;color:#065f46;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;}
+      .badge-amarillo{background:#fef3c7;color:#92400e;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;}
+      @media print{body{margin:10px;}}
+    </style></head><body>${contenido}</body></html>`);
+  ventana.document.close();
+  ventana.focus();
+  setTimeout(() => ventana.print(), 400);
+}
+
+function campo(label, valor) {
+  const v = (valor === null || valor === undefined || valor === '') ? '—' : String(valor);
+  return `<div class="vr-campo"><span class="vr-label">${label}</span><span class="vr-valor">${v}</span></div>`;
+}
+
+function bloqueVR(titulo, campos) {
+  return `<div class="vr-bloque">
+    ${titulo ? `<div class="vr-titulo">${titulo}</div>` : ''}
+    <div class="vr-grid">${campos}</div>
+  </div>`;
+}
+
+function tablaIndicadoresVR(indicadoresArr, indicadoresData) {
+  const etiquetas = {1:'No evidenciado', 2:'Med. evidenciado', 3:'Evidenciado', 4:'No aplica'};
+  const colores = {1:'#fee2e2', 2:'#fef3c7', 3:'#d1fae5', 4:'#f0f5fa'};
+  const colTxt = {1:'#7f1d1d', 2:'#78350f', 3:'#065f46', 4:'#617384'};
+  let html = `<div class="vr-bloque"><div class="vr-titulo">Escala de Estimación</div>
+    <div style="overflow-x:auto;">
+    <table class="vr-tabla-ind">
+      <thead><tr><th style="width:60px;">#</th><th>Indicador</th><th style="width:170px;">Valoración</th><th>Observaciones</th></tr></thead>
+      <tbody>`;
+  indicadoresArr.forEach(item => {
+    if (item.tipo === 'seccion') {
+      html += `<tr><td colspan="4" class="vr-sec">${item.titulo}</td></tr>`;
+      return;
+    }
+    const dato = indicadoresData?.[item.codigo] || {};
+    const val  = dato.valor;
+    const obs  = dato.observacion || '';
+    const etq  = val ? etiquetas[val] : '—';
+    const bg   = val ? colores[val] : 'transparent';
+    const tc   = val ? colTxt[val] : '#617384';
+    html += `<tr>
+      <td style="font-weight:700;color:#8fa5bb;text-align:center;">${item.codigo}</td>
+      <td style="font-size:12px;">${item.texto}</td>
+      <td><span style="background:${bg};color:${tc};border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;">${etq}</span></td>
+      <td style="font-size:12px;color:#617384;">${obs || '—'}</td>
+    </tr>`;
+  });
+  html += `</tbody></table></div></div>`;
+  return html;
+}
+
+function verRegistro(r) {
+  const modal = document.getElementById('modalVerRegistro');
+  const tipo = r.tipo_instrumento || 'docente';
+  const esCoord = tipo === 'coordinador';
+  const esDist  = tipo === 'tecnico_distrital';
+
+  document.getElementById('vrTitulo').textContent = esCoord
+    ? 'Acompañamiento al Coordinador Pedagógico'
+    : esDist ? 'Acompañamiento al Técnico Distrital'
+    : 'Acompañamiento al Docente';
+  document.getElementById('vrSubtitulo').textContent =
+    'Registrado el ' + (r.created_at ? new Date(r.created_at).toLocaleString('es-DO') : '—') +
+    ' · ID: ' + (r.id?.slice(0,8) || '—');
+  const badge = document.getElementById('vrBadgeEstado');
+  badge.textContent = r.estado || '—';
+  badge.className = 'badge ' + (r.estado === 'Enviado' ? 'badge-verde' : 'badge-amarillo');
+
+  let html = '';
+
+  // ── Sección: Datos del acompañante ─────────────────────────────────────────
+  html += bloqueVR('Datos del acompañante',
+    campo('Nombre', r.nombre_acompanante) +
+    campo('Rol', r.rol_acompanante)
+  );
+
+  // ── Sección: Centro educativo ───────────────────────────────────────────────
+  html += bloqueVR('Centro educativo',
+    campo('Código', r.codigo_centro) +
+    campo('Nombre del centro', r.centro_educativo) +
+    campo('Regional', r.regional) +
+    campo('Distrito', r.distrito) +
+    campo('Sector', r.sector) +
+    (r.zona ? campo('Zona', r.zona) : '')
+  );
+
+  if (esCoord) {
+    // ── Coordinador: datos del coordinador acompañado ─────────────────────────
+    html += bloqueVR('Coordinador acompañado',
+      campo('Nombre', r.nombre_docente) +
+      campo('Cédula', r.cedula_docente)
+    );
+    html += bloqueVR('Detalles del acompañamiento',
+      campo('Tipo', r.tipo_acompanamiento) +
+      campo('Fecha', r.fecha) +
+      campo('Foco / Propósito', r.foco) +
+      campo('Observaciones', r.observaciones) +
+      campo('Acuerdos / Compromisos', r.acuerdos)
+    );
+    html += tablaIndicadoresVR(INDICADORES_COORD, r.indicadores);
+
+  } else if (esDist) {
+    // ── Técnico Distrital ─────────────────────────────────────────────────────
+    html += bloqueVR('Técnico acompañado',
+      campo('Nombre', r.nombre_docente) +
+      campo('Cédula', r.cedula_docente)
+    );
+    html += bloqueVR('Detalles del acompañamiento',
+      campo('Tipo', r.tipo_acompanamiento) +
+      campo('Fecha', r.fecha) +
+      campo('Foco / Propósito', r.foco) +
+      campo('Observaciones', r.observaciones) +
+      campo('Acuerdos / Compromisos', r.acuerdos)
+    );
+
+  } else {
+    // ── Docente ───────────────────────────────────────────────────────────────
+    html += bloqueVR('Datos del docente',
+      campo('Nombre', r.nombre_docente) +
+      campo('Cédula', r.cedula_docente) +
+      campo('Grado académico', r.grado_academico) +
+      campo('Especialidad', r.especialidad) +
+      campo('Años de experiencia', r.anios_experiencia)
+    );
+    html += bloqueVR('Datos de la clase',
+      campo('Modalidad', r.modalidad) +
+      campo('Área acompañada', r.area_acompanada) +
+      campo('Ciclo', r.ciclo) +
+      campo('Grado', r.grado) +
+      campo('Sección', r.seccion) +
+      campo('Inscritos', r.inscritos) +
+      campo('Presentes', r.presentes)
+    );
+    html += bloqueVR('Datos del acompañamiento',
+      campo('Fecha', r.fecha) +
+      campo('Hora de inicio', r.hora_inicio) +
+      campo('Hora de término', r.hora_termino) +
+      campo('Tipo de acompañamiento', r.tipo_acompanamiento) +
+      campo('Foco / Propósito', r.foco) +
+      campo('Intención pedagógica del docente', r.intencion_docente) +
+      campo('Contenido conceptual', r.contenido_conceptual)
+    );
+    html += tablaIndicadoresVR(INDICADORES, r.indicadores);
+    html += bloqueVR('Acuerdos / Compromisos',
+      campo('Acuerdos', r.acuerdos)
+    );
+  }
+
+  document.getElementById('vrCuerpo').innerHTML = html;
+  modal.style.display = 'block';
+  modal.scrollTop = 0;
+}
+</script>
 
 </body>
 </html>
