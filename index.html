@@ -67,6 +67,7 @@ async function previsualizarCarga(input) {
 
   const rolesValidos = [
     'Técnico/a Nacional','Técnico/a Regional','Técnico/a Distrital',
+    'Técnico/a Coordinador/a Regional','Técnico/a Coordinador/a Distrital',
     'Coordinador/a Pedagógico/a','Director/a de Centro','Administrador/a'
   ];
 
@@ -147,6 +148,7 @@ async function ejecutarCargaMasiva() {
   log.innerHTML = '';
 
   let creados = 0, fallidos = 0;
+  const usuariosCreados = []; // track for credentials document
 
   for (let i = 0; i < validos.length; i++) {
     const u = validos[i];
@@ -180,6 +182,7 @@ async function ejecutarCargaMasiva() {
       if (!resp.ok || result.error) throw new Error(result.error || 'Error desconocido');
 
       creados++;
+      usuariosCreados.push({ nombre: u.nombre, regional: u.regional, distrito: u.distrito, email: u.email, clave, rol: u.rol });
       log.innerHTML += `<span style="color:#2a6b1a;">✓ ${u.nombre} (${u.email}) — Clave: <strong>${clave}</strong></span>\n`;
     } catch(e) {
       fallidos++;
@@ -193,6 +196,9 @@ async function ejecutarCargaMasiva() {
   barra.style.width = '100%';
   texto.textContent = `Proceso completado.`;
 
+  // Store for download
+  window._usuariosCreados = usuariosCreados;
+
   document.getElementById('resultadoCarga').style.display = 'block';
   document.getElementById('resultadoCarga').innerHTML = `
     <div style="background:${creados>0?'#d8ead0':'#fee2e2'};border:1px solid ${creados>0?'#a3c99a':'#f4c2bd'};border-radius:12px;padding:18px;">
@@ -204,10 +210,11 @@ async function ejecutarCargaMasiva() {
         ${fallidos>0?`<strong style="color:#b42318;">${fallidos}</strong> usuarios fallaron (ver log arriba).`:''}
       </div>
       <div style="margin-top:12px;font-size:12px;color:#617384;">
-        ⚠️ <strong>Importante:</strong> Guarde el log de contraseñas antes de cerrar esta página. Las contraseñas no se pueden recuperar posteriormente.
+        ⚠️ <strong>Importante:</strong> Descargue el documento de credenciales antes de cerrar esta página. Las contraseñas no se pueden recuperar posteriormente.
       </div>
       <div class="acciones" style="margin-top:14px;">
-        <button class="btn-primario" onclick="copiarLog()">📋 Copiar log de contraseñas</button>
+        ${creados>0?`<button class="btn-primario" onclick="descargarCredenciales()">📄 Descargar credenciales</button>`:''}
+        <button class="btn-secundario" onclick="copiarLog()">📋 Copiar log</button>
         <button class="btn-secundario" onclick="cancelarCarga(); cargarUsuarios();">Ver usuarios registrados</button>
       </div>
     </div>`;
@@ -219,6 +226,83 @@ function copiarLog() {
   if (!requiereAdministrador()) return;
   const log = document.getElementById('logCarga').innerText;
   navigator.clipboard.writeText(log).then(() => mostrarNotif('Log copiado al portapapeles.'));
+}
+
+function descargarPlantillaCarga() {
+  const bom = '﻿';
+  const lineas = [
+    '=== PLANTILLA CARGA MASIVA DE USUARIOS SIGAP ===',
+    '=== Instrucciones: Complete los datos a partir de la fila 10. No modifique las filas 1-9. ===',
+    '=== Columnas: Nombre | Correo | Rol | Nivel | Regional | Distrito | Código Centro | Nombre Centro | Activo ===',
+    '=== Roles válidos: Técnico/a Nacional | Técnico/a Regional | Técnico/a Distrital | Técnico/a Coordinador/a Regional | Técnico/a Coordinador/a Distrital | Coordinador/a Pedagógico/a | Director/a de Centro | Administrador/a ===',
+    '=== Nivel: dejar vacío para usuario normal; escribir "admin" para administrador ===',
+    '=== Regional: código de 2 dígitos (ej: 01) ===',
+    '=== Distrito: código de 4 dígitos (ej: 0101) ===',
+    '=== Activo: dejar vacío o escribir SI para activo; NO para inactivo ===',
+    '',
+    'Nombre,Correo,Rol,Nivel,Regional,Distrito,Código Centro,Nombre Centro,Activo',
+    'Juan Pérez,jperez@ejemplo.com,Técnico/a Distrital,,01,0101,,Centro Modelo,SI',
+    'María López,mlopez@ejemplo.com,Técnico/a Coordinador/a Distrital,,01,0101,,,SI',
+    'Carlos Ruiz,cruiz@ejemplo.com,Técnico/a Coordinador/a Regional,,01,,,,SI',
+    'Ana Martínez,amartinez@ejemplo.com,Coordinador/a Pedagógico/a,,01,0101,C001,Centro Esperanza,SI',
+    'Pedro Gómez,pgomez@ejemplo.com,Director/a de Centro,,01,0101,C002,Centro Nuevo,SI',
+  ];
+  const csv = bom + lineas.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'plantilla_usuarios_sigap.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function descargarCredenciales() {
+  const lista = window._usuariosCreados || [];
+  if (!lista.length) { mostrarNotif('No hay credenciales para descargar.', true); return; }
+  const fecha = new Date().toLocaleDateString('es-DO', { year:'numeric', month:'2-digit', day:'2-digit' });
+  const filas = lista.map(u => `
+    <tr>
+      <td>${u.nombre}</td>
+      <td style="text-align:center;">${u.regional||'—'}</td>
+      <td style="text-align:center;">${u.distrito||'—'}</td>
+      <td>${u.email}</td>
+      <td style="font-family:monospace;font-weight:700;color:#0d4a7a;">${u.clave}</td>
+      <td>${u.rol}</td>
+    </tr>`).join('');
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Credenciales de usuarios — SIGAP ${fecha}</title>
+<style>
+  body{font-family:Arial,sans-serif;font-size:13px;color:#1a3a52;padding:24px;}
+  h1{font-size:18px;color:#0d4a7a;margin-bottom:4px;}
+  p.sub{font-size:12px;color:#617384;margin-bottom:20px;}
+  table{width:100%;border-collapse:collapse;}
+  th{background:#0d4a7a;color:#fff;padding:9px 12px;font-size:12px;text-align:left;}
+  td{padding:8px 12px;border-bottom:1px solid #dce9f5;vertical-align:top;}
+  tr:nth-child(even) td{background:#f4f9ff;}
+  .aviso{margin-top:20px;padding:12px 16px;background:#fff8e1;border:1px solid #f9c74f;border-radius:8px;font-size:12px;color:#7a5500;}
+</style>
+</head>
+<body>
+<h1>📋 Credenciales de acceso — SIGAP</h1>
+<p class="sub">Generado el ${fecha} · ${lista.length} usuario${lista.length!==1?'s':''} creado${lista.length!==1?'s':''}</p>
+<table>
+  <thead><tr><th>Nombre</th><th>Regional</th><th>Distrito</th><th>Usuario (correo)</th><th>Contraseña</th><th>Rol</th></tr></thead>
+  <tbody>${filas}</tbody>
+</table>
+<div class="aviso">⚠️ <strong>Confidencial.</strong> Este documento contiene contraseñas en texto plano. Distribúyalo de forma segura y solicite a cada usuario que cambie su contraseña en el primer acceso. Una vez entregadas las credenciales, destruya este documento.</div>
+</body>
+</html>`;
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `credenciales_sigap_${fecha.replace(/\//g,'-')}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function cancelarCarga() {
@@ -1989,9 +2073,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
           </p>
           <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;">
             <div>
-              <a href="plantilla_usuarios_sigap.xlsx" download>
-                <button type="button" class="btn-secundario">📥 Descargar plantilla</button>
-              </a>
+              <button type="button" class="btn-secundario" onclick="descargarPlantillaCarga()">📥 Descargar plantilla</button>
             </div>
             <div style="flex:1;min-width:260px;">
               <label style="font-size:13px;font-weight:700;color:#243b53;display:block;margin-bottom:6px;">
@@ -4304,6 +4386,7 @@ async function previsualizarCarga(input) {
 
   const rolesValidos = [
     'Técnico/a Nacional','Técnico/a Regional','Técnico/a Distrital',
+    'Técnico/a Coordinador/a Regional','Técnico/a Coordinador/a Distrital',
     'Coordinador/a Pedagógico/a','Director/a de Centro','Administrador/a'
   ];
 
@@ -4384,6 +4467,7 @@ async function ejecutarCargaMasiva() {
   log.innerHTML = '';
 
   let creados = 0, fallidos = 0;
+  const usuariosCreados = []; // track for credentials document
 
   for (let i = 0; i < validos.length; i++) {
     const u = validos[i];
@@ -4417,6 +4501,7 @@ async function ejecutarCargaMasiva() {
       if (!resp.ok || result.error) throw new Error(result.error || 'Error desconocido');
 
       creados++;
+      usuariosCreados.push({ nombre: u.nombre, regional: u.regional, distrito: u.distrito, email: u.email, clave, rol: u.rol });
       log.innerHTML += `<span style="color:#2a6b1a;">✓ ${u.nombre} (${u.email}) — Clave: <strong>${clave}</strong></span>\n`;
     } catch(e) {
       fallidos++;
@@ -4430,6 +4515,9 @@ async function ejecutarCargaMasiva() {
   barra.style.width = '100%';
   texto.textContent = `Proceso completado.`;
 
+  // Store for download
+  window._usuariosCreados = usuariosCreados;
+
   document.getElementById('resultadoCarga').style.display = 'block';
   document.getElementById('resultadoCarga').innerHTML = `
     <div style="background:${creados>0?'#d8ead0':'#fee2e2'};border:1px solid ${creados>0?'#a3c99a':'#f4c2bd'};border-radius:12px;padding:18px;">
@@ -4441,10 +4529,11 @@ async function ejecutarCargaMasiva() {
         ${fallidos>0?`<strong style="color:#b42318;">${fallidos}</strong> usuarios fallaron (ver log arriba).`:''}
       </div>
       <div style="margin-top:12px;font-size:12px;color:#617384;">
-        ⚠️ <strong>Importante:</strong> Guarde el log de contraseñas antes de cerrar esta página. Las contraseñas no se pueden recuperar posteriormente.
+        ⚠️ <strong>Importante:</strong> Descargue el documento de credenciales antes de cerrar esta página. Las contraseñas no se pueden recuperar posteriormente.
       </div>
       <div class="acciones" style="margin-top:14px;">
-        <button class="btn-primario" onclick="copiarLog()">📋 Copiar log de contraseñas</button>
+        ${creados>0?`<button class="btn-primario" onclick="descargarCredenciales()">📄 Descargar credenciales</button>`:''}
+        <button class="btn-secundario" onclick="copiarLog()">📋 Copiar log</button>
         <button class="btn-secundario" onclick="cancelarCarga(); cargarUsuarios();">Ver usuarios registrados</button>
       </div>
     </div>`;
@@ -4456,6 +4545,83 @@ function copiarLog() {
   if (!requiereAdministrador()) return;
   const log = document.getElementById('logCarga').innerText;
   navigator.clipboard.writeText(log).then(() => mostrarNotif('Log copiado al portapapeles.'));
+}
+
+function descargarPlantillaCarga() {
+  const bom = '﻿';
+  const lineas = [
+    '=== PLANTILLA CARGA MASIVA DE USUARIOS SIGAP ===',
+    '=== Instrucciones: Complete los datos a partir de la fila 10. No modifique las filas 1-9. ===',
+    '=== Columnas: Nombre | Correo | Rol | Nivel | Regional | Distrito | Código Centro | Nombre Centro | Activo ===',
+    '=== Roles válidos: Técnico/a Nacional | Técnico/a Regional | Técnico/a Distrital | Técnico/a Coordinador/a Regional | Técnico/a Coordinador/a Distrital | Coordinador/a Pedagógico/a | Director/a de Centro | Administrador/a ===',
+    '=== Nivel: dejar vacío para usuario normal; escribir "admin" para administrador ===',
+    '=== Regional: código de 2 dígitos (ej: 01) ===',
+    '=== Distrito: código de 4 dígitos (ej: 0101) ===',
+    '=== Activo: dejar vacío o escribir SI para activo; NO para inactivo ===',
+    '',
+    'Nombre,Correo,Rol,Nivel,Regional,Distrito,Código Centro,Nombre Centro,Activo',
+    'Juan Pérez,jperez@ejemplo.com,Técnico/a Distrital,,01,0101,,Centro Modelo,SI',
+    'María López,mlopez@ejemplo.com,Técnico/a Coordinador/a Distrital,,01,0101,,,SI',
+    'Carlos Ruiz,cruiz@ejemplo.com,Técnico/a Coordinador/a Regional,,01,,,,SI',
+    'Ana Martínez,amartinez@ejemplo.com,Coordinador/a Pedagógico/a,,01,0101,C001,Centro Esperanza,SI',
+    'Pedro Gómez,pgomez@ejemplo.com,Director/a de Centro,,01,0101,C002,Centro Nuevo,SI',
+  ];
+  const csv = bom + lineas.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'plantilla_usuarios_sigap.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function descargarCredenciales() {
+  const lista = window._usuariosCreados || [];
+  if (!lista.length) { mostrarNotif('No hay credenciales para descargar.', true); return; }
+  const fecha = new Date().toLocaleDateString('es-DO', { year:'numeric', month:'2-digit', day:'2-digit' });
+  const filas = lista.map(u => `
+    <tr>
+      <td>${u.nombre}</td>
+      <td style="text-align:center;">${u.regional||'—'}</td>
+      <td style="text-align:center;">${u.distrito||'—'}</td>
+      <td>${u.email}</td>
+      <td style="font-family:monospace;font-weight:700;color:#0d4a7a;">${u.clave}</td>
+      <td>${u.rol}</td>
+    </tr>`).join('');
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Credenciales de usuarios — SIGAP ${fecha}</title>
+<style>
+  body{font-family:Arial,sans-serif;font-size:13px;color:#1a3a52;padding:24px;}
+  h1{font-size:18px;color:#0d4a7a;margin-bottom:4px;}
+  p.sub{font-size:12px;color:#617384;margin-bottom:20px;}
+  table{width:100%;border-collapse:collapse;}
+  th{background:#0d4a7a;color:#fff;padding:9px 12px;font-size:12px;text-align:left;}
+  td{padding:8px 12px;border-bottom:1px solid #dce9f5;vertical-align:top;}
+  tr:nth-child(even) td{background:#f4f9ff;}
+  .aviso{margin-top:20px;padding:12px 16px;background:#fff8e1;border:1px solid #f9c74f;border-radius:8px;font-size:12px;color:#7a5500;}
+</style>
+</head>
+<body>
+<h1>📋 Credenciales de acceso — SIGAP</h1>
+<p class="sub">Generado el ${fecha} · ${lista.length} usuario${lista.length!==1?'s':''} creado${lista.length!==1?'s':''}</p>
+<table>
+  <thead><tr><th>Nombre</th><th>Regional</th><th>Distrito</th><th>Usuario (correo)</th><th>Contraseña</th><th>Rol</th></tr></thead>
+  <tbody>${filas}</tbody>
+</table>
+<div class="aviso">⚠️ <strong>Confidencial.</strong> Este documento contiene contraseñas en texto plano. Distribúyalo de forma segura y solicite a cada usuario que cambie su contraseña en el primer acceso. Una vez entregadas las credenciales, destruya este documento.</div>
+</body>
+</html>`;
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `credenciales_sigap_${fecha.replace(/\//g,'-')}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function cancelarCarga() {
