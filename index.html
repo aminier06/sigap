@@ -724,7 +724,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
       <div style="width:1px;height:32px;background:rgba(255,255,255,.25);margin:0 10px;"></div>
       <div>
         <div class="topbar-sigla">SIGAP</div>
-        <div class="topbar-nombre">Sistema de Gestión de Acompañamiento Pedagógico</div>
+        <div class="topbar-nombre">Acompañamiento Pedagógico</div>
       </div>
     </div>
     <div class="topbar-right">
@@ -1068,7 +1068,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
                 <div class="campo"><label>Modalidad</label><div class="opciones"><label class="opcion"><input type="radio" name="modalidad" value="Regular" onchange="toggleMultigrado()"> Regular</label><label class="opcion"><input type="radio" name="modalidad" value="Multigrado" onchange="toggleMultigrado()"> Multigrado</label></div></div>
                 <div class="campo">
                   <label for="areaAcompanada">Área acompañada</label>
-                  <select id="areaAcompanada" name="areaAcompanada">
+                  <select id="areaAcompanada" name="areaAcompanada" onchange="crearTablaIndicadores()">
                     <option value="">Seleccione</option><option>Lengua Española</option><option>Matemática</option>
                     <option>Ciencias Sociales</option><option>Ciencias de la Naturaleza</option>
                     <option>Lenguas Extranjeras (Inglés)</option><option>Educación Artística</option>
@@ -3183,13 +3183,12 @@ function toggleMultigrado() {
 const INDICADORES = [
   {tipo:'seccion',titulo:'1. Planificación'},
   {codigo:'1.1',texto:'Cuenta con una planificación que responde a las estrategias orientadas desde el Nivel Primario.'},
-  {codigo:'1.2',texto:'Muestra una planificación diaria actualizada, orientada al desarrollo de las competencias del grado y propias del área acompañada, tomando como base la planificación de unidad.'},
-  {codigo:'1.3',texto:'Toma en cuenta las guías didácticas de su ciclo para la realización de la planificación diaria como se orientó desde el Nivel Primario.'},
-  {codigo:'1.4',texto:'La secuencia didáctica que está trabajando se corresponde con la sugerida en la calendarización de la Dirección de Educación Primaria para el período en curso.'},
-  {codigo:'1.5',texto:'Existe coherencia entre la intención pedagógica y las actividades elaboradas para cada uno de los momentos de la clase.'},
-  {codigo:'1.6',texto:'Se observan estrategias y actividades diferenciadas para atender a la diversidad del aula.'},
-  {codigo:'1.7',texto:'Elabora actividades de evaluación alineadas con la intención pedagógica e instrumentos para registrar los aprendizajes obtenidos por los estudiantes.'},
-  {codigo:'1.8',texto:'Se evidencia en la planificación diaria recursos didácticos previamente seleccionados en función al desarrollo de los contenidos a desarrollar y la intención pedagógica.'},
+  {codigo:'1.2',texto:'Muestra una planificación diaria actualizada que toma como base la planificación de unidad, se orienta al desarrollo de las competencias del grado y del área, y articula las guías didácticas del ciclo conforme a las orientaciones del Nivel Primario.'},
+  {codigo:'1.3',texto:'La secuencia didáctica que está trabajando se corresponde con la sugerida en la calendarización de la Dirección de Educación Primaria para el período en curso.'},
+  {codigo:'1.4',texto:'Existe coherencia entre la intención pedagógica y las actividades elaboradas para cada uno de los momentos de la clase.'},
+  {codigo:'1.5',texto:'Se observan estrategias y actividades diferenciadas para atender a la diversidad del aula.'},
+  {codigo:'1.6',texto:'Elabora actividades de evaluación alineadas con la intención pedagógica e instrumentos para registrar los aprendizajes obtenidos por los estudiantes.'},
+  {codigo:'1.7',texto:'Se evidencia en la planificación diaria recursos didácticos previamente seleccionados en función al desarrollo de los contenidos a desarrollar y la intención pedagógica.'},
   {tipo:'seccion',titulo:'2. Momentos de la práctica pedagógica'},
   {tipo:'subseccion',titulo:'Actividades de inicio'},
   {codigo:'2.1',texto:'Realiza la retroalimentación del tema anterior utilizando estrategias innovadoras.'},
@@ -3204,12 +3203,11 @@ const INDICADORES = [
   {codigo:'2.9',texto:'Demuestra dominio de los contenidos del área durante las actividades de construcción de los conocimientos.'},
   {codigo:'2.10',texto:'El aula está ambientada con sentido pedagógico y acorde con los contenidos curriculares que desarrolla, como lo indica el Modelo Pedagógico del Nivel Primario.'},
   {codigo:'2.11',texto:'Utiliza los recursos de manera pertinente, en el desarrollo de las actividades, facilitando el logro de las competencias del área que está impartiendo, incorporando la tecnología.'},
-  {codigo:'2.12',texto:'Durante el desarrollo de la clase se evidencia un rol protagónico de los estudiantes, construyendo sus aprendizajes de manera reflexiva.'},
-  {codigo:'2.13',texto:'Se evidencia una disciplina funcional fundamentada en el respeto durante el desarrollo de la clase.'},
-  {codigo:'2.14',texto:'Se evidencia una distribución efectiva del tiempo para cada uno de los momentos: inicio, desarrollo y cierre.'},
+  {codigo:'2.12',texto:'Se evidencia una disciplina funcional fundamentada en el respeto durante el desarrollo de la clase.'},
+  {codigo:'2.13',texto:'Se evidencia una distribución efectiva del tiempo para cada uno de los momentos: inicio, desarrollo y cierre.'},
   {tipo:'subseccion',titulo:'Actividades de cierre'},
-  {codigo:'2.15',texto:'Realiza una actividad o ejercicio de evaluación alineada con la intención pedagógica, usando alguna técnica o instrumento de evaluación para registrar los aprendizajes obtenidos por los estudiantes.'},
-  {codigo:'2.16',texto:'Realiza el cierre pedagógico de la clase retomando la intención pedagógica presentada y socializada al inicio de la clase.'},
+  {codigo:'2.14',texto:'Realiza una actividad o ejercicio de evaluación alineada con la intención pedagógica, usando alguna técnica o instrumento de evaluación para registrar los aprendizajes obtenidos por los estudiantes.'},
+  {codigo:'2.15',texto:'Realiza el cierre pedagógico de la clase retomando la intención pedagógica presentada y socializada al inicio de la clase.'},
   {tipo:'seccion',titulo:'3. Aspectos a tomar en cuenta (Ordenanza 04-2023)'},
   {codigo:'3.1',texto:'Tiene el registro de grado actualizado con las calificaciones de los indicadores de logro del período en curso, según lo establece la Ordenanza 04-2023.'},
   {codigo:'3.2',texto:'Las calificaciones registradas son coherentes con las evidencias de los cuadernos y producciones de los estudiantes.'},
@@ -3222,17 +3220,24 @@ const INDICADORES = [
   {codigo:'4.2',texto:'Logra identificar las oportunidades de mejora a partir de las preguntas reflexivas realizadas por el acompañante.'},
   {codigo:'4.3',texto:'Muestra una actitud colaborativa y de respeto ante las observaciones y sugerencias dadas por el acompañante.'},
   {codigo:'4.4',texto:'Construye los acuerdos tomando en cuenta las oportunidades de mejora detectadas en el acompañamiento, los escribe y muestra una actitud positiva con el cumplimiento de estos.'},
+  {tipo:'seccion',titulo:'5. Seguimiento a programas y proyectos prioritarios'},
+  {codigo:'5.1',texto:'Da seguimiento a la implementación del Proyecto GOAL (inglés) en los grados y niveles que aplica.'},
+  {codigo:'5.2',texto:'Tiene identificados y sistematizados los estudiantes en condición de sobreedad que participarán en el Plan Nacional de Sobreedad Escolar.'},
+  {codigo:'5.3',texto:'Desarrolla acciones de nivelación y aceleración con los estudiantes identificados en condición de sobreedad escolar.'},
+  {tipo:'seccion',titulo:'6. Indicadores por área curricular',area:true},
+  {codigo:'A.1',area:true,texto:'Promueve el desarrollo de las competencias propias del área. Los estudiantes aplican los conocimientos y habilidades esperados en situaciones concretas y significativas.'},
+  {codigo:'A.2',area:true,texto:'Utiliza estrategias pertinentes al área que favorecen la comprensión, el análisis y la construcción activa del conocimiento por parte de los estudiantes.'},
+  {codigo:'A.3',area:true,texto:'Evalúa y retroalimenta de manera continua el proceso de aprendizaje. Identifica dificultades o errores y ofrece retroalimentación oportuna para mejorar el desempeño de los estudiantes.'},
 ];
 
 const SUGERENCIAS = {
   '1.1':{b:'Planificación',t:'Elaborar la planificación alineada con las estrategias orientadas desde el Nivel Primario.'},
-  '1.2':{b:'Planificación',t:'Actualizar la planificación diaria tomando como base la planificación de unidad y las competencias del grado y del área.'},
-  '1.3':{b:'Planificación',t:'Incorporar de manera sistemática las guías didácticas del ciclo en la planificación diaria.'},
-  '1.4':{b:'Planificación',t:'Ajustar la secuencia didáctica trabajada para que se corresponda con la calendarización de la Dirección de Educación Primaria para el período en curso.'},
-  '1.5':{b:'Planificación',t:'Revisar la coherencia entre la intención pedagógica y las actividades previstas para cada momento de la clase.'},
-  '1.6':{b:'Planificación',t:'Incluir estrategias diferenciadas para atender la diversidad del aula.'},
-  '1.7':{b:'Planificación',t:'Diseñar actividades e instrumentos de evaluación alineados con la intención pedagógica.'},
-  '1.8':{b:'Planificación',t:'Seleccionar previamente los recursos didácticos según el contenido y la intención pedagógica.'},
+  '1.2':{b:'Planificación',t:'Actualizar la planificación diaria tomando como base la planificación de unidad, las competencias del grado y del área, y las guías didácticas del ciclo.'},
+  '1.3':{b:'Planificación',t:'Ajustar la secuencia didáctica trabajada para que se corresponda con la calendarización de la Dirección de Educación Primaria para el período en curso.'},
+  '1.4':{b:'Planificación',t:'Revisar la coherencia entre la intención pedagógica y las actividades previstas para cada momento de la clase.'},
+  '1.5':{b:'Planificación',t:'Incluir estrategias diferenciadas para atender la diversidad del aula.'},
+  '1.6':{b:'Planificación',t:'Diseñar actividades e instrumentos de evaluación alineados con la intención pedagógica.'},
+  '1.7':{b:'Planificación',t:'Seleccionar previamente los recursos didácticos según el contenido y la intención pedagógica.'},
   '2.1':{b:'Inicio',t:'Implementar estrategias innovadoras para la retroalimentación del tema anterior.'},
   '2.2':{b:'Inicio',t:'Comunicar explícitamente la intención pedagógica al inicio de cada clase.'},
   '2.3':{b:'Inicio',t:'Incorporar actividades para explorar los conocimientos previos de los estudiantes.'},
@@ -3244,25 +3249,35 @@ const SUGERENCIAS = {
   '2.9':{b:'Desarrollo',t:'Fortalecer el dominio de los contenidos del área acompañada.'},
   '2.10':{b:'Desarrollo',t:'Ambientar el aula con mayor sentido pedagógico y en coherencia con los contenidos curriculares.'},
   '2.11':{b:'Desarrollo',t:'Utilizar recursos y tecnología de forma más pertinente para favorecer el desarrollo de competencias.'},
-  '2.12':{b:'Desarrollo',t:'Promover un rol más protagónico del estudiante en la construcción de sus aprendizajes.'},
-  '2.13':{b:'Desarrollo',t:'Fortalecer una disciplina funcional basada en el respeto durante toda la clase.'},
-  '2.14':{b:'Desarrollo',t:'Organizar mejor el tiempo destinado a inicio, desarrollo y cierre de la clase.'},
-  '2.15':{b:'Cierre',t:'Aplicar actividades de evaluación alineadas con la intención pedagógica y registrar los resultados obtenidos.'},
-  '2.16':{b:'Cierre',t:'Realizar cierres pedagógicos que retomen la intención y los aprendizajes desarrollados en la clase.'},
+  '2.12':{b:'Desarrollo',t:'Fortalecer una disciplina funcional basada en el respeto durante toda la clase.'},
+  '2.13':{b:'Desarrollo',t:'Organizar mejor el tiempo destinado a inicio, desarrollo y cierre de la clase.'},
+  '2.14':{b:'Cierre',t:'Aplicar actividades de evaluación alineadas con la intención pedagógica y registrar los resultados obtenidos.'},
+  '2.15':{b:'Cierre',t:'Realizar cierres pedagógicos que retomen la intención y los aprendizajes desarrollados en la clase.'},
   '3.1':{b:'Registro y evaluación',t:'Mantener el registro de grado actualizado con las calificaciones de los indicadores de logro del período en curso, conforme a la Ordenanza 04-2023.'},
   '3.2':{b:'Registro y evaluación',t:'Asegurar que las calificaciones del registro de grado sean coherentes con las evidencias en cuadernos y producciones de los estudiantes.'},
   '3.3':{b:'Registro y evaluación',t:'Organizar y tener disponibles las evaluaciones aplicadas en el período en curso al momento del acompañamiento.'},
   '3.4':{b:'Recuperación pedagógica',t:'Identificar a los estudiantes que requieren recuperación pedagógica, documentar el proceso y registrar los resultados conforme a la Ordenanza 04-2023.'},
   '3.5':{b:'Evidencias de aprendizaje',t:'Organizar los cuadernos de los estudiantes de manera coherente con la planificación y el trabajo de aula.'},
   '3.6':{b:'Evidencias de aprendizaje',t:'Fortalecer el uso del portafolio como evidencia de progreso en las competencias del grado.'},
+  '5.1':{b:'Programas',t:'Incorporar el Proyecto GOAL en la planificación y llevar registro de las acciones implementadas en los grados que aplica.'},
+  '5.2':{b:'Sobreedad',t:'Levantar y sistematizar el listado de estudiantes en condición de sobreedad para su participación en el Plan Nacional.'},
+  '5.3':{b:'Sobreedad',t:'Diseñar e implementar acciones específicas de nivelación y aceleración para los estudiantes identificados en condición de sobreedad.'},
+  'A.1':{b:'Área curricular',t:'Diseñar actividades que promuevan el desarrollo de las competencias propias del área en situaciones concretas y significativas.'},
+  'A.2':{b:'Área curricular',t:'Seleccionar y aplicar estrategias pertinentes al área que favorezcan la comprensión, el análisis y la construcción activa del conocimiento.'},
+  'A.3':{b:'Área curricular',t:'Implementar procesos continuos de evaluación y retroalimentación oportuna para identificar dificultades y mejorar el desempeño de los estudiantes.'},
 };
 
 function crearTablaIndicadores() {
   const tabla = document.getElementById('tablaIndicadores');
   if (!tabla) return;
   tabla.innerHTML = '';
+  const areaSeleccionada = (document.getElementById('areaAcompanada')?.value || '').trim();
   INDICADORES.forEach(item => {
-    if (item.tipo === 'seccion') { const tr = document.createElement('tr'); tr.className='fila-seccion'; tr.innerHTML='<td colspan="7">'+item.titulo+'</td>'; tabla.appendChild(tr); return; }
+    if (item.tipo === 'seccion') {
+      let titulo = item.titulo;
+      if (item.area && areaSeleccionada) titulo = '6. Indicadores por área: ' + areaSeleccionada;
+      const tr = document.createElement('tr'); tr.className='fila-seccion'; tr.innerHTML='<td colspan="7">'+titulo+'</td>'; tabla.appendChild(tr); return;
+    }
     if (item.tipo === 'subseccion') { const tr = document.createElement('tr'); tr.className='fila-subseccion'; tr.innerHTML='<td colspan="7">'+item.titulo+'</td>'; tabla.appendChild(tr); return; }
     const tr = document.createElement('tr');
     let radios = '';
@@ -3314,16 +3329,15 @@ const INDICADORES_COORD = [
   {codigo:'C1.1',texto:'Cuenta con un plan de acompañamiento para el período que incluye docentes priorizados según necesidades identificadas.'},
   {codigo:'C1.2',texto:'El cronograma de acompañamientos está actualizado y refleja los realizados y los pendientes.'},
   {codigo:'C1.3',texto:'Demuestra conocimiento del instrumento de acompañamiento y sus indicadores antes de iniciar la observación.'},
-  {codigo:'C1.4',texto:'Coordina con el director la visita al aula con anticipación y define roles.'},
-  {codigo:'C1.5',texto:'Verifica el cumplimiento de los acuerdos establecidos en el acompañamiento anterior antes de iniciar el nuevo.'},
+  {codigo:'C1.4',texto:'Verifica el cumplimiento de los acuerdos establecidos en el acompañamiento anterior antes de iniciar el nuevo.'},
   {tipo:'seccion',titulo:'2. Observación de la clase'},
   {codigo:'C2.1',texto:'Observa la clase completa (o el tiempo acordado) sin interrumpir el proceso de enseñanza.'},
   {codigo:'C2.2',texto:'Registra evidencias concretas y objetivas durante la observación, sin emitir juicios de valor en el momento.'},
   {codigo:'C2.3',texto:'Contrasta lo observado con la planificación diaria del docente.'},
   {codigo:'C2.4',texto:'Examina cuadernos o producciones de estudiantes como parte de la observación.'},
   {tipo:'seccion',titulo:'3. Retroalimentación y reflexión pedagógica'},
-  {codigo:'C3.1',texto:'Realiza la retroalimentación el mismo día del acompañamiento o al siguiente.'},
-  {codigo:'C3.2',texto:'Inicia el diálogo con preguntas reflexivas que permiten al docente identificar sus fortalezas.'},
+  {codigo:'C3.1',texto:'Realiza la retroalimentación de manera oportuna tras el acompañamiento.'},
+  {codigo:'C3.2',texto:'Inicia el diálogo con preguntas reflexivas que permiten al docente identificar sus fortalezas y oportunidades de mejora.'},
   {codigo:'C3.3',texto:'Fundamenta las sugerencias en evidencias concretas registradas durante la observación.'},
   {codigo:'C3.4',texto:'Vincula la retroalimentación con los documentos curriculares oficiales (guías, secuencias, calendarización).'},
   {codigo:'C3.5',texto:'Construye acuerdos de mejora junto con el docente, estableciendo responsable, fecha y evidencia esperada.'},
@@ -3356,14 +3370,13 @@ const SUGERENCIAS_COORD = {
   'C1.1':{b:'Planificación',t:'Elaborar un plan de acompañamiento para el período que incluya docentes priorizados según las necesidades identificadas.'},
   'C1.2':{b:'Planificación',t:'Actualizar el cronograma de acompañamientos reflejando los realizados y los pendientes.'},
   'C1.3':{b:'Planificación',t:'Revisar el instrumento de acompañamiento y sus indicadores antes de cada visita al aula.'},
-  'C1.4':{b:'Planificación',t:'Coordinar previamente con el director la visita al aula y definir los roles de cada uno.'},
-  'C1.5':{b:'Seguimiento',t:'Revisar los acuerdos establecidos en el acompañamiento anterior como primer paso de cada visita.'},
+  'C1.4':{b:'Seguimiento',t:'Revisar los acuerdos establecidos en el acompañamiento anterior como primer paso de cada visita.'},
   'C2.1':{b:'Observación',t:'Observar la clase completa o el tiempo acordado sin interrumpir el proceso de enseñanza.'},
   'C2.2':{b:'Observación',t:'Registrar evidencias concretas y objetivas durante la observación, reservando los juicios para la retroalimentación.'},
   'C2.3':{b:'Observación',t:'Contrastar lo observado en el aula con la planificación diaria del docente.'},
   'C2.4':{b:'Observación',t:'Incluir la revisión de cuadernos o producciones de estudiantes como parte sistemática de la observación.'},
-  'C3.1':{b:'Retroalimentación',t:'Realizar la retroalimentación el mismo día del acompañamiento o al día siguiente.'},
-  'C3.2':{b:'Retroalimentación',t:'Iniciar el diálogo de retroalimentación con preguntas reflexivas que permitan al docente identificar sus propias fortalezas.'},
+  'C3.1':{b:'Retroalimentación',t:'Garantizar que la retroalimentación se realice de manera oportuna, evitando que transcurra demasiado tiempo desde la observación.'},
+  'C3.2':{b:'Retroalimentación',t:'Iniciar el diálogo de retroalimentación con preguntas reflexivas que permitan al docente identificar tanto sus fortalezas como sus oportunidades de mejora.'},
   'C3.3':{b:'Retroalimentación',t:'Fundamentar todas las sugerencias en evidencias concretas registradas durante la observación.'},
   'C3.4':{b:'Retroalimentación',t:'Vincular la retroalimentación con los documentos curriculares oficiales vigentes.'},
   'C3.5':{b:'Acuerdos',t:'Construir acuerdos de mejora junto con el docente, especificando responsable, fecha y evidencia esperada.'},
