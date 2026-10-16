@@ -2263,13 +2263,13 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
             </div>
             <div class="campo" id="mapaFiltroRegionalWrap">
               <label style="font-size:12px;font-weight:600;color:#617384;">Regional</label>
-              <select id="mapaFiltroRegional" onchange="poblarDistritosMapa()" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;min-width:160px;">
+              <select id="mapaFiltroRegional" onchange="poblarDistritosMapa().then(()=>cargarMapaCobertura())" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;min-width:160px;">
                 <option value="">Todas</option>
               </select>
             </div>
             <div class="campo" id="mapaFiltroDistritoWrap">
               <label style="font-size:12px;font-weight:600;color:#617384;">Distrito</label>
-              <select id="mapaFiltroDistrito" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;min-width:160px;">
+              <select id="mapaFiltroDistrito" onchange="cargarMapaCobertura()" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;min-width:160px;">
                 <option value="">Todos</option>
               </select>
             </div>
