@@ -6322,6 +6322,152 @@ guardarRegistro = async function(estado) {
   if (estado === 'Enviado') limpiarFormulario();
 };
 
+// ── OVERRIDE enviarFormularioCoord PARA OFFLINE ───────────────────────────────
+const _enviarFormularioCoordOriginal = enviarFormularioCoord;
+enviarFormularioCoord = async function(event) {
+  if (!estaOffline) return _enviarFormularioCoordOriginal(event);
+  event.preventDefault();
+  const v = id => (document.getElementById(id)||{}).value || '';
+  const r = name => { const el = document.querySelector('input[name="'+name+'"]:checked'); return el?el.value:''; };
+  const indicadoresData = {};
+  INDICADORES_COORD.forEach(item => {
+    if (!item.codigo) return;
+    const sel = document.querySelector('input[name="val_'+item.codigo+'"]:checked');
+    const obs = document.querySelector('textarea[name="obs_'+item.codigo+'"]');
+    indicadoresData[item.codigo] = { valor: sel ? parseInt(sel.value) : null, observacion: obs ? obs.value : '' };
+  });
+  await guardarOffline('acompanamiento', {
+    usuario_id: usuarioActual?.id,
+    nombre_acompanante: v('cNombreAcompanante'),
+    rol_acompanante: v('cRolAcompanante'),
+    regional: v('cRegional'),
+    distrito: v('cDistrito'),
+    centro_educativo: v('cCentroEducativo'),
+    codigo_centro: v('cCodigoCentro'),
+    sector: v('cSectorCentro'),
+    nombre_docente: v('cNombreCoord'),
+    cedula_docente: v('cCedulaCoord'),
+    tipo_acompanamiento: r('cTipoAcomp'),
+    fecha: v('cFechaCoord') || null,
+    foco: v('cFocoCoord'),
+    observaciones: v('cObservacionesCoord'),
+    acuerdos: v('cAcuerdosCoord'),
+    indicadores: indicadoresData,
+    tipo_instrumento: 'coordinador',
+    estado: 'Enviado',
+  });
+  await actualizarIndicadorSync();
+  mostrarNotif('💾 Guardado localmente. Se sincronizará al reconectar.');
+  limpiarFormularioCoord();
+};
+
+// ── OVERRIDE guardarBorradorCoord PARA OFFLINE ────────────────────────────────
+const _guardarBorradorCoordOriginal = guardarBorradorCoord;
+guardarBorradorCoord = async function() {
+  if (!estaOffline) return _guardarBorradorCoordOriginal();
+  const v = id => (document.getElementById(id)||{}).value || '';
+  const r = name => { const el = document.querySelector('input[name="'+name+'"]:checked'); return el?el.value:''; };
+  const indicadoresData = {};
+  INDICADORES_COORD.forEach(item => {
+    if (!item.codigo) return;
+    const sel = document.querySelector('input[name="val_'+item.codigo+'"]:checked');
+    const obs = document.querySelector('textarea[name="obs_'+item.codigo+'"]');
+    indicadoresData[item.codigo] = { valor: sel ? parseInt(sel.value) : null, observacion: obs ? obs.value : '' };
+  });
+  await guardarOffline('acompanamiento', {
+    usuario_id: usuarioActual?.id,
+    nombre_acompanante: v('cNombreAcompanante'),
+    rol_acompanante: v('cRolAcompanante'),
+    regional: v('cRegional'),
+    distrito: v('cDistrito'),
+    centro_educativo: v('cCentroEducativo'),
+    codigo_centro: v('cCodigoCentro'),
+    sector: v('cSectorCentro'),
+    nombre_docente: v('cNombreCoord'),
+    cedula_docente: v('cCedulaCoord'),
+    tipo_acompanamiento: r('cTipoAcomp'),
+    fecha: v('cFechaCoord') || null,
+    foco: v('cFocoCoord'),
+    observaciones: v('cObservacionesCoord'),
+    acuerdos: v('cAcuerdosCoord'),
+    indicadores: indicadoresData,
+    tipo_instrumento: 'coordinador',
+    estado: 'Borrador',
+  });
+  await actualizarIndicadorSync();
+  mostrarNotif('💾 Borrador guardado localmente. Se sincronizará al reconectar.');
+};
+
+// ── OVERRIDE enviarFormularioDist PARA OFFLINE ────────────────────────────────
+const _enviarFormularioDistOriginal = enviarFormularioDist;
+enviarFormularioDist = async function(event) {
+  if (!estaOffline) return _enviarFormularioDistOriginal(event);
+  event.preventDefault();
+  const fd = new FormData(document.getElementById('formAcompDist'));
+  const valores = {};
+  INDICADORES_DIST.filter(i => i.codigo).forEach(i => {
+    const sel = document.querySelector(`input[name="val_${i.codigo}"]:checked`);
+    valores[i.codigo] = sel ? parseInt(sel.value) : null;
+  });
+  const acuerdos = (document.getElementById('dAcuerdosDist')?.value || '').trim();
+  await guardarOffline('acompanamiento', {
+    nombre_acompanante: fd.get('dNombreAcompanante'),
+    rol_acompanante: fd.get('dRolAcompanante'),
+    codigo_centro: fd.get('dCodigoCentro'),
+    centro_educativo: fd.get('dCentroEducativo'),
+    regional: fd.get('dRegional'),
+    distrito: fd.get('dDistrito'),
+    nombre_docente: fd.get('dNombreTecnico'),
+    cedula: fd.get('dCedulaTecnico'),
+    fecha: fd.get('dFechaDist') || null,
+    tipo_acompanamiento: fd.get('dTipoAcomp'),
+    foco: fd.get('dFocoDist'),
+    observaciones: fd.get('dObservacionesDist'),
+    acuerdos,
+    valores_json: JSON.stringify(valores),
+    tipo_instrumento: 'tecnico_distrital',
+    usuario_id: usuarioActual?.id,
+    estado: 'enviado',
+  });
+  await actualizarIndicadorSync();
+  mostrarNotif('💾 Guardado localmente. Se sincronizará al reconectar.');
+  limpiarFormularioDist();
+};
+
+// ── OVERRIDE guardarBorradorDist PARA OFFLINE ─────────────────────────────────
+const _guardarBorradorDistOriginal = guardarBorradorDist;
+guardarBorradorDist = async function() {
+  if (!estaOffline) return _guardarBorradorDistOriginal();
+  const fd = new FormData(document.getElementById('formAcompDist'));
+  const valores = {};
+  INDICADORES_DIST.filter(i => i.codigo).forEach(i => {
+    const sel = document.querySelector(`input[name="val_${i.codigo}"]:checked`);
+    valores[i.codigo] = sel ? parseInt(sel.value) : null;
+  });
+  const acuerdos = (document.getElementById('dAcuerdosDist')?.value || '').trim();
+  await guardarOffline('acompanamiento', {
+    nombre_acompanante: fd.get('dNombreAcompanante'),
+    rol_acompanante: fd.get('dRolAcompanante'),
+    codigo_centro: fd.get('dCodigoCentro'),
+    centro_educativo: fd.get('dCentroEducativo'),
+    regional: fd.get('dRegional'),
+    distrito: fd.get('dDistrito'),
+    nombre_docente: fd.get('dNombreTecnico'),
+    cedula: fd.get('dCedulaTecnico'),
+    fecha: fd.get('dFechaDist') || null,
+    tipo_acompanamiento: fd.get('dTipoAcomp'),
+    foco: fd.get('dFocoDist'),
+    observaciones: fd.get('dObservacionesDist'),
+    acuerdos,
+    valores_json: JSON.stringify(valores),
+    tipo_instrumento: 'tecnico_distrital',
+    usuario_id: usuarioActual?.id,
+    estado: 'Borrador',
+  });
+  await actualizarIndicadorSync();
+  mostrarNotif('💾 Borrador guardado localmente. Se sincronizará al reconectar.');
+};
+
 // ── INSTALACIÓN PWA ───────────────────────────────────────────────────────────
 let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
