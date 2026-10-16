@@ -3236,6 +3236,33 @@ function limpiarFiltrosMapa() {
 }
 
 // Genera el HTML de las tarjetas de resumen por sector
+// Estado del filtro activo en el mapa: null = todos, 'con' = solo con acomp., 'sin' = solo sin, 'sector:X' = sector
+let _mapaFiltroActivo = null;
+// Almacena todos los marcadores del mapa para poder filtrarlos sin recargar
+let _mapaMarkers = [];
+
+function _filtrarMarcadoresMapa(filtro) {
+  _mapaFiltroActivo = (_mapaFiltroActivo === filtro) ? null : filtro; // toggle
+  _mapaMarkers.forEach(({ marker, cubierto, sector }) => {
+    let visible = true;
+    if (_mapaFiltroActivo === 'con')          visible = cubierto;
+    else if (_mapaFiltroActivo === 'sin')     visible = !cubierto;
+    else if (_mapaFiltroActivo?.startsWith('sector:')) {
+      const s = _mapaFiltroActivo.slice(7);
+      visible = (sector || '').trim() === s;
+    }
+    if (visible) { if (!_mapaLeaflet.hasLayer(marker)) marker.addTo(_mapaLeaflet); }
+    else         { if (_mapaLeaflet.hasLayer(marker))  _mapaLeaflet.removeLayer(marker); }
+  });
+  // Actualizar aspecto visual de tarjetas
+  document.querySelectorAll('[data-mapa-filtro]').forEach(el => {
+    const activo = el.dataset.mapaFiltro === _mapaFiltroActivo;
+    el.style.outline = activo ? '2.5px solid #1a6fb5' : 'none';
+    el.style.transform = activo ? 'scale(1.03)' : 'scale(1)';
+    el.style.boxShadow = activo ? '0 4px 16px rgba(26,111,181,.25)' : '';
+  });
+}
+
 function _renderResumenMapa(centros, codigosConVisita) {
   const SECTORES = [
     { key:'Público',     bg:'#e0f2fe', fg:'#0369a1', borde:'#bae6fd' },
@@ -3248,15 +3275,23 @@ function _renderResumenMapa(centros, codigosConVisita) {
   const totalSin  = centros.length - totalCon;
   const totalPct  = centros.length ? Math.round(totalCon / centros.length * 100) : 0;
 
+  const cursorStyle = 'cursor:pointer;transition:transform .15s,box-shadow .15s,outline .15s;';
+
   let html = `
     <div style="width:100%;display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
-      <div style="background:#d1fae5;border-radius:10px;padding:12px 20px;min-width:130px;text-align:center;border:1px solid #a7f3d0;">
+      <div data-mapa-filtro="con" onclick="_filtrarMarcadoresMapa('con')"
+           style="background:#d1fae5;border-radius:10px;padding:12px 20px;min-width:130px;text-align:center;border:1px solid #a7f3d0;${cursorStyle}"
+           title="Clic para ver solo centros con acompañamiento">
         <div style="font-size:26px;font-weight:800;color:#065f46;">${totalCon}</div>
         <div style="font-size:11px;color:#047857;font-weight:600;">Con acompañamiento</div>
+        <div style="font-size:10px;color:#6b7280;margin-top:2px;">🔍 clic para filtrar</div>
       </div>
-      <div style="background:#fee2e2;border-radius:10px;padding:12px 20px;min-width:130px;text-align:center;border:1px solid #fecaca;">
+      <div data-mapa-filtro="sin" onclick="_filtrarMarcadoresMapa('sin')"
+           style="background:#fee2e2;border-radius:10px;padding:12px 20px;min-width:130px;text-align:center;border:1px solid #fecaca;${cursorStyle}"
+           title="Clic para ver solo centros sin acompañamiento">
         <div style="font-size:26px;font-weight:800;color:#991b1b;">${totalSin}</div>
         <div style="font-size:11px;color:#b91c1c;font-weight:600;">Sin acompañamiento</div>
+        <div style="font-size:10px;color:#6b7280;margin-top:2px;">🔍 clic para filtrar</div>
       </div>
       <div style="background:#e0f2fe;border-radius:10px;padding:12px 20px;min-width:130px;text-align:center;border:1px solid #bae6fd;">
         <div style="font-size:26px;font-weight:800;color:#0369a1;">${centros.length}</div>
@@ -3268,15 +3303,18 @@ function _renderResumenMapa(centros, codigosConVisita) {
       </div>
     </div>
     <div style="width:100%;">
-      <div style="font-size:12px;font-weight:700;color:#617384;margin-bottom:6px;letter-spacing:.5px;">COBERTURA POR SECTOR</div>
+      <div style="font-size:12px;font-weight:700;color:#617384;margin-bottom:6px;letter-spacing:.5px;">COBERTURA POR SECTOR — clic para filtrar el mapa</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">`;
 
   SECTORES.forEach(s => {
     const grupo = centros.filter(c => (c.sector || '').trim() === s.key);
     const con   = grupo.filter(c => codigosConVisita.has(c.codigo)).length;
     const pct   = grupo.length ? Math.round(con / grupo.length * 100) : 0;
+    const filtroKey = `sector:${s.key}`;
     html += `
-      <div style="background:${s.bg};border:1px solid ${s.borde};border-radius:10px;padding:12px 18px;min-width:180px;flex:1;">
+      <div data-mapa-filtro="${filtroKey}" onclick="_filtrarMarcadoresMapa('${filtroKey}')"
+           style="background:${s.bg};border:1px solid ${s.borde};border-radius:10px;padding:12px 18px;min-width:180px;flex:1;${cursorStyle}"
+           title="Clic para ver solo centros ${s.key}">
         <div style="font-size:12px;font-weight:700;color:${s.fg};margin-bottom:6px;">${s.key.toUpperCase()}</div>
         <div style="display:flex;gap:14px;align-items:center;">
           <div style="text-align:center;">
@@ -3423,6 +3461,10 @@ async function cargarMapaCobertura() {
     weight: 1.5, opacity: 1, fillOpacity: 0.88
   });
 
+  // Resetear marcadores y filtro activo al recargar
+  _mapaMarkers = [];
+  _mapaFiltroActivo = null;
+
   const bounds = [];
 
   centros.forEach(c => {
@@ -3446,6 +3488,8 @@ async function cargarMapaCobertura() {
         : `<span style="color:#dc2626;font-weight:700;">⚠️ Sin acompañamiento</span>`}
     `);
     marker.addTo(_mapaLeaflet);
+    // Guardar referencia para filtrado por tarjeta
+    _mapaMarkers.push({ marker, cubierto: tieneVisita, sector: c.sector || '' });
     bounds.push([lat, lon]);
   });
 
