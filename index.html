@@ -3153,18 +3153,32 @@ let _mapaRegionalesCache = null; // cache de regionales para el selector
 async function poblarRegionalesMapa() {
   const sel = document.getElementById('mapaFiltroRegional');
   if (!sel || _mapaRegionalesCache) return;
-  const { data } = await sb.from('centros')
-    .select('regional_codigo,regional_nombre')
-    .ilike('niveles','%Primario%')
-    .not('niveles','ilike','%Adultos%')
-    .not('regional_codigo','is','null')
-    .order('regional_codigo');
-  // Deduplicar
+
+  // Paginar para obtener todos los registros (Supabase limita a 1000 por defecto)
+  let todos = [];
+  let pg = 0;
+  const PG = 1000;
+  while (true) {
+    const { data: chunk } = await sb.from('centros')
+      .select('regional_codigo,regional_nombre')
+      .ilike('niveles','%Primario%')
+      .not('niveles','ilike','%Adultos%')
+      .not('regional_codigo','is','null')
+      .order('regional_codigo')
+      .range(pg * PG, (pg + 1) * PG - 1);
+    if (!chunk || chunk.length === 0) break;
+    todos = todos.concat(chunk);
+    if (chunk.length < PG) break;
+    pg++;
+  }
+
+  // Deduplicar por código
   const vistas = new Set();
-  _mapaRegionalesCache = (data || []).filter(r => {
+  _mapaRegionalesCache = todos.filter(r => {
     if (vistas.has(r.regional_codigo)) return false;
     vistas.add(r.regional_codigo); return true;
   });
+
   sel.innerHTML = '<option value="">Todas</option>';
   _mapaRegionalesCache.forEach(r => {
     sel.appendChild(new Option(`${r.regional_codigo} - ${r.regional_nombre}`, r.regional_codigo));
@@ -3178,15 +3192,28 @@ async function poblarDistritosMapa() {
   if (!sel) return;
   sel.innerHTML = '<option value="">Todos</option>';
   if (!regCod) return;
-  const { data } = await sb.from('centros')
-    .select('distrito_codigo,distrito_nombre')
-    .ilike('niveles','%Primario%')
-    .not('niveles','ilike','%Adultos%')
-    .eq('regional_codigo', regCod)
-    .not('distrito_codigo','is','null')
-    .order('distrito_codigo');
+
+  // Paginar por si una regional tiene muchos distritos
+  let todos = [];
+  let pg = 0;
+  const PG = 1000;
+  while (true) {
+    const { data: chunk } = await sb.from('centros')
+      .select('distrito_codigo,distrito_nombre')
+      .ilike('niveles','%Primario%')
+      .not('niveles','ilike','%Adultos%')
+      .eq('regional_codigo', regCod)
+      .not('distrito_codigo','is','null')
+      .order('distrito_codigo')
+      .range(pg * PG, (pg + 1) * PG - 1);
+    if (!chunk || chunk.length === 0) break;
+    todos = todos.concat(chunk);
+    if (chunk.length < PG) break;
+    pg++;
+  }
+
   const vistas = new Set();
-  (data || []).filter(d => {
+  todos.filter(d => {
     if (vistas.has(d.distrito_codigo)) return false;
     vistas.add(d.distrito_codigo); return true;
   }).forEach(d => {
@@ -3200,9 +3227,12 @@ function limpiarFiltrosMapa() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  // Limpiar también los distritos del mapa
+  // Limpiar distritos y forzar recarga de regionales la próxima vez
   const selD = document.getElementById('mapaFiltroDistrito');
   if (selD) selD.innerHTML = '<option value="">Todos</option>';
+  const selR = document.getElementById('mapaFiltroRegional');
+  if (selR) { selR.innerHTML = '<option value="">Todas</option>'; }
+  _mapaRegionalesCache = null; // invalidar caché para forzar recarga
 }
 
 // Genera el HTML de las tarjetas de resumen por sector
