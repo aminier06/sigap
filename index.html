@@ -750,6 +750,14 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
       .firmas{grid-template-columns:1fr;}
     }
   </style>
+  <!-- Leaflet.js para mapa de cobertura -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    #mapaCobertura { height: 480px; border-radius: 10px; z-index: 0; }
+    .leyenda-mapa { background: #fff; border-radius: 8px; padding: 10px 14px; box-shadow: 0 2px 8px rgba(0,0,0,.12); font-size: 13px; line-height: 1.8; }
+    .leyenda-mapa span { display: inline-block; width: 13px; height: 13px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  </style>
 </head>
 <body>
 
@@ -879,6 +887,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
         <div class="menu-etiqueta">Análisis</div>
         <div class="menu-item" onclick="mostrarPanel('historialDocente',this)"><span class="menu-icono">👨‍🏫</span> Historial por docente</div>
         <div class="menu-item" onclick="mostrarPanel('reportes',this)"><span class="menu-icono">📨</span> Reportes y alertas</div>
+        <div class="menu-item" onclick="mostrarPanel('mapaCoberta',this)"><span class="menu-icono">🗺️</span> Mapa de cobertura</div>
       </div>
       <div class="menu-grupo admin-only" id="menuAdmin">
         <div class="menu-etiqueta">Administración</div>
@@ -2218,6 +2227,45 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
         </div>
       </div>
 
+      <!-- MAPA DE COBERTURA -->
+      <div id="panel-mapaCoberta" class="panel">
+        <div class="dashboard-titulo">Mapa de cobertura</div>
+        <p class="dashboard-sub">Visualiza qué centros han recibido acompañamiento y cuáles están pendientes en tu demarcación.</p>
+
+        <!-- Filtros del mapa -->
+        <div class="filtros-bar" style="margin-bottom:16px;">
+          <div class="filtros-grid" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+            <div class="campo">
+              <label style="font-size:12px;font-weight:600;color:#617384;">Desde</label>
+              <input type="date" id="mapaFiltroDesde" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;">
+            </div>
+            <div class="campo">
+              <label style="font-size:12px;font-weight:600;color:#617384;">Hasta</label>
+              <input type="date" id="mapaFiltroHasta" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;">
+            </div>
+            <div class="campo">
+              <label style="font-size:12px;font-weight:600;color:#617384;">Tipo</label>
+              <select id="mapaFiltroTipo" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;">
+                <option value="">Todos</option>
+                <option value="docente">Docente</option>
+                <option value="coordinador">Coordinador/a</option>
+                <option value="tecnico_distrital">Técnico Distrital</option>
+              </select>
+            </div>
+            <button onclick="cargarMapaCobertura()" style="padding:7px 18px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;">Actualizar mapa</button>
+          </div>
+        </div>
+
+        <!-- Resumen de cobertura -->
+        <div id="mapaResumen" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;"></div>
+
+        <!-- Mapa -->
+        <div id="mapaCobertura"></div>
+
+        <!-- Estado de carga -->
+        <div id="mapaEstado" style="margin-top:10px;font-size:13px;color:#617384;text-align:center;"></div>
+      </div>
+
       <!-- ADMIN: TODOS LOS REGISTROS -->
       <div id="panel-adminRegistros" class="panel">
         <div class="dashboard-titulo">Todos los registros</div>
@@ -2532,6 +2580,7 @@ function mostrarPanel(id, el) {
   if (id === 'dashboard')      cargarDashboard();
   if (id === 'adminUsuarios')  cargarUsuarios();
   if (id === 'adminRegistros') cargarTodosRegistros();
+  if (id === 'mapaCoberta')    cargarMapaCobertura();
   // Autoguardado: activar solo en el formulario
   if (id === 'formDocente') iniciarAutoguardado();
   else detenerAutoguardado();
@@ -3068,6 +3117,159 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// ─── MAPA DE COBERTURA ───────────────────────────────────────────────
+let _mapaLeaflet = null;
+
+async function cargarMapaCobertura() {
+  const estado = document.getElementById('mapaEstado');
+  const resumen = document.getElementById('mapaResumen');
+  if (estado) { estado.textContent = 'Cargando datos…'; }
+  if (resumen) resumen.innerHTML = '';
+
+  const p = perfilActual;
+  if (!p) return;
+
+  // 1. Determinar filtro de demarcación para centros
+  const rol = String(p.rol || '').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+  let queryCentros = sb.from('centros').select('codigo,nombre,latitud,longitud,zona,distrito_codigo,regional_codigo');
+  if (rol === 'tecnico/a regional' || rol === 'tecnico/a coordinador/a regional') {
+    const cod = String(p.regional || '').trim().match(/^\d+/)?.[0]?.padStart(2,'0');
+    if (cod) queryCentros = queryCentros.eq('regional_codigo', cod);
+  } else if (rol === 'tecnico/a distrital' || rol === 'tecnico/a coordinador/a distrital') {
+    const cod = String(p.distrito || '').trim().match(/^\d+/)?.[0]?.padStart(4,'0');
+    if (cod) queryCentros = queryCentros.eq('distrito_codigo', cod);
+  } else if (rol === 'coordinador/a pedagogico/a' || rol === 'director/a de centro') {
+    const centro = String(p.codigo_centro || '').trim().replace(/\D/g,'').padStart(5,'0');
+    if (centro) queryCentros = queryCentros.eq('codigo', centro);
+  } else if (rol !== 'tecnico/a nacional' && p.nivel !== 'admin') {
+    if (estado) estado.textContent = 'No tienes jurisdicción asignada.';
+    return;
+  }
+
+  const { data: centros, error: errC } = await queryCentros;
+  if (errC || !centros?.length) {
+    if (estado) estado.textContent = 'No se encontraron centros para tu demarcación.';
+    return;
+  }
+
+  // 2. Cargar acompañamientos del período
+  const desde = document.getElementById('mapaFiltroDesde')?.value;
+  const hasta = document.getElementById('mapaFiltroHasta')?.value;
+  const tipo  = document.getElementById('mapaFiltroTipo')?.value;
+
+  let queryAcomp = filtrarDemarcacion(sb.from('acompañamientos').select('codigo_centro,tipo_instrumento,fecha,estado'));
+  if (desde) queryAcomp = queryAcomp.gte('fecha', desde);
+  if (hasta) queryAcomp = queryAcomp.lte('fecha', hasta);
+  if (tipo)  queryAcomp = queryAcomp.eq('tipo_instrumento', tipo);
+
+  const { data: acomps } = await queryAcomp;
+
+  // Construir set de centros con al menos un acompañamiento
+  const codigosConVisita = new Set((acomps || []).map(a => String(a.codigo_centro || '').trim()));
+
+  const conVisita    = centros.filter(c => codigosConVisita.has(c.codigo));
+  const sinVisita    = centros.filter(c => !codigosConVisita.has(c.codigo));
+  const sinCoordsAll = centros.filter(c => !c.latitud || !c.longitud);
+  const sinCoordsCon = conVisita.filter(c => !c.latitud || !c.longitud).length;
+  const sinCoordsSin = sinVisita.filter(c => !c.latitud || !c.longitud).length;
+
+  // 3. Tarjetas resumen
+  if (resumen) {
+    const pct = centros.length ? Math.round(conVisita.length / centros.length * 100) : 0;
+    resumen.innerHTML = `
+      <div style="background:#d1fae5;border-radius:10px;padding:12px 20px;min-width:140px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:#065f46;">${conVisita.length}</div>
+        <div style="font-size:12px;color:#047857;font-weight:600;">Con acompañamiento</div>
+      </div>
+      <div style="background:#fee2e2;border-radius:10px;padding:12px 20px;min-width:140px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:#991b1b;">${sinVisita.length}</div>
+        <div style="font-size:12px;color:#b91c1c;font-weight:600;">Sin acompañamiento</div>
+      </div>
+      <div style="background:#e0f2fe;border-radius:10px;padding:12px 20px;min-width:140px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:#0369a1;">${centros.length}</div>
+        <div style="font-size:12px;color:#0284c7;font-weight:600;">Total centros</div>
+      </div>
+      <div style="background:#f5f3ff;border-radius:10px;padding:12px 20px;min-width:140px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:#6d28d9;">${pct}%</div>
+        <div style="font-size:12px;color:#7c3aed;font-weight:600;">Cobertura</div>
+      </div>`;
+  }
+
+  // 4. Inicializar / actualizar mapa Leaflet
+  if (!_mapaLeaflet) {
+    _mapaLeaflet = L.map('mapaCobertura').setView([18.7357, -70.1627], 8);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 18
+    }).addTo(_mapaLeaflet);
+
+    // Leyenda
+    const leyenda = L.control({ position: 'bottomright' });
+    leyenda.onAdd = () => {
+      const div = L.DomUtil.create('div','leyenda-mapa');
+      div.innerHTML = `
+        <strong>Cobertura</strong><br>
+        <span style="background:#16a34a;"></span> Con acompañamiento<br>
+        <span style="background:#dc2626;"></span> Sin acompañamiento<br>
+        <span style="background:#9ca3af;"></span> Sin coordenadas`;
+      return div;
+    };
+    leyenda.addTo(_mapaLeaflet);
+  } else {
+    // Limpiar capas de marcadores anteriores
+    _mapaLeaflet.eachLayer(l => { if (l instanceof L.CircleMarker) _mapaLeaflet.removeLayer(l); });
+  }
+
+  const iconOpts = (color) => ({
+    radius: 7, fillColor: color, color: '#fff',
+    weight: 1.5, opacity: 1, fillOpacity: 0.88
+  });
+
+  const bounds = [];
+
+  centros.forEach(c => {
+    if (!c.latitud || !c.longitud) return;
+    const lat = parseFloat(c.latitud);
+    const lon = parseFloat(c.longitud);
+    if (isNaN(lat) || isNaN(lon)) return;
+
+    const tieneVisita = codigosConVisita.has(c.codigo);
+    const color = tieneVisita ? '#16a34a' : '#dc2626';
+    const visitasCount = (acomps || []).filter(a => String(a.codigo_centro).trim() === c.codigo).length;
+
+    const marker = L.circleMarker([lat, lon], iconOpts(color));
+    marker.bindPopup(`
+      <strong>${c.nombre}</strong><br>
+      <span style="font-size:12px;color:#617384;">Código: ${c.codigo} · ${c.zona || ''}</span><br>
+      ${tieneVisita
+        ? `<span style="color:#16a34a;font-weight:700;">✅ ${visitasCount} acompañamiento${visitasCount!==1?'s':''}</span>`
+        : `<span style="color:#dc2626;font-weight:700;">⚠️ Sin acompañamiento</span>`}
+    `);
+    marker.addTo(_mapaLeaflet);
+    bounds.push([lat, lon]);
+  });
+
+  if (bounds.length > 1) {
+    _mapaLeaflet.fitBounds(bounds, { padding: [30, 30] });
+  } else if (bounds.length === 1) {
+    _mapaLeaflet.setView(bounds[0], 13);
+  }
+
+  // Invalidar tamaño (por si el panel estaba oculto al inicializar)
+  setTimeout(() => _mapaLeaflet.invalidateSize(), 100);
+
+  const sinCoords = sinCoordsAll.length;
+  if (estado) {
+    estado.textContent = sinCoords > 0
+      ? `${sinCoords} centro${sinCoords!==1?'s':''} sin coordenadas no aparece${sinCoords!==1?'n':''} en el mapa.`
+      : 'Todos los centros con coordenadas están representados.';
+  }
+}
+
+// Cargar mapa al abrir el panel
+const _origMostrarPanel = typeof mostrarPanel === 'function' ? mostrarPanel : null;
+// (El hook se registra al final, tras la definición de mostrarPanel)
 
 function limpiarFiltros() {
   ['filtroDesde','filtroHasta','filtroRegional','filtroDistrito','filtroCentro','filtroArea','filtroTipo','filtroEstado','filtroInstrumento']
@@ -6082,6 +6284,10 @@ if ('serviceWorker' in navigator) {
     <div id="menuMasTecCoord" onclick="mostrarPanelMovil('seguimientoTecnicos',null);toggleMenuMas()"
       style="display:none;padding:14px 20px;font-size:14px;font-weight:700;color:#2d4a63;border-bottom:1px solid #f0f5fa;">
       🔍 Seguimiento de técnicos
+    </div>
+    <div onclick="mostrarPanelMovil('mapaCoberta',null);toggleMenuMas()"
+      style="padding:14px 20px;font-size:14px;font-weight:700;color:#2d4a63;border-bottom:1px solid #f0f5fa;">
+      🗺️ Mapa de cobertura
     </div>
     <div id="menuMasAdmin" style="display:none;">
       <div onclick="mostrarPanelMovil('adminUsuarios',null);toggleMenuMas()"
