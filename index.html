@@ -944,8 +944,17 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
                 <option value="">Todos los centros</option>
               </select>
             </div>
-            <div class="campo">
-              <label>Área</label>
+            <div class="campo" id="filtroInstrumentoWrap">
+              <label>Instrumento</label>
+              <select id="filtroInstrumento" onchange="onChangeFiltroInstrumento()">
+                <option value="">Todos</option>
+                <option value="docente">Docente</option>
+                <option value="coordinador">Coordinador/a</option>
+                <option value="tecnico_distrital">Técnico distrital</option>
+              </select>
+            </div>
+            <div class="campo" id="filtroAreaWrap">
+              <label>Área <span id="filtroAreaNote" style="font-size:10px;color:#8fa5bb;"></span></label>
               <select id="filtroArea" onchange="cargarDashboard()">
                 <option value="">Todas las áreas</option>
                 <option>Lengua Española</option>
@@ -981,17 +990,17 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
 
         <!-- TARJETAS RESUMEN -->
         <div class="cards-resumen" style="margin-top:20px;">
-          <div class="card-stat">
+          <div class="card-stat" onclick="filtrarDashboardPorStat('todos')" style="cursor:pointer;" title="Ver todos los registros">
             <div class="icono">📋</div>
             <div class="numero" id="statTotal">—</div>
             <div class="etiqueta">Total acompañamientos</div>
           </div>
-          <div class="card-stat">
+          <div class="card-stat" onclick="filtrarDashboardPorStat('enviados')" style="cursor:pointer;" title="Ver solo enviados">
             <div class="icono">✅</div>
             <div class="numero" id="statEnviados">—</div>
             <div class="etiqueta">Enviados</div>
           </div>
-          <div class="card-stat">
+          <div class="card-stat" onclick="filtrarDashboardPorStat('borradores')" style="cursor:pointer;" title="Ver solo borradores">
             <div class="icono">📝</div>
             <div class="numero" id="statBorradores">—</div>
             <div class="etiqueta">Borradores</div>
@@ -1006,10 +1015,10 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
             <div class="numero" id="statDocentes">—</div>
             <div class="etiqueta">Personas acompañadas</div>
           </div>
-          <div class="card-stat">
+          <div class="card-stat" onclick="filtrarDashboardPorStat('mes')" style="cursor:pointer;" title="Ver registros de este mes">
             <div class="icono">📅</div>
             <div class="numero" id="statMes">—</div>
-            <div class="etiqueta">Este mes</div>
+            <div class="etiqueta" id="statMesLabel">Este mes</div>
           </div>
         </div>
 
@@ -1082,7 +1091,20 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
         </div>
 
         <div class="acciones">
-          <button class="btn-primario" onclick="mostrarPanel('formDocente',document.querySelector('[onclick*=formDocente]'))">+ Nuevo acompañamiento</button>
+          <div style="position:relative;display:inline-block;" id="dropdownNuevoWrap">
+            <button class="btn-primario" onclick="toggleDropdownNuevo(event)" id="btnNuevoAcomp">+ Nuevo acompañamiento ▾</button>
+            <div id="dropdownNuevo" style="display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:220px;background:#fff;border:1px solid #d0dce8;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:200;overflow:hidden;">
+              <div onclick="cerrarDropdownNuevo();mostrarPanel('formDocente',document.getElementById('menuItemDocente')||document.querySelector('[onclick*=formDocente]'))" style="padding:11px 18px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:14px;transition:background .12s;" onmouseover="this.style.background='#f0f7ff'" onmouseout="this.style.background=''">
+                <span>🎓</span> Acompañamiento a Docente
+              </div>
+              <div id="dropItemCoord" onclick="cerrarDropdownNuevo();mostrarPanel('formCoord',document.getElementById('menuItemCoord'))" style="padding:11px 18px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:14px;transition:background .12s;" onmouseover="this.style.background='#f0f7ff'" onmouseout="this.style.background=''">
+                <span>👤</span> Acompañamiento a Coordinador/a
+              </div>
+              <div id="dropItemDist" onclick="cerrarDropdownNuevo();mostrarPanel('formDist',document.getElementById('menuItemDist'))" style="padding:11px 18px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:14px;transition:background .12s;" onmouseover="this.style.background='#f0f7ff'" onmouseout="this.style.background=''">
+                <span>🔧</span> Acompañamiento a Técnico Distrital
+              </div>
+            </div>
+          </div>
         </div>
       </div><!-- FORM DOCENTE -->
       <div id="panel-formDocente" class="panel">
@@ -1531,9 +1553,44 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
       <div id="panel-registros" class="panel">
         <div class="dashboard-titulo">Registros de mi demarcación</div>
         <p class="dashboard-sub">Historial de acompañamientos guardados.</p>
+
+        <div class="filtros-bar" style="margin-bottom:18px;">
+          <div class="filtros-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;">
+            <div class="campo">
+              <label>Desde</label>
+              <input type="date" id="misRegFiltroDesde">
+            </div>
+            <div class="campo">
+              <label>Hasta</label>
+              <input type="date" id="misRegFiltroHasta">
+            </div>
+            <div class="campo">
+              <label>Tipo de instrumento</label>
+              <select id="misRegFiltroTipo">
+                <option value="">Todos</option>
+                <option value="docente">Docente</option>
+                <option value="coordinador">Coordinador/a</option>
+                <option value="tecnico_distrital">Técnico distrital</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label>Estado</label>
+              <select id="misRegFiltroEstado">
+                <option value="">Todos</option>
+                <option value="Enviado">Enviado</option>
+                <option value="Borrador">Borrador</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:10px;">
+            <button class="btn-primario btn-sm" onclick="aplicarFiltrosMisReg()">🔍 Filtrar</button>
+            <button class="btn-secundario btn-sm" onclick="limpiarFiltrosMisReg()">✕ Limpiar</button>
+          </div>
+        </div>
+
         <div class="tabla-wrap-outer">
           <table class="tabla-registros">
-            <thead><tr><th>Fecha</th><th>Tipo</th><th>Docente</th><th>Centro</th><th>Área</th><th>Grado</th><th>Estado</th><th>Acción</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Tipo</th><th>Acompañado</th><th>Centro</th><th>Área / Detalle</th><th>Grado</th><th>Estado</th><th>Acción</th></tr></thead>
             <tbody id="cuerpoMisRegistros"><tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Cargando…</td></tr></tbody>
           </table>
         </div>
@@ -1575,7 +1632,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
           <div class="bloque-titulo">Planificación de los acompañamientos semanales</div>
           <div class="bloque-cuerpo" style="padding:0;">
             <div class="tabla-wrap-outer">
-              <table class="tabla-registros" id="tablaPlanificacion" style="box-shadow:none;min-width:900px;">
+              <table class="tabla-registros" id="tablaPlanificacion" style="box-shadow:none;">
                 <thead>
                   <tr>
                     <th style="width:40px;">#</th>
@@ -1725,7 +1782,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
           <div class="bloque-titulo">Detalle comparativo</div>
           <div class="bloque-cuerpo" style="padding:0;">
             <div class="tabla-wrap-outer">
-              <table class="tabla-registros" style="box-shadow:none;min-width:900px;">
+              <table class="tabla-registros" style="box-shadow:none;">
                 <thead>
                   <tr>
                     <th>Fecha planificada</th>
@@ -2138,10 +2195,53 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
       <div id="panel-adminRegistros" class="panel">
         <div class="dashboard-titulo">Todos los registros</div>
         <p class="dashboard-sub">Acompañamientos registrados por todos los usuarios.</p>
+
+        <div class="filtros-bar" style="margin-bottom:18px;">
+          <div class="filtros-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;">
+            <div class="campo">
+              <label>Desde</label>
+              <input type="date" id="adminFiltroDesde">
+            </div>
+            <div class="campo">
+              <label>Hasta</label>
+              <input type="date" id="adminFiltroHasta">
+            </div>
+            <div class="campo">
+              <label>Tipo de instrumento</label>
+              <select id="adminFiltroTipo">
+                <option value="">Todos</option>
+                <option value="docente">Docente</option>
+                <option value="coordinador">Coordinador/a</option>
+                <option value="tecnico_distrital">Técnico distrital</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label>Estado</label>
+              <select id="adminFiltroEstado">
+                <option value="">Todos</option>
+                <option value="Enviado">Enviado</option>
+                <option value="Borrador">Borrador</option>
+              </select>
+            </div>
+            <div class="campo" id="adminFiltroRegionalWrap">
+              <label>Regional</label>
+              <input type="text" id="adminFiltroRegional" placeholder="Ej: 07">
+            </div>
+            <div class="campo" id="adminFiltroDistritoWrap">
+              <label>Distrito</label>
+              <input type="text" id="adminFiltroDistrito" placeholder="Ej: 07-04">
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:10px;">
+            <button class="btn-primario btn-sm" onclick="aplicarFiltrosAdmin()">🔍 Filtrar</button>
+            <button class="btn-secundario btn-sm" onclick="limpiarFiltrosAdmin()">✕ Limpiar</button>
+          </div>
+        </div>
+
         <div class="tabla-wrap-outer">
           <table class="tabla-registros">
-            <thead><tr><th>Fecha</th><th>Acompañante</th><th>Rol</th><th>Tipo</th><th>Docente</th><th>Centro</th><th>Área</th><th>Estado</th></tr></thead>
-            <tbody id="cuerpoAdminRegistros"><tr><td colspan="7" style="text-align:center;color:#8fa5bb;padding:24px;">Cargando…</td></tr></tbody>
+            <thead><tr><th>Fecha</th><th>Acompañante</th><th>Rol</th><th>Tipo</th><th>Acompañado</th><th>Centro</th><th>Área / Detalle</th><th>Estado</th></tr></thead>
+            <tbody id="cuerpoAdminRegistros"><tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Cargando…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -2544,9 +2644,15 @@ async function busquedaRapida(termino) {
         <div onclick="verRegistroBusqueda('${r.id}')"
           style="padding:12px 14px;border-bottom:1px solid #f0f5fa;cursor:pointer;transition:background .12s;"
           onmouseover="this.style.background='#f7fbfe'" onmouseout="this.style.background=''">
-          <div style="font-size:13px;font-weight:700;color:#1c2b3a;">${r.nombre_docente || '—'}</div>
+          <div style="font-size:13px;font-weight:700;color:#1c2b3a;">${
+            r.tipo_instrumento === 'coordinador'
+              ? (r.nombre_coordinador || r.nombre_docente || '—')
+              : r.tipo_instrumento === 'tecnico_distrital'
+                ? (r.nombre_tecnico || r.nombre_docente || '—')
+                : (r.nombre_docente || '—')
+          }</div>
           <div style="font-size:12px;color:#617384;margin-top:2px;">
-            ${r.centro_educativo || '—'} &nbsp;·&nbsp; ${r.fecha || '—'} &nbsp;·&nbsp; ${r.area_acompanada || '—'}
+            ${r.centro_educativo || '—'} &nbsp;·&nbsp; ${r.fecha || '—'} &nbsp;·&nbsp; ${r.tipo_instrumento === 'docente' || !r.tipo_instrumento ? (r.area_acompanada || '—') : (r.cargo_coordinador || r.distrito || '—')}
           </div>
           <div style="margin-top:4px;">
             <span class="badge ${r.estado === 'Enviado' ? 'badge-verde' : 'badge-amarillo'}" style="font-size:10px;">${r.estado}</span>
@@ -2667,16 +2773,20 @@ async function cargarDashboard() {
   let query = filtrarDemarcacion(sb.from('acompañamientos').select('*')).order('fecha', { ascending: false });
 
 
-  const filtroEstado   = document.getElementById('filtroEstado')?.value;
-  const filtroArea     = document.getElementById('filtroArea')?.value;
-  const filtroTipo     = document.getElementById('filtroTipo')?.value;
-  const filtroRegional = document.getElementById('filtroRegional')?.value;
-  const filtroDistrito = document.getElementById('filtroDistrito')?.value;
-  const filtroCentro   = document.getElementById('filtroCentro')?.value;
-  const filtroMes      = document.getElementById('filtroMes')?.value;
+  const filtroEstado      = document.getElementById('filtroEstado')?.value;
+  const filtroArea        = document.getElementById('filtroArea')?.value;
+  const filtroTipo        = document.getElementById('filtroTipo')?.value;
+  const filtroRegional    = document.getElementById('filtroRegional')?.value;
+  const filtroDistrito    = document.getElementById('filtroDistrito')?.value;
+  const filtroCentro      = document.getElementById('filtroCentro')?.value;
+  const filtroMes         = document.getElementById('filtroMes')?.value;
+  const filtroInstrumento = document.getElementById('filtroInstrumento')?.value;
 
-  if (filtroEstado)   query = query.eq('estado', filtroEstado);
-  if (filtroArea)     query = query.eq('area_acompanada', filtroArea);
+  if (filtroEstado)      query = query.eq('estado', filtroEstado);
+  if (filtroInstrumento) query = query.eq('tipo_instrumento', filtroInstrumento);
+  // Filtro de área solo aplica a docentes
+  if (filtroArea && (!filtroInstrumento || filtroInstrumento === 'docente'))
+    query = query.eq('area_acompanada', filtroArea);
   if (filtroTipo)     query = query.eq('tipo_acompanamiento', filtroTipo);
   // Se compara solo por el código (ej. "01", "0101"), no por la cadena completa:
   // el dato guardado usa guion largo "–" y nombre en mayúsculas ("01 – BARAHONA"),
@@ -2726,6 +2836,10 @@ async function cargarDashboard() {
   ]);
   document.getElementById('statDocentes').textContent  = nombresAcompañados.size;
   document.getElementById('statMes').textContent       = todosRegistros.filter(r => r.fecha && r.fecha.startsWith(mesActual)).length;
+  // Actualizar label del stat "Este mes" con el nombre real del mes
+  const nombreMes = new Date().toLocaleDateString('es-DO', { month:'long' });
+  const labelMes = document.getElementById('statMesLabel');
+  if (labelMes) labelMes.textContent = nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1);
 
   // Poblar filtros dinámicos
   poblarDistritosDashboard(todosRegistros);
@@ -2942,9 +3056,85 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function limpiarFiltros() {
-  ['filtroMes','filtroRegional','filtroDistrito','filtroCentro','filtroArea','filtroTipo','filtroEstado']
+  ['filtroMes','filtroRegional','filtroDistrito','filtroCentro','filtroArea','filtroTipo','filtroEstado','filtroInstrumento']
     .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  // Reactivar filtro área
+  const areaSelect = document.getElementById('filtroArea');
+  if (areaSelect) { areaSelect.disabled = false; areaSelect.style.opacity = ''; }
+  const areaNote = document.getElementById('filtroAreaNote');
+  if (areaNote) areaNote.textContent = '';
   cargarDashboard();
+}
+
+function onChangeFiltroInstrumento() {
+  const val = document.getElementById('filtroInstrumento')?.value || '';
+  const areaSelect = document.getElementById('filtroArea');
+  const areaNote   = document.getElementById('filtroAreaNote');
+  if (val === 'coordinador' || val === 'tecnico_distrital') {
+    if (areaSelect) { areaSelect.value = ''; areaSelect.disabled = true; areaSelect.style.opacity = '0.4'; }
+    if (areaNote) areaNote.textContent = '(solo docentes)';
+  } else {
+    if (areaSelect) { areaSelect.disabled = false; areaSelect.style.opacity = ''; }
+    if (areaNote) areaNote.textContent = '';
+  }
+  cargarDashboard();
+}
+
+function toggleDropdownNuevo(e) {
+  e.stopPropagation();
+  const dd = document.getElementById('dropdownNuevo');
+  if (!dd) return;
+  const visible = dd.style.display !== 'none';
+  dd.style.display = visible ? 'none' : 'block';
+  if (!visible) {
+    // Ocultar opciones según rol
+    const rol = (perfilActual?.rol || '').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+    const esNacional = rol.includes('nacional');
+    const puedeCoord = !esNacional; // todos excepto nacional pueden ver coord/dist (ajustar si necesario)
+    const itemCoord = document.getElementById('dropItemCoord');
+    const itemDist  = document.getElementById('dropItemDist');
+    if (itemCoord) itemCoord.style.display = puedeCoord ? '' : 'none';
+    if (itemDist)  itemDist.style.display  = puedeCoord ? '' : 'none';
+    setTimeout(() => document.addEventListener('click', cerrarDropdownNuevo, {once:true}), 50);
+  }
+}
+function cerrarDropdownNuevo() {
+  const dd = document.getElementById('dropdownNuevo');
+  if (dd) dd.style.display = 'none';
+}
+
+function filtrarDashboardPorStat(tipo) {
+  // Resalta la tabla de últimos registros filtrando por el stat clickeado
+  const lista = todosRegistros || [];
+  const cuerpo = document.getElementById('cuerpoTablaRecientes');
+  if (!cuerpo) return;
+
+  let filtrados;
+  if (tipo === 'enviados')   filtrados = lista.filter(r => r.estado === 'Enviado');
+  else if (tipo === 'borradores') filtrados = lista.filter(r => r.estado === 'Borrador');
+  else if (tipo === 'mes') {
+    const mesActual = new Date().toISOString().slice(0,7);
+    filtrados = lista.filter(r => r.fecha && r.fecha.startsWith(mesActual));
+  } else filtrados = lista; // 'todos'
+
+  if (!filtrados.length) {
+    cuerpo.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8fa5bb;padding:24px;">Sin registros.</td></tr>';
+    return;
+  }
+  cuerpo.innerHTML = filtrados.slice(0,20).map(r => {
+    const tipo2 = r.tipo_instrumento || 'docente';
+    const etiquetaTipo = tipo2 === 'coordinador' ? '👤 Coord.' : tipo2 === 'tecnico_distrital' ? '🔧 Téc. Dist.' : '🎓 Docente';
+    const nombre = tipo2 === 'coordinador'
+      ? (r.nombre_coordinador || r.nombre_docente || '—')
+      : tipo2 === 'tecnico_distrital'
+        ? (r.nombre_tecnico || r.nombre_docente || '—')
+        : (r.nombre_docente || '—');
+    const detalle = tipo2 === 'docente' ? (r.area_acompanada || '—') : (r.cargo_coordinador || r.distrito || '—');
+    return `<tr><td>${r.fecha||'—'}</td><td>${nombre}<br><span style="font-size:11px;color:#8fa5bb;">${etiquetaTipo}</span></td><td style="font-size:12px;">${detalle}</td><td style="font-size:12px;">${r.centro_educativo||'—'}</td><td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td></tr>`;
+  }).join('');
+  // Scroll suave a la tabla
+  const tabla = document.getElementById('cuerpoTablaRecientes');
+  if (tabla) tabla.closest('table')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 
@@ -2959,21 +3149,100 @@ async function cargarMisRegistros() {
   }
   // Guardar registros en variable global para acceso desde verRegistro por id
   window._misRegistrosList = registros;
-  cuerpo.innerHTML = registros.map(r => `
-    <tr onclick="verRegistroById('${r.id}')" style="cursor:pointer;" title="Clic para ver el formulario completo">
-      <td>${r.fecha||'—'}</td><td>${r.tipo_acompanamiento||'—'}</td>
-      <td>${r.nombre_docente||'—'}</td><td>${r.centro_educativo||'—'}</td>
-      <td>${r.area_acompanada||'—'}</td><td>${r.grado||'—'}</td>
+  cuerpo.innerHTML = registros.map(r => {
+    const tipoInstr = r.tipo_instrumento || 'docente';
+    const badgeTipo = tipoInstr === 'coordinador'
+      ? '<span style="font-size:10px;background:#e8f0fa;color:#1a3a52;border-radius:4px;padding:1px 5px;">Coord.</span>'
+      : tipoInstr === 'tecnico_distrital'
+        ? '<span style="font-size:10px;background:#fef3e2;color:#7a4f00;border-radius:4px;padding:1px 5px;">Téc.Dist.</span>'
+        : '<span style="font-size:10px;background:#e6f4ea;color:#1a6b2a;border-radius:4px;padding:1px 5px;">Docente</span>';
+    const nombreAcomp = tipoInstr === 'coordinador'
+      ? (r.nombre_coordinador || r.nombre_docente || '—')
+      : tipoInstr === 'tecnico_distrital'
+        ? (r.nombre_tecnico || r.nombre_docente || '—')
+        : (r.nombre_docente || '—');
+    const detalle = tipoInstr === 'docente'
+      ? (r.area_acompanada || '—')
+      : (r.cargo_coordinador || r.distrito || '—');
+    const gradoCell = tipoInstr === 'docente' ? (r.grado || '—') : '—';
+    return `<tr onclick="verRegistroById('${r.id}')" style="cursor:pointer;" title="Clic para ver el formulario completo">
+      <td>${r.fecha||'—'}</td>
+      <td>${badgeTipo}<br><span style="font-size:11px;color:#617384;">${r.tipo_acompanamiento||'—'}</span></td>
+      <td>${nombreAcomp}</td>
+      <td>${r.centro_educativo||'—'}</td>
+      <td>${detalle}</td>
+      <td>${gradoCell}</td>
       <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td>
       <td onclick="event.stopPropagation()">${r.estado==='Borrador' && r.usuario_id === usuarioActual?.id
         ? `<button class="btn-secundario btn-sm" onclick="eliminarRegistro('${r.id}')">Eliminar</button>`
         : '<span style="font-size:13px;color:#8fa5bb;">👁 Ver</span>'}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 function verRegistroById(id) {
   const r = (window._misRegistrosList || []).find(x => x.id === id);
   if (r) verRegistro(r);
+}
+
+function _renderFilasMisReg(lista) {
+  const cuerpo = document.getElementById('cuerpoMisRegistros');
+  if (!lista.length) {
+    cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Sin registros con esos filtros.</td></tr>';
+    return;
+  }
+  cuerpo.innerHTML = lista.map(r => {
+    const tipoInstr = r.tipo_instrumento || 'docente';
+    const badgeTipo = tipoInstr === 'coordinador'
+      ? '<span style="font-size:10px;background:#e8f0fa;color:#1a3a52;border-radius:4px;padding:1px 5px;">Coord.</span>'
+      : tipoInstr === 'tecnico_distrital'
+        ? '<span style="font-size:10px;background:#fef3e2;color:#7a4f00;border-radius:4px;padding:1px 5px;">Téc.Dist.</span>'
+        : '<span style="font-size:10px;background:#e6f4ea;color:#1a6b2a;border-radius:4px;padding:1px 5px;">Docente</span>';
+    const nombreAcomp = tipoInstr === 'coordinador'
+      ? (r.nombre_coordinador || r.nombre_docente || '—')
+      : tipoInstr === 'tecnico_distrital'
+        ? (r.nombre_tecnico || r.nombre_docente || '—')
+        : (r.nombre_docente || '—');
+    const detalle = tipoInstr === 'docente'
+      ? (r.area_acompanada || '—')
+      : (r.cargo_coordinador || r.distrito || '—');
+    const gradoCell = tipoInstr === 'docente' ? (r.grado || '—') : '—';
+    return `<tr onclick="verRegistroById('${r.id}')" style="cursor:pointer;" title="Clic para ver el formulario completo">
+      <td>${r.fecha||'—'}</td>
+      <td>${badgeTipo}<br><span style="font-size:11px;color:#617384;">${r.tipo_acompanamiento||'—'}</span></td>
+      <td>${nombreAcomp}</td>
+      <td>${r.centro_educativo||'—'}</td>
+      <td>${detalle}</td>
+      <td>${gradoCell}</td>
+      <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td>
+      <td onclick="event.stopPropagation()">${r.estado==='Borrador' && r.usuario_id === usuarioActual?.id
+        ? `<button class="btn-secundario btn-sm" onclick="eliminarRegistro('${r.id}')">Eliminar</button>`
+        : '<span style="font-size:13px;color:#8fa5bb;">👁 Ver</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function aplicarFiltrosMisReg() {
+  const lista = window._misRegistrosList || [];
+  const desde  = document.getElementById('misRegFiltroDesde')?.value || '';
+  const hasta  = document.getElementById('misRegFiltroHasta')?.value || '';
+  const tipo   = document.getElementById('misRegFiltroTipo')?.value || '';
+  const estado = document.getElementById('misRegFiltroEstado')?.value || '';
+  const filtrados = lista.filter(r => {
+    if (desde && r.fecha < desde) return false;
+    if (hasta && r.fecha > hasta) return false;
+    const tipoR = r.tipo_instrumento || 'docente';
+    if (tipo && tipoR !== tipo) return false;
+    if (estado && r.estado !== estado) return false;
+    return true;
+  });
+  _renderFilasMisReg(filtrados);
+}
+
+function limpiarFiltrosMisReg() {
+  ['misRegFiltroDesde','misRegFiltroHasta'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  ['misRegFiltroTipo','misRegFiltroEstado'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  _renderFilasMisReg(window._misRegistrosList || []);
 }
 
 async function eliminarRegistro(id) {
@@ -3331,7 +3600,13 @@ async function cargarSeguimientoTecnicos() {
           <td style="font-size:12px;">${r.regional || '—'}</td>
           <td style="font-size:12px;">${r.distrito || '—'}</td>
           <td style="font-size:12px;">${r.centro_educativo || '—'}</td>
-          <td style="font-size:12px;">${r.nombre_docente || r.foco || '—'}</td>
+          <td style="font-size:12px;">${
+            r.tipo_instrumento === 'coordinador'
+              ? (r.nombre_coordinador || r.nombre_docente || '—')
+              : r.tipo_instrumento === 'tecnico_distrital'
+                ? (r.nombre_tecnico || r.nombre_docente || '—')
+                : (r.nombre_docente || '—')
+          }</td>
           <td><span class="badge ${r.estado === 'Enviado' ? 'badge-verde' : 'badge-amarillo'}">${r.estado || 'Borrador'}</span></td>
         </tr>`).join('')
       : '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Sin registros en el período.</td></tr>';
@@ -4269,6 +4544,98 @@ async function crearUsuario() {
   cargarUsuarios();
 }
 
+function aplicarFiltrosAdmin() {
+  const lista = window._adminRegistrosList || [];
+  const desde  = document.getElementById('adminFiltroDesde')?.value || '';
+  const hasta  = document.getElementById('adminFiltroHasta')?.value || '';
+  const tipo   = document.getElementById('adminFiltroTipo')?.value || '';
+  const estado = document.getElementById('adminFiltroEstado')?.value || '';
+  const reg    = (document.getElementById('adminFiltroRegional')?.value || '').trim().toLowerCase();
+  const dist   = (document.getElementById('adminFiltroDistrito')?.value || '').trim().toLowerCase();
+
+  const filtrados = lista.filter(r => {
+    if (desde && r.fecha < desde) return false;
+    if (hasta && r.fecha > hasta) return false;
+    const tipoR = r.tipo_instrumento || 'docente';
+    if (tipo && tipoR !== tipo) return false;
+    if (estado && r.estado !== estado) return false;
+    if (reg  && !(r.regional||'').toLowerCase().includes(reg))  return false;
+    if (dist && !(r.distrito||'').toLowerCase().includes(dist)) return false;
+    return true;
+  });
+
+  const cuerpo = document.getElementById('cuerpoAdminRegistros');
+  if (!filtrados.length) {
+    cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Sin registros con esos filtros.</td></tr>';
+    return;
+  }
+  cuerpo.innerHTML = filtrados.map(r => {
+    const tipoInstr = r.tipo_instrumento || 'docente';
+    const badgeTipoAdmin = tipoInstr === 'coordinador'
+      ? '<span style="font-size:10px;background:#e8f0fa;color:#1a3a52;border-radius:4px;padding:1px 5px;">Coord.</span>'
+      : tipoInstr === 'tecnico_distrital'
+        ? '<span style="font-size:10px;background:#fef3e2;color:#7a4f00;border-radius:4px;padding:1px 5px;">Téc.Dist.</span>'
+        : '<span style="font-size:10px;background:#e6f4ea;color:#1a6b2a;border-radius:4px;padding:1px 5px;">Docente</span>';
+    const nombreAcompAdmin = tipoInstr === 'coordinador'
+      ? (r.nombre_coordinador || r.nombre_docente || '—')
+      : tipoInstr === 'tecnico_distrital'
+        ? (r.nombre_tecnico || r.nombre_docente || '—')
+        : (r.nombre_docente || '—');
+    const detalleAdmin = tipoInstr === 'docente'
+      ? (r.area_acompanada || '—')
+      : (r.cargo_coordinador || r.distrito || '—');
+    return `<tr onclick="verRegistroAdmin('${r.id}')" style="cursor:pointer;" title="Clic para ver el formulario completo">
+      <td>${r.fecha||'—'}</td>
+      <td>${r.nombre_acompanante||'—'}</td>
+      <td style="font-size:11px;color:#617384;">${r.rol_acompanante||'—'}</td>
+      <td>${badgeTipoAdmin}<br><span style="font-size:11px;color:#617384;">${r.tipo_acompanamiento||'—'}</span></td>
+      <td>${nombreAcompAdmin}</td>
+      <td>${r.centro_educativo||'—'}</td>
+      <td style="font-size:12px;">${detalleAdmin}</td>
+      <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function limpiarFiltrosAdmin() {
+  ['adminFiltroDesde','adminFiltroHasta','adminFiltroRegional','adminFiltroDistrito'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  ['adminFiltroTipo','adminFiltroEstado'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  // Re-renderizar con todos los registros
+  const cuerpo = document.getElementById('cuerpoAdminRegistros');
+  const lista = window._adminRegistrosList || [];
+  if (!lista.length) return;
+  cuerpo.innerHTML = lista.map(r => {
+    const tipoInstr = r.tipo_instrumento || 'docente';
+    const badgeTipoAdmin = tipoInstr === 'coordinador'
+      ? '<span style="font-size:10px;background:#e8f0fa;color:#1a3a52;border-radius:4px;padding:1px 5px;">Coord.</span>'
+      : tipoInstr === 'tecnico_distrital'
+        ? '<span style="font-size:10px;background:#fef3e2;color:#7a4f00;border-radius:4px;padding:1px 5px;">Téc.Dist.</span>'
+        : '<span style="font-size:10px;background:#e6f4ea;color:#1a6b2a;border-radius:4px;padding:1px 5px;">Docente</span>';
+    const nombreAcompAdmin = tipoInstr === 'coordinador'
+      ? (r.nombre_coordinador || r.nombre_docente || '—')
+      : tipoInstr === 'tecnico_distrital'
+        ? (r.nombre_tecnico || r.nombre_docente || '—')
+        : (r.nombre_docente || '—');
+    const detalleAdmin = tipoInstr === 'docente'
+      ? (r.area_acompanada || '—')
+      : (r.cargo_coordinador || r.distrito || '—');
+    return `<tr onclick="verRegistroAdmin('${r.id}')" style="cursor:pointer;" title="Clic para ver el formulario completo">
+      <td>${r.fecha||'—'}</td>
+      <td>${r.nombre_acompanante||'—'}</td>
+      <td style="font-size:11px;color:#617384;">${r.rol_acompanante||'—'}</td>
+      <td>${badgeTipoAdmin}<br><span style="font-size:11px;color:#617384;">${r.tipo_acompanamiento||'—'}</span></td>
+      <td>${nombreAcompAdmin}</td>
+      <td>${r.centro_educativo||'—'}</td>
+      <td style="font-size:12px;">${detalleAdmin}</td>
+      <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td>
+    </tr>`;
+  }).join('');
+}
+
 async function cargarUsuarios() {
   if (!requiereAdministrador()) return;
   const { data } = await sb.from('perfiles').select('*').order('nombre');
@@ -4308,17 +4675,32 @@ async function cargarTodosRegistros() {
   if (error) { cuerpo.innerHTML='<tr><td colspan="8" style="text-align:center;color:#b42318;padding:24px;">Error al cargar: '+error.message+'</td></tr>'; return; }
   if (!data || data.length === 0) { cuerpo.innerHTML='<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">No hay registros.</td></tr>'; return; }
   window._adminRegistrosList = data;
-  cuerpo.innerHTML = data.map(r => `
-    <tr onclick="verRegistroAdmin('${r.id}')" style="cursor:pointer;" title="Clic para ver el formulario completo">
+  cuerpo.innerHTML = data.map(r => {
+    const tipoInstr = r.tipo_instrumento || 'docente';
+    const badgeTipoAdmin = tipoInstr === 'coordinador'
+      ? '<span style="font-size:10px;background:#e8f0fa;color:#1a3a52;border-radius:4px;padding:1px 5px;">Coord.</span>'
+      : tipoInstr === 'tecnico_distrital'
+        ? '<span style="font-size:10px;background:#fef3e2;color:#7a4f00;border-radius:4px;padding:1px 5px;">Téc.Dist.</span>'
+        : '<span style="font-size:10px;background:#e6f4ea;color:#1a6b2a;border-radius:4px;padding:1px 5px;">Docente</span>';
+    const nombreAcompAdmin = tipoInstr === 'coordinador'
+      ? (r.nombre_coordinador || r.nombre_docente || '—')
+      : tipoInstr === 'tecnico_distrital'
+        ? (r.nombre_tecnico || r.nombre_docente || '—')
+        : (r.nombre_docente || '—');
+    const detalleAdmin = tipoInstr === 'docente'
+      ? (r.area_acompanada || '—')
+      : (r.cargo_coordinador || r.distrito || '—');
+    return `<tr onclick="verRegistroAdmin('${r.id}')" style="cursor:pointer;" title="Clic para ver el formulario completo">
       <td>${r.fecha||'—'}</td>
       <td>${r.nombre_acompanante||'—'}</td>
-      <td>${r.rol_acompanante||'—'}</td>
-      <td>${r.tipo_acompanamiento||'—'}</td>
-      <td>${r.nombre_docente||'—'}</td>
+      <td style="font-size:11px;color:#617384;">${r.rol_acompanante||'—'}</td>
+      <td>${badgeTipoAdmin}<br><span style="font-size:11px;color:#617384;">${r.tipo_acompanamiento||'—'}</span></td>
+      <td>${nombreAcompAdmin}</td>
       <td>${r.centro_educativo||'—'}</td>
-      <td>${r.area_acompanada||'—'}</td>
+      <td style="font-size:12px;">${detalleAdmin}</td>
       <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 function verRegistroAdmin(id) {
