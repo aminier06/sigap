@@ -3132,7 +3132,9 @@ async function cargarMapaCobertura() {
 
   // 1. Determinar filtro de demarcación para centros
   const rol = String(p.rol || '').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
-  let queryCentros = sb.from('centros').select('codigo,nombre,latitud,longitud,zona,distrito_codigo,regional_codigo');
+  let queryCentros = sb.from('centros').select('codigo,nombre,latitud,longitud,zona,distrito_codigo,regional_codigo')
+    .ilike('niveles', '%Primario%')
+    .not('niveles', 'ilike', '%Adultos%');
   if (rol === 'tecnico/a regional' || rol === 'tecnico/a coordinador/a regional') {
     const cod = String(p.regional || '').trim().match(/^\d+/)?.[0]?.padStart(2,'0');
     if (cod) queryCentros = queryCentros.eq('regional_codigo', cod);
@@ -3147,8 +3149,21 @@ async function cargarMapaCobertura() {
     return;
   }
 
-  const { data: centros, error: errC } = await queryCentros;
-  if (errC || !centros?.length) {
+  // Paginar para superar el límite de 1000 filas de Supabase
+  let centros = [];
+  let page = 0;
+  const PAGE_SIZE = 1000;
+  while (true) {
+    const { data: chunk, error: errC } = await queryCentros
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+    if (errC) { if (estado) estado.textContent = 'Error al cargar centros.'; return; }
+    if (!chunk || chunk.length === 0) break;
+    centros = centros.concat(chunk);
+    if (chunk.length < PAGE_SIZE) break;
+    page++;
+    if (estado) estado.textContent = `Cargando centros… (${centros.length})`;
+  }
+  if (!centros.length) {
     if (estado) estado.textContent = 'No se encontraron centros para tu demarcación.';
     return;
   }
