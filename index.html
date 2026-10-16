@@ -899,14 +899,12 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
           <div class="filtros-titulo">🔍 Filtros</div>
           <div class="filtros-grid">
             <div class="campo">
-              <label>Período</label>
-              <select id="filtroMes" onchange="cargarDashboard()">
-                <option value="">Todo el tiempo</option>
-                <option value="mes">Este mes</option>
-                <option value="trimestre">Este trimestre</option>
-                <option value="semestre">Este semestre</option>
-                <option value="anio">Este año</option>
-              </select>
+              <label>Desde</label>
+              <input type="date" id="filtroDesde" onchange="cargarDashboard()">
+            </div>
+            <div class="campo">
+              <label>Hasta</label>
+              <input type="date" id="filtroHasta" onchange="cargarDashboard()">
             </div>
             <div class="campo">
               <label>Regional</label>
@@ -1639,7 +1637,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
                     <th>Fecha del acompañamiento</th>
                     <th>Centro educativo</th>
                     <th>Hora</th>
-                    <th>Docente a acompañar</th>
+                    <th>Persona a acompañar</th>
                     <th>Foco del acompañamiento</th>
                     <th>Insumos a utilizar</th>
                     <th>Estado</th>
@@ -1660,6 +1658,28 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
         <div class="bloque" id="formNuevaPlan" style="display:none;">
           <div class="bloque-titulo">➕ Agregar acompañamiento a la planificación</div>
           <div class="bloque-cuerpo">
+
+            <!-- Selector de tipo de instrumento -->
+            <div class="grid g-3" style="margin-bottom:4px;">
+              <div class="campo" style="grid-column:1/-1;">
+                <label style="font-weight:700;">Tipo de acompañamiento a planificar</label>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;">
+                  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;">
+                    <input type="radio" name="planTipoInstr" value="docente" checked onchange="adaptarFormPlan(this.value)">
+                    🎓 Docente
+                  </label>
+                  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;">
+                    <input type="radio" name="planTipoInstr" value="coordinador" onchange="adaptarFormPlan(this.value)">
+                    👤 Coordinador/a Pedagógico/a
+                  </label>
+                  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;">
+                    <input type="radio" name="planTipoInstr" value="tecnico_distrital" onchange="adaptarFormPlan(this.value)">
+                    🔧 Técnico Distrital
+                  </label>
+                </div>
+              </div>
+            </div>
+
             <div class="grid g-3">
               <div class="campo">
                 <label>Fecha prevista</label>
@@ -1681,11 +1701,13 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
                 <label>Hora prevista</label>
                 <input type="time" id="planHora" />
               </div>
-              <div class="campo">
-                <label>Docente a acompañar</label>
+              <!-- Campo dinámico según tipo -->
+              <div class="campo" id="planNombreWrap">
+                <label id="planNombreLabel">Docente a acompañar</label>
                 <input type="text" id="planDocente" placeholder="Nombre del docente" />
               </div>
-              <div class="campo">
+              <!-- Área curricular — solo para docentes -->
+              <div class="campo" id="planAreaWrap">
                 <label>Área curricular</label>
                 <select id="planArea">
                   <option value="">Seleccione</option>
@@ -1694,6 +1716,11 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
                   <option>Lenguas Extranjeras (Inglés)</option><option>Educación Artística</option>
                   <option>Formación Humana</option><option>Educación Física</option>
                 </select>
+              </div>
+              <!-- Cargo — solo para coordinador/técnico -->
+              <div class="campo" id="planCargoWrap" style="display:none;">
+                <label id="planCargoLabel">Cargo / Función</label>
+                <input type="text" id="planCargo" placeholder="Ej: Coordinadora de Lengua Española" />
               </div>
             </div>
             <div class="grid g-2 fila-linea">
@@ -2779,7 +2806,8 @@ async function cargarDashboard() {
   const filtroRegional    = document.getElementById('filtroRegional')?.value;
   const filtroDistrito    = document.getElementById('filtroDistrito')?.value;
   const filtroCentro      = document.getElementById('filtroCentro')?.value;
-  const filtroMes         = document.getElementById('filtroMes')?.value;
+  const filtroDesde       = document.getElementById('filtroDesde')?.value;
+  const filtroHasta       = document.getElementById('filtroHasta')?.value;
   const filtroInstrumento = document.getElementById('filtroInstrumento')?.value;
 
   if (filtroEstado)      query = query.eq('estado', filtroEstado);
@@ -2795,22 +2823,8 @@ async function cargarDashboard() {
   if (filtroRegional) query = query.ilike('regional', codigoDe(filtroRegional) + '%');
   if (filtroDistrito) query = query.ilike('distrito', codigoDe(filtroDistrito) + '%');
   if (filtroCentro)   query = query.eq('centro_educativo', filtroCentro);
-
-  // Filtro de período (se calcula una vez y se aplica también a coordinadores)
-  let desdeMes = null;
-  if (filtroMes) {
-    const hoy = new Date();
-    if (filtroMes === 'mes') {
-      desdeMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0,10);
-    } else if (filtroMes === 'trimestre') {
-      desdeMes = new Date(hoy.getFullYear(), Math.floor(hoy.getMonth()/3)*3, 1).toISOString().slice(0,10);
-    } else if (filtroMes === 'semestre') {
-      desdeMes = new Date(hoy.getFullYear(), hoy.getMonth() < 6 ? 0 : 6, 1).toISOString().slice(0,10);
-    } else if (filtroMes === 'anio') {
-      desdeMes = hoy.getFullYear() + '-01-01';
-    }
-  }
-  if (desdeMes) query = query.gte('fecha', desdeMes);
+  if (filtroDesde)    query = query.gte('fecha', filtroDesde);
+  if (filtroHasta)    query = query.lte('fecha', filtroHasta);
 
   const { data } = await query;
   todosRegistros = data || [];
@@ -3056,7 +3070,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function limpiarFiltros() {
-  ['filtroMes','filtroRegional','filtroDistrito','filtroCentro','filtroArea','filtroTipo','filtroEstado','filtroInstrumento']
+  ['filtroDesde','filtroHasta','filtroRegional','filtroDistrito','filtroCentro','filtroArea','filtroTipo','filtroEstado','filtroInstrumento']
     .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   // Reactivar filtro área
   const areaSelect = document.getElementById('filtroArea');
@@ -3331,13 +3345,24 @@ function renderizarPlanificacion() {
     cuerpo.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#8fa5bb;padding:32px;">No hay acompañamientos planificados para esta semana.<br><button class="btn-primario" onclick="nuevaPlanificacion()" style="margin-top:12px;">+ Agregar</button></td></tr>';
     return;
   }
-  cuerpo.innerHTML = planActual.map((p, i) => `
-    <tr>
+  cuerpo.innerHTML = planActual.map((p, i) => {
+    const tInstr = p.tipo_instrumento || 'docente';
+    const badgePlan = tInstr === 'coordinador'
+      ? '<span style="font-size:10px;background:#e8f0fa;color:#1a3a52;border-radius:4px;padding:1px 5px;margin-right:4px;">Coord.</span>'
+      : tInstr === 'tecnico_distrital'
+        ? '<span style="font-size:10px;background:#fef3e2;color:#7a4f00;border-radius:4px;padding:1px 5px;margin-right:4px;">Téc.Dist.</span>'
+        : '';
+    const nombrePlan = tInstr === 'coordinador'
+      ? (p.nombre_coordinador || p.nombre_docente || '—')
+      : tInstr === 'tecnico_distrital'
+        ? (p.nombre_tecnico || p.nombre_docente || '—')
+        : (p.nombre_docente || '—');
+    return `<tr>
       <td style="text-align:center;font-weight:700;color:#8fa5bb;">${i+1}</td>
       <td>${p.fecha_prevista || '—'}</td>
       <td>${p.centro_educativo || '—'}</td>
       <td>${p.hora_prevista || '—'}</td>
-      <td>${p.nombre_docente || '—'}</td>
+      <td>${badgePlan}${nombrePlan}</td>
       <td style="font-size:12px;">${p.foco || '—'}</td>
       <td style="font-size:12px;">${p.insumos || '—'}</td>
       <td>
@@ -3352,7 +3377,8 @@ function renderizarPlanificacion() {
              <button class="btn-peligro btn-sm" onclick="eliminarItemPlan('${p.id}')">🗑️</button>`
           : '<span style="font-size:12px;color:#2a6b1a;">Realizado</span>'}
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 function nuevaPlanificacion() {
@@ -3363,45 +3389,94 @@ function nuevaPlanificacion() {
   document.getElementById('formNuevaPlan').scrollIntoView({ behavior: 'smooth' });
 }
 
+function adaptarFormPlan(tipo) {
+  const areaWrap  = document.getElementById('planAreaWrap');
+  const cargoWrap = document.getElementById('planCargoWrap');
+  const nomLabel  = document.getElementById('planNombreLabel');
+  const cargoLbl  = document.getElementById('planCargoLabel');
+  const nomInput  = document.getElementById('planDocente');
+
+  if (tipo === 'docente') {
+    if (areaWrap)  areaWrap.style.display  = '';
+    if (cargoWrap) cargoWrap.style.display = 'none';
+    if (nomLabel)  nomLabel.textContent    = 'Docente a acompañar';
+    if (nomInput)  nomInput.placeholder    = 'Nombre del docente';
+  } else if (tipo === 'coordinador') {
+    if (areaWrap)  areaWrap.style.display  = 'none';
+    if (cargoWrap) cargoWrap.style.display = '';
+    if (nomLabel)  nomLabel.textContent    = 'Coordinador/a a acompañar';
+    if (nomInput)  nomInput.placeholder    = 'Nombre del/la coordinador/a';
+    if (cargoLbl)  cargoLbl.textContent    = 'Cargo / Función';
+    const cargoInput = document.getElementById('planCargo');
+    if (cargoInput) cargoInput.placeholder = 'Ej: Coordinadora de Lengua Española';
+  } else if (tipo === 'tecnico_distrital') {
+    if (areaWrap)  areaWrap.style.display  = 'none';
+    if (cargoWrap) cargoWrap.style.display = '';
+    if (nomLabel)  nomLabel.textContent    = 'Técnico/a distrital a acompañar';
+    if (nomInput)  nomInput.placeholder    = 'Nombre del/la técnico/a';
+    if (cargoLbl)  cargoLbl.textContent    = 'Cargo en el distrito';
+    const cargoInput = document.getElementById('planCargo');
+    if (cargoInput) cargoInput.placeholder = 'Ej: Técnico/a Distrital de Primaria';
+  }
+}
+
 function cancelarItemPlan() {
   document.getElementById('formNuevaPlan').style.display = 'none';
-  ['planFecha','planCodigoCentro','planCentro','planHora','planDocente','planFoco','planInsumos'].forEach(id => {
+  ['planFecha','planCodigoCentro','planCentro','planHora','planDocente','planFoco','planInsumos','planCargo'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
   document.getElementById('planArea').value = '';
   document.getElementById('estadoCentroPlan').textContent = '';
+  // Resetear al tipo docente
+  const radioDocente = document.querySelector('input[name="planTipoInstr"][value="docente"]');
+  if (radioDocente) { radioDocente.checked = true; adaptarFormPlan('docente'); }
 }
 
 async function guardarItemPlan() {
-  const fecha    = document.getElementById('planFecha').value;
-  const centro   = document.getElementById('planCentro').value.trim();
-  const codCentro= document.getElementById('planCodigoCentro').value.trim();
-  const hora     = document.getElementById('planHora').value;
-  const docente  = document.getElementById('planDocente').value.trim();
-  const area     = document.getElementById('planArea').value;
-  const foco     = document.getElementById('planFoco').value.trim();
-  const insumos  = document.getElementById('planInsumos').value.trim();
-  const anio     = document.getElementById('planAnioEscolar').value;
+  const fecha     = document.getElementById('planFecha').value;
+  const centro    = document.getElementById('planCentro').value.trim();
+  const codCentro = document.getElementById('planCodigoCentro').value.trim();
+  const hora      = document.getElementById('planHora').value;
+  const nombre    = document.getElementById('planDocente').value.trim();
+  const area      = document.getElementById('planArea')?.value || '';
+  const cargo     = document.getElementById('planCargo')?.value.trim() || '';
+  const foco      = document.getElementById('planFoco').value.trim();
+  const insumos   = document.getElementById('planInsumos').value.trim();
+  const anio      = document.getElementById('planAnioEscolar').value;
+  const tipoInstr = document.querySelector('input[name="planTipoInstr"]:checked')?.value || 'docente';
 
   if (!fecha || !centro) {
     mostrarNotif('La fecha y el centro son obligatorios.', true); return;
   }
 
-  const { error } = await sb.from('planificaciones').insert({
-    usuario_id:       usuarioActual.id,
+  // Construir payload según tipo
+  const payload = {
+    usuario_id:         usuarioActual.id,
     nombre_acompanante: perfilActual?.nombre || '',
-    anio_escolar:     anio,
-    fecha_prevista:   fecha,
-    codigo_centro:    codCentro,
-    centro_educativo: centro,
-    hora_prevista:    hora || null,
-    nombre_docente:   docente,
-    area_curricular:  area,
+    anio_escolar:       anio,
+    fecha_prevista:     fecha,
+    codigo_centro:      codCentro,
+    centro_educativo:   centro,
+    hora_prevista:      hora || null,
+    tipo_instrumento:   tipoInstr,
     foco,
     insumos,
-    estado:           'Pendiente',
-  });
+    estado:             'Pendiente',
+  };
+
+  if (tipoInstr === 'docente') {
+    payload.nombre_docente  = nombre;
+    payload.area_curricular = area;
+  } else if (tipoInstr === 'coordinador') {
+    payload.nombre_coordinador = nombre;
+    payload.cargo_coordinador  = cargo;
+  } else if (tipoInstr === 'tecnico_distrital') {
+    payload.nombre_tecnico = nombre;
+    payload.cargo_tecnico  = cargo;
+  }
+
+  const { error } = await sb.from('planificaciones').insert(payload);
 
   if (error) { mostrarNotif('Error al guardar: ' + error.message, true); return; }
   mostrarNotif('Acompañamiento agregado a la planificación.');
