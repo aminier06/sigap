@@ -2247,9 +2247,9 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
               <label style="font-size:12px;font-weight:600;color:#617384;">Tipo</label>
               <select id="mapaFiltroTipo" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;">
                 <option value="">Todos</option>
-                <option value="docente">Docente</option>
-                <option value="coordinador">Coordinador/a</option>
-                <option value="tecnico_distrital">Técnico Distrital</option>
+                <option value="Diagnóstico">Diagnóstico</option>
+                <option value="Seguimiento">Seguimiento</option>
+                <option value="Cierre">Cierre</option>
               </select>
             </div>
             <div class="campo">
@@ -3375,12 +3375,13 @@ async function cargarMapaCobertura() {
   const hasta = document.getElementById('mapaFiltroHasta')?.value;
   const tipo  = document.getElementById('mapaFiltroTipo')?.value;
 
-  let queryAcomp = filtrarDemarcacion(sb.from('acompañamientos').select('codigo_centro,tipo_instrumento,fecha,estado'));
+  let queryAcomp = filtrarDemarcacion(sb.from('acompañamientos').select('codigo_centro,tipo_acompanamiento,fecha,estado'));
   if (desde) queryAcomp = queryAcomp.gte('fecha', desde);
   if (hasta) queryAcomp = queryAcomp.lte('fecha', hasta);
-  if (tipo)  queryAcomp = queryAcomp.eq('tipo_instrumento', tipo);
+  if (tipo)  queryAcomp = queryAcomp.eq('tipo_acompanamiento', tipo);
 
-  const { data: acomps } = await queryAcomp;
+  const { data: acomps, error: errA } = await queryAcomp;
+  if (errA) { if (estado) estado.textContent = 'Error al cargar acompañamientos: ' + errA.message; return; }
 
   // Construir set de centros con al menos un acompañamiento
   const codigosConVisita = new Set((acomps || []).map(a => String(a.codigo_centro || '').trim()));
