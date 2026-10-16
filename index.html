@@ -2230,7 +2230,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
       <!-- MAPA DE COBERTURA -->
       <div id="panel-mapaCoberta" class="panel">
         <div class="dashboard-titulo">Mapa de cobertura</div>
-        <p class="dashboard-sub">Visualiza qué centros han recibido acompañamiento y cuáles están pendientes en tu demarcación.</p>
+        <p class="dashboard-sub">Visualiza qué centros de nivel primario han recibido acompañamiento y cuáles están pendientes en tu demarcación.</p>
 
         <!-- Filtros del mapa -->
         <div class="filtros-bar" style="margin-bottom:16px;">
@@ -2252,11 +2252,38 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
                 <option value="tecnico_distrital">Técnico Distrital</option>
               </select>
             </div>
-            <button onclick="cargarMapaCobertura()" style="padding:7px 18px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;">Actualizar mapa</button>
+            <div class="campo">
+              <label style="font-size:12px;font-weight:600;color:#617384;">Sector</label>
+              <select id="mapaFiltroSector" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;">
+                <option value="">Todos</option>
+                <option value="Público">Público</option>
+                <option value="Privado">Privado</option>
+                <option value="Semioficial">Semioficial</option>
+              </select>
+            </div>
+            <div class="campo" id="mapaFiltroRegionalWrap">
+              <label style="font-size:12px;font-weight:600;color:#617384;">Regional</label>
+              <select id="mapaFiltroRegional" onchange="poblarDistritosMapa()" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;min-width:160px;">
+                <option value="">Todas</option>
+              </select>
+            </div>
+            <div class="campo" id="mapaFiltroDistritoWrap">
+              <label style="font-size:12px;font-weight:600;color:#617384;">Distrito</label>
+              <select id="mapaFiltroDistrito" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;min-width:160px;">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label style="font-size:12px;font-weight:600;color:#617384;">Centro (código)</label>
+              <input type="text" id="mapaFiltroCentro" placeholder="Ej: 02334" maxlength="5"
+                style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;width:110px;">
+            </div>
+            <button onclick="cargarMapaCobertura()" style="padding:7px 18px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;">🗺️ Actualizar mapa</button>
+            <button onclick="limpiarFiltrosMapa()" style="padding:7px 14px;background:#edf3f8;color:#2d4a63;border:1px solid #cce0f0;border-radius:6px;font-weight:600;font-size:13px;cursor:pointer;">✕ Limpiar</button>
           </div>
         </div>
 
-        <!-- Resumen de cobertura -->
+        <!-- Tarjetas de resumen por sector -->
         <div id="mapaResumen" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;"></div>
 
         <!-- Mapa -->
@@ -3120,6 +3147,135 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ─── MAPA DE COBERTURA ───────────────────────────────────────────────
 let _mapaLeaflet = null;
+let _mapaRegionalesCache = null; // cache de regionales para el selector
+
+// Carga las regionales en el selector del mapa (se llama una sola vez)
+async function poblarRegionalesMapa() {
+  const sel = document.getElementById('mapaFiltroRegional');
+  if (!sel || _mapaRegionalesCache) return;
+  const { data } = await sb.from('centros')
+    .select('regional_codigo,regional_nombre')
+    .ilike('niveles','%Primario%')
+    .not('niveles','ilike','%Adultos%')
+    .not('regional_codigo','is','null')
+    .order('regional_codigo');
+  // Deduplicar
+  const vistas = new Set();
+  _mapaRegionalesCache = (data || []).filter(r => {
+    if (vistas.has(r.regional_codigo)) return false;
+    vistas.add(r.regional_codigo); return true;
+  });
+  sel.innerHTML = '<option value="">Todas</option>';
+  _mapaRegionalesCache.forEach(r => {
+    sel.appendChild(new Option(`${r.regional_codigo} - ${r.regional_nombre}`, r.regional_codigo));
+  });
+}
+
+// Cuando cambia la regional, carga los distritos correspondientes
+async function poblarDistritosMapa() {
+  const regCod = document.getElementById('mapaFiltroRegional')?.value;
+  const sel = document.getElementById('mapaFiltroDistrito');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Todos</option>';
+  if (!regCod) return;
+  const { data } = await sb.from('centros')
+    .select('distrito_codigo,distrito_nombre')
+    .ilike('niveles','%Primario%')
+    .not('niveles','ilike','%Adultos%')
+    .eq('regional_codigo', regCod)
+    .not('distrito_codigo','is','null')
+    .order('distrito_codigo');
+  const vistas = new Set();
+  (data || []).filter(d => {
+    if (vistas.has(d.distrito_codigo)) return false;
+    vistas.add(d.distrito_codigo); return true;
+  }).forEach(d => {
+    sel.appendChild(new Option(`${d.distrito_codigo} - ${d.distrito_nombre}`, d.distrito_codigo));
+  });
+}
+
+function limpiarFiltrosMapa() {
+  ['mapaFiltroDesde','mapaFiltroHasta','mapaFiltroTipo','mapaFiltroSector',
+   'mapaFiltroRegional','mapaFiltroDistrito','mapaFiltroCentro'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  // Limpiar también los distritos del mapa
+  const selD = document.getElementById('mapaFiltroDistrito');
+  if (selD) selD.innerHTML = '<option value="">Todos</option>';
+}
+
+// Genera el HTML de las tarjetas de resumen por sector
+function _renderResumenMapa(centros, codigosConVisita) {
+  const SECTORES = [
+    { key:'Público',     bg:'#e0f2fe', fg:'#0369a1', borde:'#bae6fd' },
+    { key:'Privado',     bg:'#fef9c3', fg:'#854d0e', borde:'#fef08a' },
+    { key:'Semioficial', bg:'#f3e8ff', fg:'#6b21a8', borde:'#e9d5ff' },
+  ];
+
+  // Totales globales
+  const totalCon  = centros.filter(c => codigosConVisita.has(c.codigo)).length;
+  const totalSin  = centros.length - totalCon;
+  const totalPct  = centros.length ? Math.round(totalCon / centros.length * 100) : 0;
+
+  let html = `
+    <div style="width:100%;display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+      <div style="background:#d1fae5;border-radius:10px;padding:12px 20px;min-width:130px;text-align:center;border:1px solid #a7f3d0;">
+        <div style="font-size:26px;font-weight:800;color:#065f46;">${totalCon}</div>
+        <div style="font-size:11px;color:#047857;font-weight:600;">Con acompañamiento</div>
+      </div>
+      <div style="background:#fee2e2;border-radius:10px;padding:12px 20px;min-width:130px;text-align:center;border:1px solid #fecaca;">
+        <div style="font-size:26px;font-weight:800;color:#991b1b;">${totalSin}</div>
+        <div style="font-size:11px;color:#b91c1c;font-weight:600;">Sin acompañamiento</div>
+      </div>
+      <div style="background:#e0f2fe;border-radius:10px;padding:12px 20px;min-width:130px;text-align:center;border:1px solid #bae6fd;">
+        <div style="font-size:26px;font-weight:800;color:#0369a1;">${centros.length}</div>
+        <div style="font-size:11px;color:#0284c7;font-weight:600;">Total centros</div>
+      </div>
+      <div style="background:#f5f3ff;border-radius:10px;padding:12px 20px;min-width:130px;text-align:center;border:1px solid #e9d5ff;">
+        <div style="font-size:26px;font-weight:800;color:#6d28d9;">${totalPct}%</div>
+        <div style="font-size:11px;color:#7c3aed;font-weight:600;">Cobertura total</div>
+      </div>
+    </div>
+    <div style="width:100%;">
+      <div style="font-size:12px;font-weight:700;color:#617384;margin-bottom:6px;letter-spacing:.5px;">COBERTURA POR SECTOR</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">`;
+
+  SECTORES.forEach(s => {
+    const grupo = centros.filter(c => (c.sector || '').trim() === s.key);
+    const con   = grupo.filter(c => codigosConVisita.has(c.codigo)).length;
+    const pct   = grupo.length ? Math.round(con / grupo.length * 100) : 0;
+    html += `
+      <div style="background:${s.bg};border:1px solid ${s.borde};border-radius:10px;padding:12px 18px;min-width:180px;flex:1;">
+        <div style="font-size:12px;font-weight:700;color:${s.fg};margin-bottom:6px;">${s.key.toUpperCase()}</div>
+        <div style="display:flex;gap:14px;align-items:center;">
+          <div style="text-align:center;">
+            <div style="font-size:22px;font-weight:800;color:#065f46;">${con}</div>
+            <div style="font-size:10px;color:#047857;">con acomp.</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:22px;font-weight:800;color:#991b1b;">${grupo.length - con}</div>
+            <div style="font-size:10px;color:#b91c1c;">sin acomp.</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:22px;font-weight:800;color:${s.fg};">${pct}%</div>
+            <div style="font-size:10px;color:${s.fg};">cobertura</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:22px;font-weight:800;color:#374151;">${grupo.length}</div>
+            <div style="font-size:10px;color:#6b7280;">total</div>
+          </div>
+        </div>
+        <!-- Barra de progreso -->
+        <div style="margin-top:8px;background:rgba(0,0,0,.08);border-radius:4px;height:6px;overflow:hidden;">
+          <div style="height:6px;border-radius:4px;background:${s.fg};width:${pct}%;transition:width .4s;"></div>
+        </div>
+      </div>`;
+  });
+
+  html += `</div></div>`;
+  return html;
+}
 
 async function cargarMapaCobertura() {
   const estado = document.getElementById('mapaEstado');
@@ -3130,11 +3286,16 @@ async function cargarMapaCobertura() {
   const p = perfilActual;
   if (!p) return;
 
-  // 1. Determinar filtro de demarcación para centros
+  // Poblar regionales si aún no se han cargado
+  await poblarRegionalesMapa();
+
+  // 1. Determinar filtro de demarcación para centros (role-based)
   const rol = String(p.rol || '').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
-  let queryCentros = sb.from('centros').select('codigo,nombre,latitud,longitud,zona,distrito_codigo,regional_codigo')
+  let queryCentros = sb.from('centros')
+    .select('codigo,nombre,latitud,longitud,zona,sector,distrito_codigo,regional_codigo')
     .ilike('niveles', '%Primario%')
     .not('niveles', 'ilike', '%Adultos%');
+
   if (rol === 'tecnico/a regional' || rol === 'tecnico/a coordinador/a regional') {
     const cod = String(p.regional || '').trim().match(/^\d+/)?.[0]?.padStart(2,'0');
     if (cod) queryCentros = queryCentros.eq('regional_codigo', cod);
@@ -3149,7 +3310,18 @@ async function cargarMapaCobertura() {
     return;
   }
 
-  // Paginar para superar el límite de 1000 filas de Supabase
+  // 2. Aplicar filtros adicionales del panel
+  const filtRegional = document.getElementById('mapaFiltroRegional')?.value;
+  const filtDistrito = document.getElementById('mapaFiltroDistrito')?.value;
+  const filtCentro   = document.getElementById('mapaFiltroCentro')?.value.trim();
+  const filtSector   = document.getElementById('mapaFiltroSector')?.value;
+
+  if (filtRegional) queryCentros = queryCentros.eq('regional_codigo', filtRegional);
+  if (filtDistrito) queryCentros = queryCentros.eq('distrito_codigo', filtDistrito);
+  if (filtCentro)   queryCentros = queryCentros.eq('codigo', filtCentro.padStart(5,'0'));
+  if (filtSector)   queryCentros = queryCentros.eq('sector', filtSector);
+
+  // 3. Paginar para superar el límite de 1000 filas de Supabase
   let centros = [];
   let page = 0;
   const PAGE_SIZE = 1000;
@@ -3164,11 +3336,11 @@ async function cargarMapaCobertura() {
     if (estado) estado.textContent = `Cargando centros… (${centros.length})`;
   }
   if (!centros.length) {
-    if (estado) estado.textContent = 'No se encontraron centros para tu demarcación.';
+    if (estado) estado.textContent = 'No se encontraron centros para los filtros seleccionados.';
     return;
   }
 
-  // 2. Cargar acompañamientos del período
+  // 4. Cargar acompañamientos del período
   const desde = document.getElementById('mapaFiltroDesde')?.value;
   const hasta = document.getElementById('mapaFiltroHasta')?.value;
   const tipo  = document.getElementById('mapaFiltroTipo')?.value;
@@ -3183,35 +3355,14 @@ async function cargarMapaCobertura() {
   // Construir set de centros con al menos un acompañamiento
   const codigosConVisita = new Set((acomps || []).map(a => String(a.codigo_centro || '').trim()));
 
-  const conVisita    = centros.filter(c => codigosConVisita.has(c.codigo));
-  const sinVisita    = centros.filter(c => !codigosConVisita.has(c.codigo));
   const sinCoordsAll = centros.filter(c => !c.latitud || !c.longitud);
-  const sinCoordsCon = conVisita.filter(c => !c.latitud || !c.longitud).length;
-  const sinCoordsSin = sinVisita.filter(c => !c.latitud || !c.longitud).length;
 
-  // 3. Tarjetas resumen
+  // 5. Tarjetas resumen (global + por sector)
   if (resumen) {
-    const pct = centros.length ? Math.round(conVisita.length / centros.length * 100) : 0;
-    resumen.innerHTML = `
-      <div style="background:#d1fae5;border-radius:10px;padding:12px 20px;min-width:140px;text-align:center;">
-        <div style="font-size:28px;font-weight:800;color:#065f46;">${conVisita.length}</div>
-        <div style="font-size:12px;color:#047857;font-weight:600;">Con acompañamiento</div>
-      </div>
-      <div style="background:#fee2e2;border-radius:10px;padding:12px 20px;min-width:140px;text-align:center;">
-        <div style="font-size:28px;font-weight:800;color:#991b1b;">${sinVisita.length}</div>
-        <div style="font-size:12px;color:#b91c1c;font-weight:600;">Sin acompañamiento</div>
-      </div>
-      <div style="background:#e0f2fe;border-radius:10px;padding:12px 20px;min-width:140px;text-align:center;">
-        <div style="font-size:28px;font-weight:800;color:#0369a1;">${centros.length}</div>
-        <div style="font-size:12px;color:#0284c7;font-weight:600;">Total centros</div>
-      </div>
-      <div style="background:#f5f3ff;border-radius:10px;padding:12px 20px;min-width:140px;text-align:center;">
-        <div style="font-size:28px;font-weight:800;color:#6d28d9;">${pct}%</div>
-        <div style="font-size:12px;color:#7c3aed;font-weight:600;">Cobertura</div>
-      </div>`;
+    resumen.innerHTML = _renderResumenMapa(centros, codigosConVisita);
   }
 
-  // 4. Inicializar / actualizar mapa Leaflet
+  // 6. Inicializar / actualizar mapa Leaflet
   if (!_mapaLeaflet) {
     _mapaLeaflet = L.map('mapaCobertura').setView([18.7357, -70.1627], 8);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -3232,7 +3383,7 @@ async function cargarMapaCobertura() {
     };
     leyenda.addTo(_mapaLeaflet);
   } else {
-    // Limpiar capas de marcadores anteriores
+    // Limpiar marcadores anteriores
     _mapaLeaflet.eachLayer(l => { if (l instanceof L.CircleMarker) _mapaLeaflet.removeLayer(l); });
   }
 
@@ -3252,11 +3403,13 @@ async function cargarMapaCobertura() {
     const tieneVisita = codigosConVisita.has(c.codigo);
     const color = tieneVisita ? '#16a34a' : '#dc2626';
     const visitasCount = (acomps || []).filter(a => String(a.codigo_centro).trim() === c.codigo).length;
+    const sectorLabel = c.sector ? `<br><span style="font-size:11px;color:#6b7280;">Sector: ${c.sector}</span>` : '';
 
     const marker = L.circleMarker([lat, lon], iconOpts(color));
     marker.bindPopup(`
       <strong>${c.nombre}</strong><br>
-      <span style="font-size:12px;color:#617384;">Código: ${c.codigo} · ${c.zona || ''}</span><br>
+      <span style="font-size:12px;color:#617384;">Código: ${c.codigo} · ${c.zona || ''}</span>
+      ${sectorLabel}<br>
       ${tieneVisita
         ? `<span style="color:#16a34a;font-weight:700;">✅ ${visitasCount} acompañamiento${visitasCount!==1?'s':''}</span>`
         : `<span style="color:#dc2626;font-weight:700;">⚠️ Sin acompañamiento</span>`}
