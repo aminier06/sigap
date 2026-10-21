@@ -2289,15 +2289,15 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="filtros-grid" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
             <div class="campo">
               <label style="font-size:12px;font-weight:600;color:#617384;">Desde</label>
-              <input type="date" id="mapaFiltroDesde" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;">
+              <input type="date" id="mapaFiltroDesde" onchange="_mapaAutoActualizar()" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;">
             </div>
             <div class="campo">
               <label style="font-size:12px;font-weight:600;color:#617384;">Hasta</label>
-              <input type="date" id="mapaFiltroHasta" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;">
+              <input type="date" id="mapaFiltroHasta" onchange="_mapaAutoActualizar()" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;">
             </div>
             <div class="campo">
               <label style="font-size:12px;font-weight:600;color:#617384;">Tipo</label>
-              <select id="mapaFiltroTipo" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;">
+              <select id="mapaFiltroTipo" onchange="_mapaAutoActualizar()" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;">
                 <option value="">Todos</option>
                 <option value="Diagnóstico">Diagnóstico</option>
                 <option value="Seguimiento">Seguimiento</option>
@@ -2306,7 +2306,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="campo">
               <label style="font-size:12px;font-weight:600;color:#617384;">Sector</label>
-              <select id="mapaFiltroSector" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;">
+              <select id="mapaFiltroSector" onchange="_mapaAutoActualizar()" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;">
                 <option value="">Todos</option>
                 <option value="Público">Público</option>
                 <option value="Privado">Privado</option>
@@ -2315,7 +2315,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="campo">
               <label style="font-size:12px;font-weight:600;color:#617384;">Acompañado por</label>
-              <select id="mapaFiltroRolAcomp" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;min-width:170px;">
+              <select id="mapaFiltroRolAcomp" onchange="_mapaAutoActualizar()" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;min-width:170px;">
                 <option value="">Todos los roles</option>
                 <option value="nacional">Técnico/a Nacional</option>
                 <option value="regional">Técnico/a Regional</option>
@@ -2339,6 +2339,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="campo">
               <label style="font-size:12px;font-weight:600;color:#617384;">Centro (código)</label>
               <input type="text" id="mapaFiltroCentro" placeholder="Ej: 02334" maxlength="5"
+                oninput="_mapaAutoActualizarCentro(this)"
+                onkeydown="if(event.key==='Enter') cargarMapaCobertura()"
                 style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;width:110px;">
             </div>
             <button onclick="cargarMapaCobertura()" style="padding:7px 18px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;">🗺️ Actualizar mapa</button>
@@ -3299,6 +3301,26 @@ function limpiarFiltrosMapa() {
   const selR = document.getElementById('mapaFiltroRegional');
   if (selR) { selR.innerHTML = '<option value="">Todas</option>'; }
   _mapaRegionalesCache = null; // invalidar caché para forzar recarga
+  _mapaAutoActualizar(0);      // recargar el mapa sin filtros
+}
+
+// ── AUTOACTUALIZACIÓN DEL MAPA AL CAMBIAR UN FILTRO ───────────────────────────
+let _mapaAutoTimeout = null;
+
+// Reprograma la recarga del mapa. El retardo agrupa cambios seguidos
+// (p. ej. elegir "desde" y "hasta") en una sola consulta.
+function _mapaAutoActualizar(ms = 250) {
+  clearTimeout(_mapaAutoTimeout);
+  _mapaAutoTimeout = setTimeout(() => cargarMapaCobertura(), ms);
+}
+
+// El código de centro tiene 5 dígitos: solo se consulta cuando está completo
+// o cuando el campo se vacía (volver a ver todos los centros).
+function _mapaAutoActualizarCentro(input) {
+  input.value = input.value.replace(/\D/g, '').slice(0, 5);
+  const v = input.value;
+  if (v.length === 5 || v.length === 0) _mapaAutoActualizar(350);
+  else clearTimeout(_mapaAutoTimeout);
 }
 
 // Agrupación de roles para el filtro "Acompañado por" del mapa.
@@ -3476,7 +3498,13 @@ function _renderResumenMapa(centros, codigosConVisita, rolClave) {
   return html;
 }
 
+// Contador de peticiones: evita que una consulta lenta sobrescriba a otra más reciente
+let _mapaPeticion = 0;
+
 async function cargarMapaCobertura() {
+  const miPeticion = ++_mapaPeticion;
+  const obsoleta = () => miPeticion !== _mapaPeticion;
+
   const estado = document.getElementById('mapaEstado');
   const resumen = document.getElementById('mapaResumen');
   if (estado) { estado.textContent = 'Cargando datos…'; }
@@ -3487,6 +3515,7 @@ async function cargarMapaCobertura() {
 
   // Poblar regionales si aún no se han cargado
   await poblarRegionalesMapa();
+  if (obsoleta()) return;
 
   // 1. Determinar filtro de demarcación para centros (role-based)
   const rol = String(p.rol || '').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
@@ -3527,6 +3556,7 @@ async function cargarMapaCobertura() {
   while (true) {
     const { data: chunk, error: errC } = await queryCentros
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+    if (obsoleta()) return;
     if (errC) { if (estado) estado.textContent = 'Error al cargar centros.'; return; }
     if (!chunk || chunk.length === 0) break;
     centros = centros.concat(chunk);
@@ -3553,6 +3583,7 @@ async function cargarMapaCobertura() {
   if (rolAcomp && ROLES_MAPA[rolAcomp]) queryAcomp = queryAcomp.in('rol_acompanante', ROLES_MAPA[rolAcomp]);
 
   const { data: acomps, error: errA } = await queryAcomp;
+  if (obsoleta()) return;
   if (errA) { if (estado) estado.textContent = 'Error al cargar acompañamientos: ' + errA.message; return; }
 
   // Construir set de centros con al menos un acompañamiento
@@ -3580,8 +3611,7 @@ async function cargarMapaCobertura() {
       div.innerHTML = `
         <strong>Cobertura</strong><br>
         <span style="background:#16a34a;"></span> Con acompañamiento<br>
-        <span style="background:#dc2626;"></span> Sin acompañamiento<br>
-        <span style="background:#9ca3af;"></span> Sin coordenadas`;
+        <span style="background:#dc2626;"></span> Sin acompañamiento`;
       return div;
     };
     leyenda.addTo(_mapaLeaflet);
@@ -3649,12 +3679,82 @@ async function cargarMapaCobertura() {
   // Invalidar tamaño (por si el panel estaba oculto al inicializar)
   setTimeout(() => _mapaLeaflet.invalidateSize(), 100);
 
+  // Aviso de calidad del dato: centros que quedan fuera del mapa por falta de coordenadas.
+  // Se guardan para poder listarlos y corregirlos en la base de datos.
+  _mapaSinCoords = sinCoordsAll;
   const sinCoords = sinCoordsAll.length;
   if (estado) {
-    estado.textContent = sinCoords > 0
-      ? `${sinCoords} centro${sinCoords!==1?'s':''} sin coordenadas no aparece${sinCoords!==1?'n':''} en el mapa.`
-      : 'Todos los centros con coordenadas están representados.';
+    if (sinCoords === 0) { estado.innerHTML = ''; }
+    else {
+      const plural = sinCoords !== 1;
+      estado.innerHTML =
+        `<span style="display:inline-flex;align-items:center;gap:8px;padding:6px 12px;background:#fff8f0;` +
+        `border:1px solid #fcd9a0;border-radius:8px;color:#8a5d00;font-size:12px;">` +
+        `📍 ${sinCoords} centro${plural?'s':''} sin coordenadas no ` +
+        `${plural?'aparecen':'aparece'} en el mapa ni se ` +
+        `${plural?'representan':'representa'} en los marcadores.` +
+        `<button onclick="_mostrarCentrosSinCoords()" style="padding:3px 10px;background:#fff;` +
+        `border:1px solid #e0b770;border-radius:6px;font-size:12px;font-weight:700;color:#8a5d00;` +
+        `cursor:pointer;">Ver cuáles</button></span>` +
+        `<div id="mapaListaSinCoords" style="display:none;margin-top:10px;"></div>`;
+    }
   }
+}
+
+// Centros excluidos del mapa por no tener latitud/longitud registradas
+let _mapaSinCoords = [];
+
+function _mostrarCentrosSinCoords() {
+  const cont = document.getElementById('mapaListaSinCoords');
+  if (!cont) return;
+  if (cont.style.display === 'block') { cont.style.display = 'none'; return; }
+
+  const esc = s => String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const filas = _mapaSinCoords
+    .slice()
+    .sort((a,b) => String(a.codigo).localeCompare(String(b.codigo)))
+    .map(c => `<tr>
+      <td style="padding:5px 10px;font-family:monospace;font-size:12px;">${esc(c.codigo)}</td>
+      <td style="padding:5px 10px;font-size:12px;">${esc(c.nombre)}</td>
+      <td style="padding:5px 10px;font-size:12px;color:#617384;">${esc(c.sector||'—')}</td>
+      <td style="padding:5px 10px;font-size:12px;color:#617384;">${esc(c.distrito_codigo||'—')}</td>
+    </tr>`).join('');
+
+  cont.innerHTML = `
+    <div style="max-height:260px;overflow:auto;border:1px solid #e3ecf4;border-radius:8px;background:#fff;text-align:left;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#f4f8fb;position:sticky;top:0;">
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:#617384;">Código</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:#617384;">Centro</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:#617384;">Sector</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:#617384;">Distrito</th>
+          </tr>
+        </thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:8px;text-align:left;">
+      <button onclick="_descargarCentrosSinCoords()" style="padding:5px 12px;background:#edf3f8;border:1px solid #cce0f0;border-radius:6px;font-size:12px;font-weight:600;color:#2d4a63;cursor:pointer;">⬇️ Descargar CSV</button>
+      <span style="font-size:11px;color:#8fa5bb;margin-left:8px;">Para completar las coordenadas en la base de datos.</span>
+    </div>`;
+  cont.style.display = 'block';
+}
+
+function _descargarCentrosSinCoords() {
+  const campos = ['codigo','nombre','sector','zona','distrito_codigo','regional_codigo'];
+  const celda = v => `"${String(v == null ? '' : v).replace(/"/g,'""')}"`;
+  const csv = [campos.join(',')]
+    .concat(_mapaSinCoords.map(c => campos.map(k => celda(c[k])).join(',')))
+    .join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `centros_sin_coordenadas_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // Cargar mapa al abrir el panel
