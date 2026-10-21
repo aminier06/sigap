@@ -1864,10 +1864,16 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
         <p class="dashboard-sub">Evolución de los indicadores de un docente, coordinador o técnico distrital a través del tiempo.</p>
 
         <!-- Selector de tipo -->
-        <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
-          <button id="hTab-docente" class="btn-primario" onclick="cambiarTipoHistorial('docente')" style="flex:1;min-width:140px;">👨‍🏫 Docente</button>
-          <button id="hTab-coordinador" class="btn-secundario" onclick="cambiarTipoHistorial('coordinador')" style="flex:1;min-width:140px;">🧑‍💼 Coordinador</button>
-          <button id="hTab-tecnico" class="btn-secundario" onclick="cambiarTipoHistorial('tecnico')" style="flex:1;min-width:140px;">🏫 Técnico distrital</button>
+        <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;border-bottom:2px solid var(--borde);padding-bottom:12px;">
+          <button id="hTab-docente"
+            style="padding:8px 18px;border-radius:8px;border:1.5px solid var(--azul);background:var(--azul);color:#fff;font-weight:700;font-size:13px;cursor:pointer;"
+            onclick="cambiarTipoHistorial('docente')">👨‍🏫 Docente</button>
+          <button id="hTab-coordinador"
+            style="padding:8px 18px;border-radius:8px;border:1.5px solid var(--borde);background:#fff;color:var(--azul-osc);font-weight:700;font-size:13px;cursor:pointer;"
+            onclick="cambiarTipoHistorial('coordinador')">🧑‍💼 Coordinador</button>
+          <button id="hTab-tecnico"
+            style="padding:8px 18px;border-radius:8px;border:1.5px solid var(--borde);background:#fff;color:var(--azul-osc);font-weight:700;font-size:13px;cursor:pointer;"
+            onclick="cambiarTipoHistorial('tecnico')">🏫 Técnico distrital</button>
         </div>
 
         <div class="filtros-bar" style="margin-bottom:20px;">
@@ -5934,16 +5940,21 @@ let tipoHistorialActivo = 'docente'; // 'docente' | 'coordinador' | 'tecnico'
 
 function cambiarTipoHistorial(tipo) {
   tipoHistorialActivo = tipo;
-  // Actualizar tabs
+  // Actualizar tabs con estilos inline
   ['docente','coordinador','tecnico'].forEach(t => {
     const btn = document.getElementById('hTab-' + t);
-    if (btn) btn.className = t === tipo ? 'btn-primario' : 'btn-secundario';
+    if (!btn) return;
+    if (t === tipo) {
+      btn.style.background = 'var(--azul)'; btn.style.color = '#fff'; btn.style.borderColor = 'var(--azul)';
+    } else {
+      btn.style.background = '#fff'; btn.style.color = 'var(--azul-osc)'; btn.style.borderColor = 'var(--borde)';
+    }
   });
   // Actualizar label
   const labels = { docente: 'Cédula del docente', coordinador: 'Cédula del coordinador', tecnico: 'Cédula del técnico distrital' };
   const labelEl = document.getElementById('labelCedulaHistorial');
   if (labelEl) labelEl.textContent = labels[tipo] || 'Cédula';
-  // Limpiar resultados anteriores
+  // Limpiar
   document.getElementById('buscarDocente').value = '';
   document.getElementById('estadoNombreHistorial').textContent = '';
   document.getElementById('historialResultado').style.display = 'none';
@@ -5963,10 +5974,9 @@ async function buscarDocenteHistorial(cedula) {
   historialTimeout = setTimeout(async () => {
     const esTecnico = tipoHistorialActivo === 'tecnico';
     const colCedula = esTecnico ? 'cedula' : 'cedula_docente';
-    // Usar .in() para buscar ambos formatos (con y sin guiones) sin problemas de URL
     const candidatos = [...new Set([cedula.trim(), cedLimpia])];
-    let q = filtrarDemarcacion(sb.from('acompañamientos')
-      .select(`nombre_docente, ${colCedula}`))
+    let q = sb.from('acompañamientos')
+      .select(`nombre_docente, ${colCedula}`)
       .in(colCedula, candidatos)
       .not('nombre_docente', 'is', null);
     if (tipoHistorialActivo === 'coordinador') q = q.eq('tipo_instrumento', 'coordinador');
@@ -6002,7 +6012,7 @@ async function cargarHistorialDocente() {
   const esTecnico = tipoHistorialActivo === 'tecnico';
   const colCedula = esTecnico ? 'cedula' : 'cedula_docente';
   const candidatos = [...new Set([cedInput, cedLimpia])];
-  let q = filtrarDemarcacion(sb.from('acompañamientos').select('*'))
+  let q = sb.from('acompañamientos').select('*')
     .in(colCedula, candidatos)
     .eq('estado', 'Enviado')
     .order('fecha', { ascending: true });
