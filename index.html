@@ -4775,6 +4775,31 @@ async function guardarBorradorDist() { mostrarNotif('Borrador guardado localment
 
 async function enviarFormularioDist(event) {
   event.preventDefault();
+
+  // ── VALIDACIÓN ───────────────────────────────────────────────────────────────
+  const vd = id => (document.getElementById(id)||{}).value || '';
+  const rd = name => { const el = document.querySelector('input[name="'+name+'"]:checked'); return el?el.value:''; };
+  const faltantesDist = [];
+  [
+    { id: 'dCentroEducativo',  label: 'Centro educativo' },
+    { id: 'dCodigoCentro',     label: 'Código del centro' },
+    { id: 'dNombreTecnico',    label: 'Nombre del técnico acompañado' },
+    { id: 'dFechaDist',        label: 'Fecha' },
+    { id: 'dFocoDist',         label: 'Foco del acompañamiento' },
+  ].forEach(({ id, label }) => { if (!vd(id)) faltantesDist.push(label); });
+  if (!rd('dTipoAcomp')) faltantesDist.push('Tipo de acompañamiento');
+  const indDistSinValor = INDICADORES_DIST.filter(item => {
+    if (!item.codigo) return false;
+    return !document.querySelector('input[name="val_'+item.codigo+'"]:checked');
+  });
+  if (indDistSinValor.length) faltantesDist.push('Indicadores sin calificar (' + indDistSinValor.length + ')');
+  if (faltantesDist.length) {
+    const lista = faltantesDist.map(f => '<li>'+f+'</li>').join('');
+    mostrarNotif('<strong>⚠️ Complete los siguientes campos antes de enviar:</strong><ul style="margin:4px 0 0 16px;padding:0">'+lista+'</ul>', true, true);
+    return;
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
   const btn = document.getElementById('btnEnviarDist');
   btn.disabled = true; btn.textContent = 'Enviando…';
   try {
@@ -4910,6 +4935,29 @@ async function enviarFormularioCoord(event) {
   event.preventDefault();
   const v = id => (document.getElementById(id)||{}).value || '';
   const r = name => { const el = document.querySelector('input[name="'+name+'"]:checked'); return el?el.value:''; };
+
+  // ── VALIDACIÓN ───────────────────────────────────────────────────────────────
+  const faltantesCoord = [];
+  [
+    { id: 'cCentroEducativo',  label: 'Centro educativo' },
+    { id: 'cCodigoCentro',     label: 'Código del centro' },
+    { id: 'cNombreCoord',      label: 'Nombre del coordinador' },
+    { id: 'cFechaCoord',       label: 'Fecha' },
+    { id: 'cFocoCoord',        label: 'Foco del acompañamiento' },
+  ].forEach(({ id, label }) => { if (!v(id)) faltantesCoord.push(label); });
+  if (!r('cTipoAcomp')) faltantesCoord.push('Tipo de acompañamiento');
+  const indCoordSinValor = INDICADORES_COORD.filter(item => {
+    if (!item.codigo) return false;
+    return !document.querySelector('input[name="val_'+item.codigo+'"]:checked');
+  });
+  if (indCoordSinValor.length) faltantesCoord.push('Indicadores sin calificar (' + indCoordSinValor.length + ')');
+  if (faltantesCoord.length) {
+    const lista = faltantesCoord.map(f => '<li>'+f+'</li>').join('');
+    mostrarNotif('<strong>⚠️ Complete los siguientes campos antes de enviar:</strong><ul style="margin:4px 0 0 16px;padding:0">'+lista+'</ul>', true, true);
+    return;
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
   const indicadoresData = {};
   INDICADORES_COORD.forEach(item => {
     if (!item.codigo) return;
