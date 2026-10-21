@@ -4443,7 +4443,7 @@ async function buscarPorCedulaDocente(cedula) {
     const cedulaSola = cedLimpia; // solo dígitos, sin guiones
     const { data, error } = await sb.from('acompañamientos')
       .select('nombre_docente, grado_academico, especialidad, anios_experiencia, cedula_docente')
-      .or(`cedula_docente.eq.${cedulaFormateada},cedula_docente.eq.${cedulaSola}`)
+      .in('cedula_docente', [...new Set([cedulaFormateada, cedulaSola])])
       .not('nombre_docente', 'is', null)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -4479,7 +4479,7 @@ async function buscarPorCedulaCoord(cedula) {
     const cedulaSola = cedLimpia;
     const { data, error } = await sb.from('acompañamientos')
       .select('nombre_docente, grado_academico, anios_experiencia')
-      .or(`cedula_docente.eq.${cedulaFormateada},cedula_docente.eq.${cedulaSola}`)
+      .in('cedula_docente', [...new Set([cedulaFormateada, cedulaSola])])
       .eq('tipo_instrumento', 'coordinador')
       .not('nombre_docente', 'is', null)
       .order('created_at', { ascending: false })
@@ -4511,7 +4511,7 @@ async function buscarPorCedulaDist(cedula) {
     const cedulaSola = cedLimpia;
     const { data, error } = await sb.from('acompañamientos')
       .select('nombre_docente, grado_academico, anios_experiencia')
-      .or(`cedula.eq.${cedulaFormateada},cedula.eq.${cedulaSola}`)
+      .in('cedula', [...new Set([cedulaFormateada, cedulaSola])])
       .eq('tipo_instrumento', 'tecnico_distrital')
       .not('nombre_docente', 'is', null)
       .order('created_at', { ascending: false })
@@ -5961,17 +5961,16 @@ async function buscarDocenteHistorial(cedula) {
 
   clearTimeout(historialTimeout);
   historialTimeout = setTimeout(async () => {
-    const cedulaFmt = cedula.trim();
-    // Columna y filtro según tipo
     const esTecnico = tipoHistorialActivo === 'tecnico';
     const colCedula = esTecnico ? 'cedula' : 'cedula_docente';
+    // Usar .in() para buscar ambos formatos (con y sin guiones) sin problemas de URL
+    const candidatos = [...new Set([cedula.trim(), cedLimpia])];
     let q = filtrarDemarcacion(sb.from('acompañamientos')
       .select(`nombre_docente, ${colCedula}`))
-      .or(`${colCedula}.eq.${cedulaFmt},${colCedula}.eq.${cedLimpia}`)
+      .in(colCedula, candidatos)
       .not('nombre_docente', 'is', null);
     if (tipoHistorialActivo === 'coordinador') q = q.eq('tipo_instrumento', 'coordinador');
     else if (tipoHistorialActivo === 'tecnico') q = q.eq('tipo_instrumento', 'tecnico_distrital');
-    // Para docentes no filtramos tipo_instrumento — registros antiguos pueden no tener ese campo
     const { data, error } = await q.limit(1).maybeSingle();
 
     if (error) { console.error('buscarDocenteHistorial error:', error); return; }
@@ -5988,9 +5987,8 @@ async function buscarDocenteHistorial(cedula) {
   }, 400);
 }
 
-function seleccionarDocente(cedula, centro) {
+function seleccionarDocente(cedula) {
   document.getElementById('buscarDocente').value = cedula;
-  document.getElementById('filtroCentroHistorial').value = centro;
   document.getElementById('sugerenciasDocente').innerHTML = '';
   cedulaHistorialSeleccionada = cedula;
   cargarHistorialDocente();
@@ -6003,14 +6001,15 @@ async function cargarHistorialDocente() {
 
   const esTecnico = tipoHistorialActivo === 'tecnico';
   const colCedula = esTecnico ? 'cedula' : 'cedula_docente';
+  const candidatos = [...new Set([cedInput, cedLimpia])];
   let q = filtrarDemarcacion(sb.from('acompañamientos').select('*'))
-    .or(`${colCedula}.eq.${cedInput},${colCedula}.eq.${cedLimpia}`)
+    .in(colCedula, candidatos)
     .eq('estado', 'Enviado')
     .order('fecha', { ascending: true });
   if (tipoHistorialActivo === 'coordinador') q = q.eq('tipo_instrumento', 'coordinador');
   else if (tipoHistorialActivo === 'tecnico') q = q.eq('tipo_instrumento', 'tecnico_distrital');
-  // Para docentes no filtramos tipo_instrumento — registros antiguos pueden no tener ese campo
-  const { data } = await q;
+  const { data, error } = await q;
+  if (error) { console.error('cargarHistorialDocente error:', error); mostrarNotif('Error al cargar historial.', true); return; }
   const registros = data || [];
 
   document.getElementById('historialResultado').style.display = 'none';
