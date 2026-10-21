@@ -1185,8 +1185,13 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
 
               <div class="subtitulo fila-linea">Datos del docente</div>
               <div class="grid g-3">
+                <div class="campo">
+                  <label for="cedulaDocente">Cédula</label>
+                  <input type="text" id="cedulaDocente" name="cedulaDocente" placeholder="000-0000000-0" maxlength="13" inputmode="numeric"
+                    oninput="formatearCedula(this); buscarPorCedulaDocente(this.value)" autocomplete="off" />
+                  <div id="estadoBusquedaCedulaDocente" style="font-size:12px;min-height:16px;margin-top:3px;color:#617384;"></div>
+                </div>
                 <div class="campo"><label for="nombreDocente">Nombre del docente</label><input type="text" id="nombreDocente" name="nombreDocente" /></div>
-                <div class="campo"><label for="cedulaDocente">Cédula</label><input type="text" id="cedulaDocente" name="cedulaDocente" placeholder="000-0000000-0" /></div>
                 <div class="campo">
                   <label for="gradoAcademicoDocente">Grado académico</label>
                   <select id="gradoAcademicoDocente" name="gradoAcademicoDocente">
@@ -1336,8 +1341,13 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
 
               <div class="subtitulo fila-linea">Datos del coordinador acompañado</div>
               <div class="grid g-3">
+                <div class="campo">
+                  <label for="cCedulaCoord">Cédula</label>
+                  <input type="text" id="cCedulaCoord" name="cCedulaCoord" placeholder="000-0000000-0" maxlength="13" inputmode="numeric"
+                    oninput="formatearCedula(this); buscarPorCedulaCoord(this.value)" autocomplete="off" />
+                  <div id="estadoBusquedaCedulaCoord" style="font-size:12px;min-height:16px;margin-top:3px;color:#617384;"></div>
+                </div>
                 <div class="campo"><label for="cNombreCoord">Nombre del coordinador</label><input type="text" id="cNombreCoord" name="cNombreCoord" /></div>
-                <div class="campo"><label for="cCedulaCoord">Cédula</label><input type="text" id="cCedulaCoord" name="cCedulaCoord" placeholder="000-0000000-0" /></div>
                 <div class="campo">
                   <label for="cGradoAcademicoCoord">Grado académico</label>
                   <select id="cGradoAcademicoCoord" name="cGradoAcademicoCoord">
@@ -1456,10 +1466,14 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
           <div class="seccion-form">
             <div class="seccion-titulo">Datos del técnico/a distrital acompañado/a</div>
             <div class="grid g-2">
+              <div class="campo">
+                <label for="dCedulaTecnico">Cédula</label>
+                <input type="text" id="dCedulaTecnico" name="dCedulaTecnico" maxlength="13" placeholder="000-0000000-0" inputmode="numeric"
+                  oninput="formatearCedula(this); buscarPorCedulaDist(this.value)" autocomplete="off">
+                <div id="estadoBusquedaCedulaDist" style="font-size:12px;min-height:16px;margin-top:3px;color:#617384;"></div>
+              </div>
               <div class="campo"><label for="dNombreTecnico">Nombre completo</label>
                 <input type="text" id="dNombreTecnico" name="dNombreTecnico" required></div>
-              <div class="campo"><label for="dCedulaTecnico">Cédula</label>
-                <input type="text" id="dCedulaTecnico" name="dCedulaTecnico" maxlength="13" placeholder="000-0000000-0"></div>
             </div>
             <div class="grid g-3">
               <div class="campo"><label for="dGradoAcadDist">Grado académico</label>
@@ -4390,6 +4404,114 @@ function autocompletarCiclosMulti() {
 
 function marcarAmbosCiclos() {
   document.querySelectorAll('input[name="ciclosMultigrado"]').forEach(cb => cb.checked = true);
+}
+
+// ── FORMATO CÉDULA (000-0000000-0) ────────────────────────────────────────────
+function formatearCedula(input) {
+  // Solo dígitos
+  let digits = input.value.replace(/\D/g, '').slice(0, 11);
+  let formatted = digits;
+  if (digits.length > 3 && digits.length <= 10) {
+    formatted = digits.slice(0, 3) + '-' + digits.slice(3);
+  } else if (digits.length > 10) {
+    formatted = digits.slice(0, 3) + '-' + digits.slice(3, 10) + '-' + digits.slice(10);
+  }
+  // Preservar posición del cursor
+  const pos = input.selectionStart;
+  const prevLen = input.value.length;
+  input.value = formatted;
+  const newLen = formatted.length;
+  const diff = newLen - prevLen;
+  try { input.setSelectionRange(pos + diff, pos + diff); } catch(e) {}
+}
+
+// ── LOOKUP POR CÉDULA ─────────────────────────────────────────────────────────
+let buscarCedulaDocTimeout = null;
+async function buscarPorCedulaDocente(cedula) {
+  const estado = document.getElementById('estadoBusquedaCedulaDocente');
+  const cedLimpia = cedula.replace(/\D/g, '');
+  if (cedLimpia.length < 11) { estado.textContent = ''; return; }
+  clearTimeout(buscarCedulaDocTimeout);
+  buscarCedulaDocTimeout = setTimeout(async () => {
+    estado.textContent = 'Buscando…'; estado.style.color = '#617384';
+    const { data } = await sb.from('acompañamientos')
+      .select('nombre_docente, grado_academico, especialidad, anios_experiencia')
+      .eq('cedula_docente', cedula.trim())
+      .is('tipo_instrumento', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!data) {
+      estado.textContent = ''; return;
+    }
+    // Solo prellenar campos vacíos
+    const setIfEmpty = (id, val) => {
+      const el = document.getElementById(id);
+      if (el && !el.value && val) el.value = val;
+    };
+    setIfEmpty('nombreDocente', data.nombre_docente);
+    setIfEmpty('gradoAcademicoDocente', data.grado_academico);
+    setIfEmpty('especialidadDocente', data.especialidad);
+    setIfEmpty('aniosExp', data.anios_experiencia);
+    estado.textContent = '✅ Datos cargados del registro anterior.';
+    estado.style.color = '#2a6b1a';
+  }, 500);
+}
+
+let buscarCedulaCoordTimeout = null;
+async function buscarPorCedulaCoord(cedula) {
+  const estado = document.getElementById('estadoBusquedaCedulaCoord');
+  const cedLimpia = cedula.replace(/\D/g, '');
+  if (cedLimpia.length < 11) { estado.textContent = ''; return; }
+  clearTimeout(buscarCedulaCoordTimeout);
+  buscarCedulaCoordTimeout = setTimeout(async () => {
+    estado.textContent = 'Buscando…'; estado.style.color = '#617384';
+    const { data } = await sb.from('acompañamientos')
+      .select('nombre_docente, grado_academico, anios_experiencia')
+      .eq('cedula_docente', cedula.trim())
+      .eq('tipo_instrumento', 'coordinador')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!data) { estado.textContent = ''; return; }
+    const setIfEmpty = (id, val) => {
+      const el = document.getElementById(id);
+      if (el && !el.value && val) el.value = val;
+    };
+    setIfEmpty('cNombreCoord', data.nombre_docente);
+    setIfEmpty('cGradoAcademicoCoord', data.grado_academico);
+    setIfEmpty('cAniosExpCoord', data.anios_experiencia);
+    estado.textContent = '✅ Datos cargados del registro anterior.';
+    estado.style.color = '#2a6b1a';
+  }, 500);
+}
+
+let buscarCedulaDistTimeout = null;
+async function buscarPorCedulaDist(cedula) {
+  const estado = document.getElementById('estadoBusquedaCedulaDist');
+  const cedLimpia = cedula.replace(/\D/g, '');
+  if (cedLimpia.length < 11) { estado.textContent = ''; return; }
+  clearTimeout(buscarCedulaDistTimeout);
+  buscarCedulaDistTimeout = setTimeout(async () => {
+    estado.textContent = 'Buscando…'; estado.style.color = '#617384';
+    const { data } = await sb.from('acompañamientos')
+      .select('nombre_docente, grado_academico, anios_experiencia')
+      .eq('cedula', cedula.trim())
+      .eq('tipo_instrumento', 'tecnico_distrital')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!data) { estado.textContent = ''; return; }
+    const setIfEmpty = (id, val) => {
+      const el = document.getElementById(id);
+      if (el && !el.value && val) el.value = val;
+    };
+    setIfEmpty('dNombreTecnico', data.nombre_docente);
+    setIfEmpty('dGradoAcadDist', data.grado_academico);
+    setIfEmpty('dAniosExpDist', data.anios_experiencia);
+    estado.textContent = '✅ Datos cargados del registro anterior.';
+    estado.style.color = '#2a6b1a';
+  }, 500);
 }
 
 // ── INDICADORES ───────────────────────────────────────────────────────────────
