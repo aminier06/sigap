@@ -4434,20 +4434,25 @@ async function buscarPorCedulaDocente(cedula) {
   clearTimeout(buscarCedulaDocTimeout);
   buscarCedulaDocTimeout = setTimeout(async () => {
     estado.textContent = 'Buscando…'; estado.style.color = '#617384';
-    const { data } = await sb.from('acompañamientos')
-      .select('nombre_docente, grado_academico, especialidad, anios_experiencia')
-      .eq('cedula_docente', cedula.trim())
-      .is('tipo_instrumento', null)
+    // Buscar por cédula con o sin guiones — probamos ambos formatos
+    const cedulaFormateada = cedula.trim();
+    const cedulaSola = cedLimpia; // solo dígitos, sin guiones
+    const { data, error } = await sb.from('acompañamientos')
+      .select('nombre_docente, grado_academico, especialidad, anios_experiencia, cedula_docente')
+      .or(`cedula_docente.eq.${cedulaFormateada},cedula_docente.eq.${cedulaSola}`)
+      .not('nombre_docente', 'is', null)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (!data) {
+    if (error) {
+      console.error('buscarPorCedulaDocente error:', error);
       estado.textContent = ''; return;
     }
+    if (!data) { estado.textContent = ''; return; }
     // Solo prellenar campos vacíos
     const setIfEmpty = (id, val) => {
       const el = document.getElementById(id);
-      if (el && !el.value && val) el.value = val;
+      if (el && !el.value && val != null) el.value = val;
     };
     setIfEmpty('nombreDocente', data.nombre_docente);
     setIfEmpty('gradoAcademicoDocente', data.grado_academico);
