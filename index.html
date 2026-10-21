@@ -365,8 +365,11 @@ async function ejecutarEliminarUsuario() {
 }
 
 // Close modal on outside click
-document.getElementById('modalEliminarUsuario').addEventListener('click', function(e) {
-  if (e.target === this) cerrarModalEliminar();
+document.addEventListener('DOMContentLoaded', () => {
+  const _mEli = document.getElementById('modalEliminarUsuario');
+  if (_mEli) _mEli.addEventListener('click', function(e) {
+    if (e.target === this) cerrarModalEliminar();
+  });
 });
 
 // ── EDITAR USUARIO ────────────────────────────────────────────────────────────
@@ -410,8 +413,11 @@ async function guardarEdicionUsuario() {
 }
 
 // Cerrar modal al hacer clic fuera
-document.getElementById('modalEditarUsuario').addEventListener('click', function(e) {
-  if (e.target === this) cerrarModalEditar();
+document.addEventListener('DOMContentLoaded', () => {
+  const _mEdi = document.getElementById('modalEditarUsuario');
+  if (_mEdi) _mEdi.addEventListener('click', function(e) {
+    if (e.target === this) cerrarModalEditar();
+  });
 });
 
 </script>
@@ -5887,8 +5893,11 @@ async function ejecutarEliminarUsuario() {
 }
 
 // Close modal on outside click
-document.getElementById('modalEliminarUsuario').addEventListener('click', function(e) {
-  if (e.target === this) cerrarModalEliminar();
+document.addEventListener('DOMContentLoaded', () => {
+  const _mEli = document.getElementById('modalEliminarUsuario');
+  if (_mEli) _mEli.addEventListener('click', function(e) {
+    if (e.target === this) cerrarModalEliminar();
+  });
 });
 
 // ── EDITAR USUARIO ────────────────────────────────────────────────────────────
@@ -5932,8 +5941,11 @@ async function guardarEdicionUsuario() {
 }
 
 // Cerrar modal al hacer clic fuera
-document.getElementById('modalEditarUsuario').addEventListener('click', function(e) {
-  if (e.target === this) cerrarModalEditar();
+document.addEventListener('DOMContentLoaded', () => {
+  const _mEdi = document.getElementById('modalEditarUsuario');
+  if (_mEdi) _mEdi.addEventListener('click', function(e) {
+    if (e.target === this) cerrarModalEditar();
+  });
 });
 
 
