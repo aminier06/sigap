@@ -1861,35 +1861,41 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
       <!-- HISTORIAL POR DOCENTE -->
       <div id="panel-historialDocente" class="panel">
         <div class="dashboard-titulo">Historial por acompañado</div>
-        <p class="dashboard-sub">Evolución de los indicadores de un docente, coordinador o técnico distrital a través del tiempo.</p>
+        <p class="dashboard-sub">Evolución de los indicadores a través del tiempo.</p>
 
-        <!-- Selector de tipo -->
-        <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;border-bottom:2px solid var(--borde);padding-bottom:12px;">
-          <button id="hTab-docente"
-            style="padding:8px 18px;border-radius:8px;border:1.5px solid var(--azul);background:var(--azul);color:#fff;font-weight:700;font-size:13px;cursor:pointer;"
-            onclick="cambiarTipoHistorial('docente')">👨‍🏫 Docente</button>
-          <button id="hTab-coordinador"
-            style="padding:8px 18px;border-radius:8px;border:1.5px solid var(--borde);background:#fff;color:var(--azul-osc);font-weight:700;font-size:13px;cursor:pointer;"
-            onclick="cambiarTipoHistorial('coordinador')">🧑‍💼 Coordinador</button>
-          <button id="hTab-tecnico"
-            style="padding:8px 18px;border-radius:8px;border:1.5px solid var(--borde);background:#fff;color:var(--azul-osc);font-weight:700;font-size:13px;cursor:pointer;"
-            onclick="cambiarTipoHistorial('tecnico')">🏫 Técnico distrital</button>
-        </div>
-
-        <div class="filtros-bar" style="margin-bottom:20px;">
-          <div class="filtros-grid" style="grid-template-columns:1fr auto;align-items:end;">
-            <div class="campo">
-              <label id="labelCedulaHistorial">Cédula del docente</label>
-              <input type="text" id="buscarDocente" placeholder="000-0000000-0" maxlength="13" inputmode="numeric"
-                oninput="formatearCedula(this); buscarDocenteHistorial(this.value)" autocomplete="off" />
-              <div id="sugerenciasDocente" style="position:relative;"></div>
-              <div id="estadoNombreHistorial" style="font-size:12px;min-height:16px;margin-top:3px;color:#617384;"></div>
+        <!-- Buscador compacto -->
+        <div class="bloque" style="margin-bottom:20px;">
+          <div class="bloque-cuerpo" style="padding:16px 20px;">
+            <!-- Tabs de tipo -->
+            <div style="display:flex;gap:6px;margin-bottom:16px;">
+              <button id="hTab-docente" onclick="cambiarTipoHistorial('docente')"
+                style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--azul);background:var(--azul);color:#fff;font-weight:700;font-size:12px;cursor:pointer;transition:all .15s;">
+                👨‍🏫 Docente</button>
+              <button id="hTab-coordinador" onclick="cambiarTipoHistorial('coordinador')"
+                style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--borde);background:transparent;color:var(--azul-osc);font-weight:700;font-size:12px;cursor:pointer;transition:all .15s;">
+                🧑‍💼 Coordinador</button>
+              <button id="hTab-tecnico" onclick="cambiarTipoHistorial('tecnico')"
+                style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--borde);background:transparent;color:var(--azul-osc);font-weight:700;font-size:12px;cursor:pointer;transition:all .15s;">
+                🏫 Técnico distrital</button>
             </div>
-            <div>
-              <button class="btn-primario" onclick="cargarHistorialDocente()" style="margin-top:20px;">
-                Ver historial
-              </button>
+            <!-- Campo cédula + botón en una sola fila -->
+            <div style="display:flex;gap:10px;align-items:flex-start;">
+              <div style="flex:0 0 220px;">
+                <label id="labelCedulaHistorial" style="font-size:12px;font-weight:700;color:var(--azul-osc);display:block;margin-bottom:4px;">Cédula del docente</label>
+                <input type="text" id="buscarDocente" placeholder="000-0000000-0" maxlength="13" inputmode="numeric"
+                  autocomplete="off"
+                  oninput="formatearCedula(this); buscarDocenteHistorial(this.value)"
+                  onkeydown="if(event.key==='Enter') cargarHistorialDocente()"
+                  style="width:100%;padding:8px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:14px;font-family:monospace;box-sizing:border-box;" />
+              </div>
+              <div style="padding-top:22px;">
+                <button onclick="cargarHistorialDocente()" style="padding:8px 18px;background:var(--azul);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">
+                  Ver historial
+                </button>
+              </div>
             </div>
+            <div id="sugerenciasDocente" style="position:relative;"></div>
+            <div id="estadoNombreHistorial" style="font-size:12px;min-height:16px;margin-top:6px;color:#617384;"></div>
           </div>
         </div>
 
@@ -5947,7 +5953,7 @@ function cambiarTipoHistorial(tipo) {
     if (t === tipo) {
       btn.style.background = 'var(--azul)'; btn.style.color = '#fff'; btn.style.borderColor = 'var(--azul)';
     } else {
-      btn.style.background = '#fff'; btn.style.color = 'var(--azul-osc)'; btn.style.borderColor = 'var(--borde)';
+      btn.style.background = 'transparent'; btn.style.color = 'var(--azul-osc)'; btn.style.borderColor = 'var(--borde)';
     }
   });
   // Actualizar label
@@ -5991,7 +5997,7 @@ async function buscarDocenteHistorial(cedula) {
       estadoNombre.style.color = '#b94a48'; return;
     }
     cedulaHistorialSeleccionada = data[colCedula];
-    estadoNombre.textContent = `✅ ${data.nombre_docente}`;
+    estadoNombre.innerHTML = `✅ <strong>${data.nombre_docente}</strong> — <a href="#" style="font-size:11px;color:var(--azul);" onclick="event.preventDefault();cargarHistorialDocente()">Ver historial</a>`;
     estadoNombre.style.color = '#2a6b1a';
     contenedor.innerHTML = '';
   }, 400);
