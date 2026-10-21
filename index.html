@@ -1860,16 +1860,24 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
 
       <!-- HISTORIAL POR DOCENTE -->
       <div id="panel-historialDocente" class="panel">
-        <div class="dashboard-titulo">Historial por docente</div>
-        <p class="dashboard-sub">Evolución de los indicadores de un docente a través del tiempo.</p>
+        <div class="dashboard-titulo">Historial por acompañado</div>
+        <p class="dashboard-sub">Evolución de los indicadores de un docente, coordinador o técnico distrital a través del tiempo.</p>
+
+        <!-- Selector de tipo -->
+        <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+          <button id="hTab-docente" class="btn-primario" onclick="cambiarTipoHistorial('docente')" style="flex:1;min-width:140px;">👨‍🏫 Docente</button>
+          <button id="hTab-coordinador" class="btn-secundario" onclick="cambiarTipoHistorial('coordinador')" style="flex:1;min-width:140px;">🧑‍💼 Coordinador</button>
+          <button id="hTab-tecnico" class="btn-secundario" onclick="cambiarTipoHistorial('tecnico')" style="flex:1;min-width:140px;">🏫 Técnico distrital</button>
+        </div>
 
         <div class="filtros-bar" style="margin-bottom:20px;">
           <div class="filtros-grid" style="grid-template-columns:1fr 1fr auto;align-items:end;">
             <div class="campo">
-              <label>Nombre del docente</label>
-              <input type="text" id="buscarDocente" placeholder="Escriba el nombre..."
-                oninput="buscarDocenteHistorial(this.value)" autocomplete="off" />
+              <label id="labelCedulaHistorial">Cédula del docente</label>
+              <input type="text" id="buscarDocente" placeholder="000-0000000-0" maxlength="13" inputmode="numeric"
+                oninput="formatearCedula(this); buscarDocenteHistorial(this.value)" autocomplete="off" />
               <div id="sugerenciasDocente" style="position:relative;"></div>
+              <div id="estadoNombreHistorial" style="font-size:12px;min-height:16px;margin-top:3px;color:#617384;"></div>
             </div>
             <div class="campo">
               <label>Centro educativo</label>
@@ -1931,7 +1939,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
             <div class="bloque-titulo">Indicadores con más oportunidades de mejora</div>
             <div class="bloque-cuerpo">
               <p style="font-size:13px;color:#617384;margin-bottom:14px;">
-                Indicadores que han aparecido en nivel 1 o 2 con mayor frecuencia en todos los acompañamientos del docente.
+                Indicadores que han aparecido en nivel 1 o 2 con mayor frecuencia en todos los acompañamientos.
               </p>
               <div id="indicadoresCriticos"></div>
             </div>
@@ -1940,7 +1948,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
 
         <div id="historialVacio" style="text-align:center;padding:40px;color:#8fa5bb;display:none;">
           <div style="font-size:40px;margin-bottom:12px;">👨‍🏫</div>
-          <div style="font-size:15px;font-weight:700;">No se encontraron acompañamientos para este docente.</div>
+          <div style="font-size:15px;font-weight:700;" id="historialVacioMsg">No se encontraron acompañamientos.</div>
         </div>
       </div>
 
@@ -5925,61 +5933,98 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
 // ── HISTORIAL POR DOCENTE ─────────────────────────────────────────────────────
 let docenteSeleccionado = null;
 let historialTimeout = null;
+let cedulaHistorialSeleccionada = null;
+let tipoHistorialActivo = 'docente'; // 'docente' | 'coordinador' | 'tecnico'
 
-async function buscarDocenteHistorial(termino) {
+function cambiarTipoHistorial(tipo) {
+  tipoHistorialActivo = tipo;
+  // Actualizar tabs
+  ['docente','coordinador','tecnico'].forEach(t => {
+    const btn = document.getElementById('hTab-' + t);
+    if (btn) btn.className = t === tipo ? 'btn-primario' : 'btn-secundario';
+  });
+  // Actualizar label
+  const labels = { docente: 'Cédula del docente', coordinador: 'Cédula del coordinador', tecnico: 'Cédula del técnico distrital' };
+  const labelEl = document.getElementById('labelCedulaHistorial');
+  if (labelEl) labelEl.textContent = labels[tipo] || 'Cédula';
+  // Limpiar resultados anteriores
+  document.getElementById('buscarDocente').value = '';
+  document.getElementById('filtroCentroHistorial').value = '';
+  document.getElementById('estadoNombreHistorial').textContent = '';
+  document.getElementById('historialResultado').style.display = 'none';
+  document.getElementById('historialVacio').style.display = 'none';
+  cedulaHistorialSeleccionada = null;
+}
+
+async function buscarDocenteHistorial(cedula) {
   const contenedor = document.getElementById('sugerenciasDocente');
-  termino = termino.trim();
-  if (termino.length < 2) { contenedor.innerHTML = ''; return; }
+  const estadoNombre = document.getElementById('estadoNombreHistorial');
+  const cedLimpia = cedula.replace(/\D/g, '');
+  cedulaHistorialSeleccionada = null;
+  estadoNombre.textContent = '';
+  if (cedLimpia.length < 11) { contenedor.innerHTML = ''; return; }
 
   clearTimeout(historialTimeout);
   historialTimeout = setTimeout(async () => {
-    const esAdmin = perfilActual?.nivel === 'admin';
-    let query = filtrarDemarcacion(sb.from('acompañamientos')
-      .select('nombre_docente,centro_educativo'))
-      .ilike('nombre_docente', `%${termino}%`)
-      .limit(8);
-    const { data } = await query;
-    const unicos = [...new Map((data||[]).map(d => [d.nombre_docente, d])).values()];
+    const cedulaFmt = cedula.trim();
+    // Columna y filtro según tipo
+    const esTecnico = tipoHistorialActivo === 'tecnico';
+    const colCedula = esTecnico ? 'cedula' : 'cedula_docente';
+    let q = filtrarDemarcacion(sb.from('acompañamientos')
+      .select(`nombre_docente, ${colCedula}, centro_educativo`))
+      .or(`${colCedula}.eq.${cedulaFmt},${colCedula}.eq.${cedLimpia}`)
+      .not('nombre_docente', 'is', null);
+    if (tipoHistorialActivo === 'coordinador') q = q.eq('tipo_instrumento', 'coordinador');
+    else if (tipoHistorialActivo === 'tecnico') q = q.eq('tipo_instrumento', 'tecnico_distrital');
+    else q = q.is('tipo_instrumento', null);
+    const { data, error } = await q.limit(1).maybeSingle();
 
-    contenedor.innerHTML = unicos.length ? `
-      <div style="position:absolute;top:4px;left:0;right:0;background:#fff;border:1px solid #dce9f5;
-        border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:100;overflow:hidden;">
-        ${unicos.map(d => `
-          <div onclick="seleccionarDocente('${d.nombre_docente.replace(/'/g,"\'")}','${(d.centro_educativo||'').replace(/'/g,"\'")}' )"
-            style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f5fa;"
-            onmouseover="this.style.background='#f7fbfe'" onmouseout="this.style.background=''">
-            <strong>${d.nombre_docente}</strong>
-            <span style="color:#8fa5bb;font-size:11px;"> — ${d.centro_educativo||'—'}</span>
-          </div>`).join('')}
-      </div>` : '';
-  }, 300);
+    if (error) { console.error('buscarDocenteHistorial error:', error); return; }
+    if (!data) {
+      contenedor.innerHTML = '';
+      const etiquetas = { docente: 'docente', coordinador: 'coordinador', tecnico: 'técnico distrital' };
+      estadoNombre.textContent = `No se encontró ningún ${etiquetas[tipoHistorialActivo]} con esa cédula.`;
+      estadoNombre.style.color = '#b94a48'; return;
+    }
+    cedulaHistorialSeleccionada = data[colCedula];
+    estadoNombre.textContent = `✅ ${data.nombre_docente}`;
+    estadoNombre.style.color = '#2a6b1a';
+    document.getElementById('filtroCentroHistorial').value = data.centro_educativo || '';
+    contenedor.innerHTML = '';
+  }, 400);
 }
 
-function seleccionarDocente(nombre, centro) {
-  document.getElementById('buscarDocente').value = nombre;
+function seleccionarDocente(cedula, centro) {
+  document.getElementById('buscarDocente').value = cedula;
   document.getElementById('filtroCentroHistorial').value = centro;
   document.getElementById('sugerenciasDocente').innerHTML = '';
-  docenteSeleccionado = nombre;
+  cedulaHistorialSeleccionada = cedula;
   cargarHistorialDocente();
 }
 
 async function cargarHistorialDocente() {
-  const nombre = document.getElementById('buscarDocente').value.trim();
-  if (!nombre) { mostrarNotif('Ingrese el nombre del docente.', true); return; }
+  const cedInput = document.getElementById('buscarDocente').value.trim();
+  const cedLimpia = cedInput.replace(/\D/g, '');
+  if (cedLimpia.length < 11) { mostrarNotif('Ingrese la cédula completa.', true); return; }
 
-  const esAdmin = perfilActual?.nivel === 'admin';
-  let query = filtrarDemarcacion(sb.from('acompañamientos')
-    .select('*'))
-    .ilike('nombre_docente', `%${nombre}%`)
+  const esTecnico = tipoHistorialActivo === 'tecnico';
+  const colCedula = esTecnico ? 'cedula' : 'cedula_docente';
+  let q = filtrarDemarcacion(sb.from('acompañamientos').select('*'))
+    .or(`${colCedula}.eq.${cedInput},${colCedula}.eq.${cedLimpia}`)
     .eq('estado', 'Enviado')
     .order('fecha', { ascending: true });
-  const { data } = await query;
+  if (tipoHistorialActivo === 'coordinador') q = q.eq('tipo_instrumento', 'coordinador');
+  else if (tipoHistorialActivo === 'tecnico') q = q.eq('tipo_instrumento', 'tecnico_distrital');
+  else q = q.is('tipo_instrumento', null);
+  const { data } = await q;
   const registros = data || [];
 
   document.getElementById('historialResultado').style.display = 'none';
   document.getElementById('historialVacio').style.display = 'none';
 
   if (!registros.length) {
+    const etiquetas = { docente: 'este docente', coordinador: 'este coordinador', tecnico: 'este técnico distrital' };
+    document.getElementById('historialVacioMsg').textContent = `No se encontraron acompañamientos para ${etiquetas[tipoHistorialActivo] || 'esta persona'}.`;
     document.getElementById('historialVacio').style.display = 'block'; return;
   }
 
