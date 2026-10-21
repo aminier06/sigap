@@ -1958,6 +1958,17 @@ document.addEventListener('DOMContentLoaded', () => {
               <div id="indicadoresCriticos"></div>
             </div>
           </div>
+
+          <!-- Acuerdos y compromisos establecidos -->
+          <div class="bloque" style="margin-top:16px;">
+            <div class="bloque-titulo">Acuerdos y compromisos establecidos</div>
+            <div class="bloque-cuerpo">
+              <p style="font-size:13px;color:#617384;margin-bottom:14px;">
+                Acuerdos registrados en cada acompañamiento, del más reciente al más antiguo.
+              </p>
+              <div id="historialAcuerdos"></div>
+            </div>
+          </div>
         </div>
 
         <div id="historialVacio" style="text-align:center;padding:40px;color:#8fa5bb;display:none;">
@@ -6069,7 +6080,8 @@ async function cargarHistorialDocente() {
     return { num: i+1, fecha: r.fecha, area: r.area_acompanada, tipo: r.tipo_acompanamiento,
              grado: r.grado, pct, nivel1: vals.filter(v=>v===1).length,
              nivel2: vals.filter(v=>v===2).length, nivel3, total: vals.length,
-             acompanante: r.nombre_acompanante, id: r.id };
+             acompanante: r.nombre_acompanante, id: r.id,
+             acuerdos: r.acuerdos, observaciones: r.observaciones };
   });
 
   // Tendencia
@@ -6153,6 +6165,43 @@ async function cargarHistorialDocente() {
           </div>`).join('')}
       </div>`
     : '<div style="color:#2a6b1a;font-size:13px;padding:12px;background:#d8ead0;border-radius:10px;">✅ No hay indicadores críticos recurrentes. El docente muestra buen desempeño general.</div>';
+
+  // ── Acuerdos y compromisos ──────────────────────────────────────────────────
+  const esc = s => String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const conAcuerdos = [...datosEvolucion].reverse()
+    .filter(d => (d.acuerdos && String(d.acuerdos).trim()) ||
+                 (d.observaciones && String(d.observaciones).trim()));
+
+  document.getElementById('historialAcuerdos').innerHTML = conAcuerdos.length
+    ? `<div style="display:flex;flex-direction:column;gap:12px;">
+        ${conAcuerdos.map(d => {
+          const texto = String(d.acuerdos || '').trim();
+          const obs   = String(d.observaciones || '').trim();
+          const items = texto.split('\n').map(t => t.trim()).filter(Boolean);
+          return `
+          <div style="border:1px solid #d7e7f2;border-radius:12px;background:#f8fbfe;overflow:hidden;">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;background:#eef6fc;border-bottom:1px solid #d7e7f2;">
+              <span style="font-size:12px;font-weight:800;color:var(--azul-osc);">Acompañamiento ${d.num}</span>
+              <span style="font-size:12px;color:#617384;">${esc(d.fecha||'—')}</span>
+              ${d.area ? `<span style="font-size:11px;color:#617384;">· ${esc(d.area)}</span>` : ''}
+              <span style="margin-left:auto;font-size:11px;color:#8fa5bb;">${esc(d.acompanante||'')}</span>
+            </div>
+            <div style="padding:12px 14px;">
+              ${items.length
+                ? `<ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;">
+                     ${items.map(t => `<li style="font-size:13px;color:#1c2b3a;line-height:1.5;">${esc(t)}</li>`).join('')}
+                   </ul>`
+                : '<div style="font-size:13px;color:#8fa5bb;font-style:italic;">Sin acuerdos registrados.</div>'}
+              ${obs ? `<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #d7e7f2;">
+                         <div style="font-size:11px;font-weight:800;color:#8fa5bb;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;">Observaciones</div>
+                         <div style="font-size:13px;color:#4a5b6d;line-height:1.5;white-space:pre-wrap;">${esc(obs)}</div>
+                       </div>` : ''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`
+    : '<div style="color:#8fa5bb;font-size:13px;padding:12px;background:#f4f8fb;border-radius:10px;">No se registraron acuerdos en los acompañamientos encontrados.</div>';
 
   document.getElementById('historialResultado').style.display = 'block';
 }
