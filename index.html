@@ -2313,6 +2313,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 <option value="Semioficial">Semioficial</option>
               </select>
             </div>
+            <div class="campo">
+              <label style="font-size:12px;font-weight:600;color:#617384;">Acompañado por</label>
+              <select id="mapaFiltroRolAcomp" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;min-width:170px;">
+                <option value="">Todos los roles</option>
+                <option value="nacional">Técnico/a Nacional</option>
+                <option value="regional">Técnico/a Regional</option>
+                <option value="distrital">Técnico/a Distrital</option>
+                <option value="coordinador">Coordinador/a Pedagógico/a</option>
+                <option value="director">Director/a de Centro</option>
+              </select>
+            </div>
             <div class="campo" id="mapaFiltroRegionalWrap">
               <label style="font-size:12px;font-weight:600;color:#617384;">Regional</label>
               <select id="mapaFiltroRegional" onchange="poblarDistritosMapa().then(()=>cargarMapaCobertura())" style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;min-width:160px;">
@@ -3278,7 +3289,7 @@ async function poblarDistritosMapa() {
 
 function limpiarFiltrosMapa() {
   ['mapaFiltroDesde','mapaFiltroHasta','mapaFiltroTipo','mapaFiltroSector',
-   'mapaFiltroRegional','mapaFiltroDistrito','mapaFiltroCentro'].forEach(id => {
+   'mapaFiltroRolAcomp','mapaFiltroRegional','mapaFiltroDistrito','mapaFiltroCentro'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -3289,6 +3300,21 @@ function limpiarFiltrosMapa() {
   if (selR) { selR.innerHTML = '<option value="">Todas</option>'; }
   _mapaRegionalesCache = null; // invalidar caché para forzar recarga
 }
+
+// Agrupación de roles para el filtro "Acompañado por" del mapa.
+// Los técnicos coordinadores se agrupan con su nivel correspondiente.
+const ROLES_MAPA = {
+  nacional:    ['Técnico/a Nacional'],
+  regional:    ['Técnico/a Regional', 'Técnico/a Coordinador/a Regional'],
+  distrital:   ['Técnico/a Distrital', 'Técnico/a Coordinador/a Distrital'],
+  coordinador: ['Coordinador/a Pedagógico/a'],
+  director:    ['Director/a de Centro'],
+};
+const ROLES_MAPA_ETIQUETA = {
+  nacional: 'Técnico/a Nacional', regional: 'Técnico/a Regional',
+  distrital: 'Técnico/a Distrital', coordinador: 'Coordinador/a Pedagógico/a',
+  director: 'Director/a de Centro',
+};
 
 // Genera el HTML de las tarjetas de resumen por sector
 // Estado del filtro activo en el mapa: null = todos, 'con' = solo con acomp., 'sin' = solo sin, 'sector:X' = sector
@@ -3352,7 +3378,7 @@ function _filtrarMarcadoresMapa(filtro) {
   }
 }
 
-function _renderResumenMapa(centros, codigosConVisita) {
+function _renderResumenMapa(centros, codigosConVisita, rolClave) {
   const SECTORES = [
     { key:'Público',     bg:'#e0f2fe', fg:'#0369a1', borde:'#bae6fd' },
     { key:'Privado',     bg:'#fef9c3', fg:'#854d0e', borde:'#fef08a' },
@@ -3366,7 +3392,17 @@ function _renderResumenMapa(centros, codigosConVisita) {
 
   const cursorStyle = 'cursor:pointer;transition:transform .15s,box-shadow .15s,outline .15s;';
 
-  let html = `
+  // Aviso cuando se filtra por rol del acompañante: cambia el significado de "sin acompañamiento"
+  const etiquetaRol = ROLES_MAPA_ETIQUETA[rolClave];
+  let html = etiquetaRol ? `
+    <div style="width:100%;padding:8px 14px;margin-bottom:4px;background:#fff8f0;border:1px solid #fcd9a0;border-radius:8px;">
+      <span style="font-size:12px;color:#8a5d00;">
+        👤 Mostrando únicamente acompañamientos realizados por <strong>${etiquetaRol}</strong>.
+        Los centros en rojo pueden haber sido acompañados por otro rol.
+      </span>
+    </div>` : '';
+
+  html += `
     <div style="width:100%;display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
       <div data-mapa-filtro="con" onclick="_filtrarMarcadoresMapa('con')"
            style="background:#d1fae5;border-radius:10px;padding:12px 20px;min-width:130px;text-align:center;border:1px solid #a7f3d0;${cursorStyle}"
@@ -3508,10 +3544,13 @@ async function cargarMapaCobertura() {
   const hasta = document.getElementById('mapaFiltroHasta')?.value;
   const tipo  = document.getElementById('mapaFiltroTipo')?.value;
 
-  let queryAcomp = filtrarDemarcacion(sb.from('acompañamientos').select('codigo_centro,tipo_acompanamiento,fecha,estado'));
+  const rolAcomp = document.getElementById('mapaFiltroRolAcomp')?.value;
+
+  let queryAcomp = filtrarDemarcacion(sb.from('acompañamientos').select('codigo_centro,tipo_acompanamiento,fecha,estado,rol_acompanante'));
   if (desde) queryAcomp = queryAcomp.gte('fecha', desde);
   if (hasta) queryAcomp = queryAcomp.lte('fecha', hasta);
   if (tipo)  queryAcomp = queryAcomp.eq('tipo_acompanamiento', tipo);
+  if (rolAcomp && ROLES_MAPA[rolAcomp]) queryAcomp = queryAcomp.in('rol_acompanante', ROLES_MAPA[rolAcomp]);
 
   const { data: acomps, error: errA } = await queryAcomp;
   if (errA) { if (estado) estado.textContent = 'Error al cargar acompañamientos: ' + errA.message; return; }
@@ -3523,7 +3562,7 @@ async function cargarMapaCobertura() {
 
   // 5. Tarjetas resumen (global + por sector)
   if (resumen) {
-    resumen.innerHTML = _renderResumenMapa(centros, codigosConVisita);
+    resumen.innerHTML = _renderResumenMapa(centros, codigosConVisita, rolAcomp);
   }
 
   // 6. Inicializar / actualizar mapa Leaflet
@@ -3570,8 +3609,20 @@ async function cargarMapaCobertura() {
 
     const tieneVisita = codigosConVisita.has(c.codigo);
     const color = tieneVisita ? '#16a34a' : '#dc2626';
-    const visitasCount = (acomps || []).filter(a => String(a.codigo_centro).trim() === c.codigo).length;
+    const visitasCentro = (acomps || []).filter(a => String(a.codigo_centro).trim() === c.codigo);
+    const visitasCount = visitasCentro.length;
     const sectorLabel = c.sector ? `<br><span style="font-size:11px;color:#6b7280;">Sector: ${c.sector}</span>` : '';
+
+    // Desglose por rol del acompañante
+    const porRol = {};
+    visitasCentro.forEach(a => {
+      const r = String(a.rol_acompanante || '').trim() || 'Sin rol registrado';
+      porRol[r] = (porRol[r] || 0) + 1;
+    });
+    const detalleRoles = Object.entries(porRol)
+      .sort((a, b) => b[1] - a[1])
+      .map(([r, n]) => `<div style="font-size:11px;color:#4a5b6d;">• ${r}: <strong>${n}</strong></div>`)
+      .join('');
 
     const marker = L.circleMarker([lat, lon], iconOpts(color));
     marker.bindPopup(`
@@ -3579,7 +3630,8 @@ async function cargarMapaCobertura() {
       <span style="font-size:12px;color:#617384;">Código: ${c.codigo} · ${c.zona || ''}</span>
       ${sectorLabel}<br>
       ${tieneVisita
-        ? `<span style="color:#16a34a;font-weight:700;">✅ ${visitasCount} acompañamiento${visitasCount!==1?'s':''}</span>`
+        ? `<span style="color:#16a34a;font-weight:700;">✅ ${visitasCount} acompañamiento${visitasCount!==1?'s':''}</span>
+           ${detalleRoles ? `<div style="margin-top:4px;padding-top:4px;border-top:1px solid #e5eef5;">${detalleRoles}</div>` : ''}`
         : `<span style="color:#dc2626;font-weight:700;">⚠️ Sin acompañamiento</span>`}
     `);
     marker.addTo(_mapaLeaflet);
