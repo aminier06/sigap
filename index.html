@@ -602,9 +602,9 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
     .cargando-overlay{position:fixed;inset:0;background:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;z-index:500;font-size:15px;font-weight:700;color:var(--azul-osc);gap:12px;}
 
     /* NOTIFICACIÓN */
-    #notificacion{position:fixed;bottom:28px;right:28px;background:var(--azul-osc);color:#fff;padding:14px 22px;border-radius:12px;font-size:14px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transform:translateY(10px);transition:all .3s;pointer-events:none;z-index:999;}
+    #notificacion{position:fixed;bottom:28px;right:28px;background:var(--azul-osc);color:#fff;padding:14px 22px;border-radius:12px;font-size:14px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transform:translateY(10px);transition:all .3s;pointer-events:none;z-index:999;max-width:340px;}
     #notificacion.visible{opacity:1;transform:translateY(0);}
-    #notificacion.error{background:var(--rojo);}
+    #notificacion.error{background:var(--rojo);pointer-events:auto;max-width:380px;}
 
     /* MODAL */
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:800;display:flex;align-items:center;justify-content:center;}
@@ -1208,10 +1208,10 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
                   </select>
                 </div>
                 <div class="campo" id="bloqueCicloRegular"><span class="grupo-label">Ciclo</span><div class="opciones"><label class="opcion"><input type="radio" name="ciclo" value="Primer Ciclo"> Primer Ciclo</label><label class="opcion"><input type="radio" name="ciclo" value="Segundo Ciclo"> Segundo Ciclo</label></div></div>
-                <div class="campo oculto" id="bloqueCiclosMulti"><span class="grupo-label">Ciclos</span><div class="opciones"><label class="opcion"><input type="checkbox" name="ciclosMultigrado" value="Primer Ciclo"> Primer Ciclo</label><label class="opcion"><input type="checkbox" name="ciclosMultigrado" value="Segundo Ciclo"> Segundo Ciclo</label></div></div>
+                <div class="campo oculto" id="bloqueCiclosMulti"><span class="grupo-label">Ciclos</span><div class="opciones"><label class="opcion"><input type="checkbox" name="ciclosMultigrado" value="Primer Ciclo"> Primer Ciclo</label><label class="opcion"><input type="checkbox" name="ciclosMultigrado" value="Segundo Ciclo"> Segundo Ciclo</label><button type="button" class="btn-secundario btn-sm" onclick="marcarAmbosCiclos()" style="margin-left:8px;padding:3px 10px;font-size:0.82em;">Ambos ciclos</button></div></div>
               </div>
-              <div class="campo fila-linea" id="bloqueGradoRegular"><span class="grupo-label">Grado acompañado</span><div class="selector-grados"><label class="grado-box"><input type="radio" name="gradoUnico" value="1ro."> 1ro.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="2do."> 2do.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="3ro."> 3ro.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="4to."> 4to.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="5to."> 5to.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="6to."> 6to.</label></div></div>
-              <div class="campo fila-linea oculto" id="bloqueGradosMulti"><span class="grupo-label">Grados acompañados</span><div class="selector-grados"><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="1ro."> 1ro.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="2do."> 2do.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="3ro."> 3ro.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="4to."> 4to.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="5to."> 5to.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="6to."> 6to.</label></div></div>
+              <div class="campo fila-linea" id="bloqueGradoRegular"><span class="grupo-label">Grado acompañado</span><div class="selector-grados"><label class="grado-box"><input type="radio" name="gradoUnico" value="1ro." onchange="autocompletarCiclo(this)"> 1ro.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="2do." onchange="autocompletarCiclo(this)"> 2do.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="3ro." onchange="autocompletarCiclo(this)"> 3ro.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="4to." onchange="autocompletarCiclo(this)"> 4to.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="5to." onchange="autocompletarCiclo(this)"> 5to.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="6to." onchange="autocompletarCiclo(this)"> 6to.</label></div></div>
+              <div class="campo fila-linea oculto" id="bloqueGradosMulti"><span class="grupo-label">Grados acompañados</span><div class="selector-grados"><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="1ro." onchange="autocompletarCiclosMulti()"> 1ro.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="2do." onchange="autocompletarCiclosMulti()"> 2do.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="3ro." onchange="autocompletarCiclosMulti()"> 3ro.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="4to." onchange="autocompletarCiclosMulti()"> 4to.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="5to." onchange="autocompletarCiclosMulti()"> 5to.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="6to." onchange="autocompletarCiclosMulti()"> 6to.</label></div></div>
 
               <div class="grid g-4 fila-linea">
                 <div class="campo"><label for="seccion">Sección</label><select id="seccion" name="seccion"><option value="">Seleccione</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option><option>H</option><option>I</option><option>J</option></select></div>
@@ -4226,6 +4226,11 @@ async function buscarCentro(codigo) {
     selReg.value = regionalVal;
     cargarDistritosDocente(distritoVal);
     document.getElementById('sectorCentro').value = data.sector;
+    // Autocomplete zona desde centros
+    if (data.zona) {
+      const zonaRadio = document.querySelector('input[name="zona"][value="'+data.zona+'"]');
+      if (zonaRadio) zonaRadio.checked = true;
+    }
     estado.textContent = '✅ Centro encontrado.';
     estado.style.color = '#2a6b1a';
   }, 400);
@@ -4234,7 +4239,60 @@ async function buscarCentro(codigo) {
 async function guardarRegistro(estado) {
   const v = id => (document.getElementById(id)||{}).value || '';
   const r = name => { const el = document.querySelector('input[name="'+name+'"]:checked'); return el?el.value:''; };
+  const multi = document.querySelector('input[name="modalidad"][value="Multigrado"]')?.checked;
   const grado = r('gradoUnico') || Array.from(document.querySelectorAll('input[name="gradosMultigrado"]:checked')).map(c=>c.value).join(', ');
+
+  // ── VALIDACIÓN (solo al enviar, no al guardar borrador) ──────────────────────
+  if (estado === 'Enviado') {
+    const faltantes = [];
+    // Campos de texto/select requeridos
+    const camposReq = [
+      { id: 'centroEducativo',       label: 'Centro educativo' },
+      { id: 'codigoCentro',          label: 'Código del centro' },
+      { id: 'nombreDocente',         label: 'Nombre del docente' },
+      { id: 'areaAcompanada',        label: 'Área acompañada' },
+      { id: 'fecha',                 label: 'Fecha' },
+      { id: 'horaInicio',            label: 'Hora de inicio' },
+      { id: 'horaTermino',           label: 'Hora de término' },
+      { id: 'foco',                  label: 'Foco del acompañamiento' },
+      { id: 'intencionDocente',      label: 'Intención pedagógica' },
+      { id: 'contenidoConceptual',   label: 'Contenido conceptual' },
+    ];
+    camposReq.forEach(({ id, label }) => { if (!v(id)) faltantes.push(label); });
+
+    // Grupos de radio requeridos
+    const radiosReq = [
+      { name: 'modalidad',           label: 'Modalidad' },
+      { name: 'zona',                label: 'Zona' },
+      { name: 'tipoAcompanamiento',  label: 'Tipo de acompañamiento' },
+    ];
+    radiosReq.forEach(({ name, label }) => { if (!r(name)) faltantes.push(label); });
+
+    // Ciclo (solo en modo regular) / Grados
+    if (!multi) {
+      if (!r('ciclo')) faltantes.push('Ciclo');
+      if (!r('gradoUnico')) faltantes.push('Grado acompañado');
+    } else {
+      const ciclosMarc = document.querySelectorAll('input[name="ciclosMultigrado"]:checked').length;
+      const gradosMarc = document.querySelectorAll('input[name="gradosMultigrado"]:checked').length;
+      if (!ciclosMarc) faltantes.push('Ciclos (multigrado)');
+      if (!gradosMarc) faltantes.push('Grados acompañados (multigrado)');
+    }
+
+    // Todos los indicadores deben tener valor seleccionado
+    const indSinValor = INDICADORES.filter(item => {
+      if (!item.codigo) return false;
+      return !document.querySelector('input[name="val_'+item.codigo+'"]:checked');
+    });
+    if (indSinValor.length) faltantes.push('Indicadores sin calificar (' + indSinValor.length + ')');
+
+    if (faltantes.length) {
+      const lista = faltantes.map(f => '<li>'+f+'</li>').join('');
+      mostrarNotif('<strong>⚠️ Complete los siguientes campos antes de enviar:</strong><ul style="margin:4px 0 0 16px;padding:0">'+lista+'</ul>', true, true);
+      return;
+    }
+  }
+  // ────────────────────────────────────────────────────────────────────────────
 
   // Recoger indicadores como JSON
   const indicadoresData = {};
@@ -4301,6 +4359,31 @@ function toggleMultigrado() {
   document.getElementById('bloqueCiclosMulti').classList.toggle('oculto', !multi);
   document.getElementById('bloqueGradoRegular').classList.toggle('oculto', !!multi);
   document.getElementById('bloqueGradosMulti').classList.toggle('oculto', !multi);
+}
+
+// ── AUTOCOMPLETE CICLO ────────────────────────────────────────────────────────
+const PRIMER_CICLO_GRADOS = ['1ro.', '2do.', '3ro.'];
+const SEGUNDO_CICLO_GRADOS = ['4to.', '5to.', '6to.'];
+
+function autocompletarCiclo(radioGrado) {
+  const grado = radioGrado.value;
+  const ciclo = PRIMER_CICLO_GRADOS.includes(grado) ? 'Primer Ciclo' : 'Segundo Ciclo';
+  const radio = document.querySelector('input[name="ciclo"][value="'+ciclo+'"]');
+  if (radio) radio.checked = true;
+}
+
+function autocompletarCiclosMulti() {
+  const marcados = Array.from(document.querySelectorAll('input[name="gradosMultigrado"]:checked')).map(c => c.value);
+  const tienePrimero = marcados.some(g => PRIMER_CICLO_GRADOS.includes(g));
+  const tieneSegundo = marcados.some(g => SEGUNDO_CICLO_GRADOS.includes(g));
+  const cb1 = document.querySelector('input[name="ciclosMultigrado"][value="Primer Ciclo"]');
+  const cb2 = document.querySelector('input[name="ciclosMultigrado"][value="Segundo Ciclo"]');
+  if (cb1) cb1.checked = tienePrimero;
+  if (cb2) cb2.checked = tieneSegundo;
+}
+
+function marcarAmbosCiclos() {
+  document.querySelectorAll('input[name="ciclosMultigrado"]').forEach(cb => cb.checked = true);
 }
 
 // ── INDICADORES ───────────────────────────────────────────────────────────────
@@ -5234,11 +5317,12 @@ function verRegistroST(id) {
 }
 
 // ── NOTIFICACIÓN ──────────────────────────────────────────────────────────────
-function mostrarNotif(msg, error=false) {
+function mostrarNotif(msg, error=false, html=false) {
   const n = document.getElementById('notificacion');
-  n.textContent = msg;
+  if (html) { n.innerHTML = msg; } else { n.textContent = msg; }
   n.className = error ? 'visible error' : 'visible';
-  setTimeout(() => n.className = '', 3400);
+  clearTimeout(mostrarNotif._t);
+  mostrarNotif._t = setTimeout(() => { n.className = ''; n.innerHTML = ''; }, error ? 6000 : 3400);
 }
 
 // onAuthStateChange handled above
