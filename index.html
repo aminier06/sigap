@@ -601,6 +601,11 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
     @keyframes spin{to{transform:rotate(360deg);}}
     .cargando-overlay{position:fixed;inset:0;background:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;z-index:500;font-size:15px;font-weight:700;color:var(--azul-osc);gap:12px;}
 
+    /* CAMPOS AUTOCOMPLETADOS (solo lectura visual) */
+    .opciones-readonly{pointer-events:none;opacity:0.75;user-select:none;}
+    .opciones-readonly .btn-secundario{pointer-events:auto;opacity:1;}
+    .autocompletado-tag{font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;background:var(--azul-claro,#e8f0f8);color:var(--azul-osc,#1a3a5c);border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
+
     /* NOTIFICACIÓN */
     #notificacion{position:fixed;bottom:28px;right:28px;background:var(--azul-osc);color:#fff;padding:14px 22px;border-radius:12px;font-size:14px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transform:translateY(10px);transition:all .3s;pointer-events:none;z-index:999;max-width:340px;}
     #notificacion.visible{opacity:1;transform:translateY(0);}
@@ -1175,7 +1180,7 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
                 </div>
               </div>
               <div class="grid g-2 fila-linea">
-                <div class="campo"><label>Zona</label><div class="opciones"><label class="opcion"><input type="radio" name="zona" value="Urbana"> Urbana</label><label class="opcion"><input type="radio" name="zona" value="Rural"> Rural</label></div></div>
+                <div class="campo"><label>Zona <span class="autocompletado-tag">autocompletado</span></label><div class="opciones opciones-readonly"><label class="opcion"><input type="radio" name="zona" value="Urbana"> Urbana</label><label class="opcion"><input type="radio" name="zona" value="Rural"> Rural</label></div></div>
               </div>
 
               <div class="subtitulo fila-linea">Datos del docente</div>
@@ -1207,8 +1212,8 @@ document.getElementById('modalEditarUsuario').addEventListener('click', function
                     <option>Formación Humana</option><option>Educación Física</option>
                   </select>
                 </div>
-                <div class="campo" id="bloqueCicloRegular"><span class="grupo-label">Ciclo</span><div class="opciones"><label class="opcion"><input type="radio" name="ciclo" value="Primer Ciclo"> Primer Ciclo</label><label class="opcion"><input type="radio" name="ciclo" value="Segundo Ciclo"> Segundo Ciclo</label></div></div>
-                <div class="campo oculto" id="bloqueCiclosMulti"><span class="grupo-label">Ciclos</span><div class="opciones"><label class="opcion"><input type="checkbox" name="ciclosMultigrado" value="Primer Ciclo"> Primer Ciclo</label><label class="opcion"><input type="checkbox" name="ciclosMultigrado" value="Segundo Ciclo"> Segundo Ciclo</label><button type="button" class="btn-secundario btn-sm" onclick="marcarAmbosCiclos()" style="margin-left:8px;padding:3px 10px;font-size:0.82em;">Ambos ciclos</button></div></div>
+                <div class="campo" id="bloqueCicloRegular"><span class="grupo-label">Ciclo <span class="autocompletado-tag">autocompletado</span></span><div class="opciones opciones-readonly"><label class="opcion"><input type="radio" name="ciclo" value="Primer Ciclo"> Primer Ciclo</label><label class="opcion"><input type="radio" name="ciclo" value="Segundo Ciclo"> Segundo Ciclo</label></div></div>
+                <div class="campo oculto" id="bloqueCiclosMulti"><span class="grupo-label">Ciclos <span class="autocompletado-tag">autocompletado</span></span><div class="opciones opciones-readonly"><label class="opcion"><input type="checkbox" name="ciclosMultigrado" value="Primer Ciclo"> Primer Ciclo</label><label class="opcion"><input type="checkbox" name="ciclosMultigrado" value="Segundo Ciclo"> Segundo Ciclo</label><button type="button" class="btn-secundario btn-sm" onclick="marcarAmbosCiclos()" style="margin-left:8px;padding:3px 10px;font-size:0.82em;pointer-events:auto;">Ambos ciclos</button></div></div>
               </div>
               <div class="campo fila-linea" id="bloqueGradoRegular"><span class="grupo-label">Grado acompañado</span><div class="selector-grados"><label class="grado-box"><input type="radio" name="gradoUnico" value="1ro." onchange="autocompletarCiclo(this)"> 1ro.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="2do." onchange="autocompletarCiclo(this)"> 2do.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="3ro." onchange="autocompletarCiclo(this)"> 3ro.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="4to." onchange="autocompletarCiclo(this)"> 4to.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="5to." onchange="autocompletarCiclo(this)"> 5to.</label><label class="grado-box"><input type="radio" name="gradoUnico" value="6to." onchange="autocompletarCiclo(this)"> 6to.</label></div></div>
               <div class="campo fila-linea oculto" id="bloqueGradosMulti"><span class="grupo-label">Grados acompañados</span><div class="selector-grados"><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="1ro." onchange="autocompletarCiclosMulti()"> 1ro.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="2do." onchange="autocompletarCiclosMulti()"> 2do.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="3ro." onchange="autocompletarCiclosMulti()"> 3ro.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="4to." onchange="autocompletarCiclosMulti()"> 4to.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="5to." onchange="autocompletarCiclosMulti()"> 5to.</label><label class="grado-box"><input type="checkbox" name="gradosMultigrado" value="6to." onchange="autocompletarCiclosMulti()"> 6to.</label></div></div>
@@ -4250,6 +4255,7 @@ async function guardarRegistro(estado) {
       { id: 'centroEducativo',       label: 'Centro educativo' },
       { id: 'codigoCentro',          label: 'Código del centro' },
       { id: 'nombreDocente',         label: 'Nombre del docente' },
+      { id: 'cedulaDocente',         label: 'Cédula del docente' },
       { id: 'areaAcompanada',        label: 'Área acompañada' },
       { id: 'fecha',                 label: 'Fecha' },
       { id: 'horaInicio',            label: 'Hora de inicio' },
@@ -4784,6 +4790,7 @@ async function enviarFormularioDist(event) {
     { id: 'dCentroEducativo',  label: 'Centro educativo' },
     { id: 'dCodigoCentro',     label: 'Código del centro' },
     { id: 'dNombreTecnico',    label: 'Nombre del técnico acompañado' },
+    { id: 'dCedulaTecnico',    label: 'Cédula del técnico' },
     { id: 'dFechaDist',        label: 'Fecha' },
     { id: 'dFocoDist',         label: 'Foco del acompañamiento' },
   ].forEach(({ id, label }) => { if (!vd(id)) faltantesDist.push(label); });
@@ -4942,6 +4949,7 @@ async function enviarFormularioCoord(event) {
     { id: 'cCentroEducativo',  label: 'Centro educativo' },
     { id: 'cCodigoCentro',     label: 'Código del centro' },
     { id: 'cNombreCoord',      label: 'Nombre del coordinador' },
+    { id: 'cCedulaCoord',      label: 'Cédula del coordinador' },
     { id: 'cFechaCoord',       label: 'Fecha' },
     { id: 'cFocoCoord',        label: 'Foco del acompañamiento' },
   ].forEach(({ id, label }) => { if (!v(id)) faltantesCoord.push(label); });
