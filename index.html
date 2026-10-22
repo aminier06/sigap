@@ -931,7 +931,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
       <div class="menu-grupo">
         <div class="menu-etiqueta">Otras plataformas</div>
-        <a class="menu-item menu-externo" href="https://programaconbase.org/" target="_blank" rel="noopener noreferrer"
+        <a class="menu-item menu-externo" href="https://programaconbase.org/home" target="_blank" rel="noopener noreferrer"
            title="Programa CON BASE — se abre en una pestaña nueva">
           <span class="menu-icono">📚</span> Programa CON BASE
           <span class="menu-externo-icono" aria-hidden="true">↗</span>
@@ -2324,6 +2324,44 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
 
         <div class="seccion-titulo">Usuarios registrados</div>
+
+        <!-- Búsqueda y filtros -->
+        <div class="filtros-bar" style="margin-bottom:14px;">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+            <div class="campo" style="flex:1;min-width:240px;">
+              <label style="font-size:12px;font-weight:600;color:#617384;">Buscar</label>
+              <input type="text" id="buscarUsuario" oninput="filtrarUsuarios()"
+                     placeholder="Nombre, correo, rol, regional, distrito o centro…"
+                     style="width:100%;padding:8px 12px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;" />
+            </div>
+            <div class="campo">
+              <label style="font-size:12px;font-weight:600;color:#617384;">Regional</label>
+              <select id="filtroUsuRegional" onchange="filtrarUsuarios()"
+                      style="padding:8px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;min-width:160px;">
+                <option value="">Todas</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label style="font-size:12px;font-weight:600;color:#617384;">Distrito</label>
+              <select id="filtroUsuDistrito" onchange="filtrarUsuarios()"
+                      style="padding:8px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;min-width:160px;">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label style="font-size:12px;font-weight:600;color:#617384;">Estado</label>
+              <select id="filtroUsuEstado" onchange="filtrarUsuarios()"
+                      style="padding:8px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;">
+                <option value="">Todos</option>
+                <option value="activo">Activos</option>
+                <option value="inactivo">Inactivos</option>
+              </select>
+            </div>
+            <button class="btn-secundario btn-sm" onclick="limpiarFiltrosUsuarios()" style="white-space:nowrap;">✕ Limpiar</button>
+          </div>
+          <div id="contadorUsuarios" style="font-size:12px;color:#617384;margin-top:8px;"></div>
+        </div>
+
         <div class="tabla-wrap-outer">
           <table class="tabla-registros">
             <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Nivel</th><th>Estado</th><th>Acciones</th></tr></thead>
@@ -5852,26 +5890,112 @@ function limpiarFiltrosAdmin() {
   }).join('');
 }
 
+// Usuarios cargados, para filtrar sin volver a consultar la base de datos
+let _usuariosCargados = [];
+
 async function cargarUsuarios() {
   if (!requiereAdministrador()) return;
   const { data } = await sb.from('perfiles').select('*').order('nombre');
+  _usuariosCargados = data || [];
+  poblarFiltrosUsuarios();
+  filtrarUsuarios();
+}
+
+// Las opciones de regional y distrito salen de los propios usuarios:
+// así solo aparecen demarcaciones que realmente tienen gente asignada.
+function poblarFiltrosUsuarios() {
+  const selR = document.getElementById('filtroUsuRegional');
+  const selD = document.getElementById('filtroUsuDistrito');
+  if (!selR || !selD) return;
+  const antesR = selR.value, antesD = selD.value;
+
+  const regs = [...new Set(_usuariosCargados.map(u => (u.regional || '').trim()).filter(Boolean))].sort();
+  const dis  = [...new Set(_usuariosCargados.map(u => (u.distrito || '').trim()).filter(Boolean))].sort();
+
+  selR.innerHTML = '<option value="">Todas</option>' +
+    regs.map(r => `<option value="${r}">${r}</option>`).join('');
+  selD.innerHTML = '<option value="">Todos</option>' +
+    dis.map(d => `<option value="${d}">${d}</option>`).join('');
+
+  if (regs.includes(antesR)) selR.value = antesR;
+  if (dis.includes(antesD))  selD.value = antesD;
+}
+
+// Normaliza para que la búsqueda ignore acentos y mayúsculas
+const _norm = s => String(s == null ? '' : s)
+  .normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+function filtrarUsuarios() {
   const cuerpo = document.getElementById('cuerpoTablaUsuarios');
-  if (!data || data.length === 0) { cuerpo.innerHTML='<tr><td colspan="6" style="text-align:center;color:#8fa5bb;padding:24px;">No hay usuarios registrados.</td></tr>'; return; }
-  cuerpo.innerHTML = data.map(u => `
+  if (!cuerpo) return;
+
+  const texto    = _norm(document.getElementById('buscarUsuario')?.value);
+  const regional = document.getElementById('filtroUsuRegional')?.value || '';
+  const distrito = document.getElementById('filtroUsuDistrito')?.value || '';
+  const estado   = document.getElementById('filtroUsuEstado')?.value || '';
+  // Varias palabras: deben aparecer todas, en cualquier campo y en cualquier orden
+  const palabras = texto ? texto.split(/\s+/) : [];
+
+  const filtrados = _usuariosCargados.filter(u => {
+    if (regional && (u.regional || '').trim() !== regional) return false;
+    if (distrito && (u.distrito || '').trim() !== distrito) return false;
+    if (estado === 'activo'   && u.activo === false) return false;
+    if (estado === 'inactivo' && u.activo !== false)  return false;
+    if (!palabras.length) return true;
+    const heno = _norm([u.nombre, u.email, u.rol, u.regional, u.distrito,
+                        u.nombre_centro, u.codigo_centro].join(' '));
+    return palabras.every(p => heno.includes(p));
+  });
+
+  const cont = document.getElementById('contadorUsuarios');
+  if (cont) {
+    const hayFiltro = palabras.length || regional || distrito || estado;
+    cont.textContent = hayFiltro
+      ? `${filtrados.length} de ${_usuariosCargados.length} usuario${_usuariosCargados.length !== 1 ? 's' : ''}`
+      : `${_usuariosCargados.length} usuario${_usuariosCargados.length !== 1 ? 's' : ''} registrado${_usuariosCargados.length !== 1 ? 's' : ''}`;
+  }
+
+  if (!_usuariosCargados.length) {
+    cuerpo.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#8fa5bb;padding:24px;">No hay usuarios registrados.</td></tr>';
+    return;
+  }
+  if (!filtrados.length) {
+    cuerpo.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#8fa5bb;padding:24px;">Ningún usuario coincide con la búsqueda.</td></tr>';
+    return;
+  }
+
+  const esc = s => String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  cuerpo.innerHTML = filtrados.map(u => {
+    // Demarcación bajo el nombre: es lo que se buscó, conviene verlo
+    const demarcacion = [u.regional, u.distrito, u.nombre_centro]
+      .map(x => (x || '').trim()).filter(Boolean).join(' · ');
+    return `
     <tr>
-      <td>${u.nombre||'—'}</td>
-      <td style="font-size:12px;">${u.email||'—'}</td>
-      <td>${u.rol||'—'}</td>
+      <td>${esc(u.nombre) || '—'}${demarcacion
+        ? `<div style="font-size:11px;color:#8fa5bb;margin-top:2px;">${esc(demarcacion)}</div>` : ''}</td>
+      <td style="font-size:12px;">${esc(u.email) || '—'}</td>
+      <td style="font-size:12px;">${esc(u.rol) || '—'}</td>
       <td><span class="badge ${u.nivel==='admin'?'badge-azul':'badge-amarillo'}">${u.nivel==='admin'?'Admin':'Usuario'}</span></td>
       <td><span class="badge ${u.activo!==false?'badge-verde':'badge-rojo'}">${u.activo!==false?'Activo':'Inactivo'}</span></td>
       <td style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="btn-secundario btn-sm" onclick='abrirModalEditar(${JSON.stringify(u)})'>✏️ Editar</button>
+        <button class="btn-secundario btn-sm" onclick='abrirModalEditar(${JSON.stringify(u).replace(/'/g,"&#39;")})'>✏️ Editar</button>
         ${u.activo!==false
           ? `<button class="btn-peligro btn-sm" onclick="toggleUsuario('${u.id}',false)">Desactivar</button>`
           : `<button class="btn-secundario btn-sm" onclick="toggleUsuario('${u.id}',true)">Activar</button>`}
-        <button class="btn-peligro btn-sm" onclick="confirmarEliminarUsuario('${u.id}','${u.nombre||u.email}')">🗑️ Eliminar</button>
+        <button class="btn-peligro btn-sm" onclick="confirmarEliminarUsuario('${u.id}','${esc(u.nombre||u.email).replace(/'/g,"&#39;")}')">🗑️ Eliminar</button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
+}
+
+function limpiarFiltrosUsuarios() {
+  ['buscarUsuario','filtroUsuRegional','filtroUsuDistrito','filtroUsuEstado'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  filtrarUsuarios();
 }
 
 async function toggleUsuario(id, activo) {
