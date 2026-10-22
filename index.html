@@ -931,7 +931,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
       <div class="menu-grupo">
         <div class="menu-etiqueta">Otras plataformas</div>
-        <a class="menu-item menu-externo" href="https://programaconbase.org/home" target="_blank" rel="noopener noreferrer"
+        <a class="menu-item menu-externo" href="https://programaconbase.org/" target="_blank" rel="noopener noreferrer"
            title="Programa CON BASE — se abre en una pestaña nueva">
           <span class="menu-icono">📚</span> Programa CON BASE
           <span class="menu-externo-icono" aria-hidden="true">↗</span>
@@ -6304,14 +6304,108 @@ document.addEventListener('DOMContentLoaded', () => {
 function abrirModalEditar(u) {
   if (!requiereAdministrador()) return;
   document.getElementById('editUserId').value = u.id;
-  document.getElementById('editEmail').value = u.email || '';
-  document.getElementById('btnResetUsuario').disabled = !u.email;
+
+  const email = u.email || '';
+  document.getElementById('editEmail').value = email;
+  // Sin correo en el perfil no se puede enviar enlace ni asignar contraseña
+  document.getElementById('editEmailAviso').style.display = email ? 'none' : 'block';
+  document.getElementById('btnResetUsuario').disabled = !email;
   document.getElementById('mensajeResetUsuario').textContent = '';
+
+  // Reiniciar el bloque de contraseña en cada apertura
+  document.getElementById('editClaveNueva').value = '';
+  document.getElementById('btnCopiarClaveEdicion').disabled = true;
+  document.getElementById('btnAplicarClave').disabled = true;
 
   document.getElementById('editNombre').value = u.nombre || '';
   document.getElementById('editRol').value = u.rol || '';
   document.getElementById('editNivel').value = u.nivel || 'usuario';
   document.getElementById('modalEditarUsuario').style.display = 'flex';
+}
+
+// Genera una contraseña aleatoria legible: sin caracteres ambiguos (O/0, l/I/1)
+// y en grupos de cuatro, para dictarla o transcribirla sin errores.
+function generarClaveEdicion() {
+  const mayus = 'ABCDEFGHJKLMNPQRSTUVWXYZ';   // sin I ni O
+  const minus = 'abcdefghijkmnpqrstuvwxyz';   // sin l ni o
+  const nums  = '23456789';                   // sin 0 ni 1
+  const todos = mayus + minus + nums;
+  const azar = n => { const b = new Uint32Array(n); window.crypto.getRandomValues(b); return b; };
+
+  // Garantizar al menos una may\u00fascula, una min\u00fascula y un d\u00edgito
+  const chars = [
+    mayus[azar(1)[0] % mayus.length],
+    minus[azar(1)[0] % minus.length],
+    nums[azar(1)[0] % nums.length],
+  ];
+  const r = azar(9);
+  for (let i = 0; i < 9; i++) chars.push(todos[r[i] % todos.length]);
+  const m = azar(chars.length);
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = m[i] % (i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  const clave = chars.join('').match(/.{1,4}/g).join('-');
+
+  document.getElementById('editClaveNueva').value = clave;
+  document.getElementById('btnCopiarClaveEdicion').disabled = false;
+  const emailOk = !!document.getElementById('editEmail').value;
+  document.getElementById('btnAplicarClave').disabled = !emailOk;
+  const msg = document.getElementById('mensajeResetUsuario');
+  msg.textContent = emailOk
+    ? 'C\u00f3piela ahora: no se volver\u00e1 a mostrar al cerrar la ventana.'
+    : 'Falta el correo del usuario para poder asignarla.';
+  msg.style.color = emailOk ? '#8a5d00' : '#b94a48';
+}
+
+function copiarClaveEdicion() {
+  const clave = document.getElementById('editClaveNueva').value;
+  if (!clave) { mostrarNotif('Primero genere una contrase\u00f1a.', true); return; }
+  navigator.clipboard.writeText(clave)
+    .then(() => mostrarNotif('Contrase\u00f1a copiada al portapapeles.'))
+    .catch(() => {
+      const el = document.getElementById('editClaveNueva');
+      el.removeAttribute('readonly'); el.select();
+      document.execCommand('copy');
+      el.setAttribute('readonly', '');
+      mostrarNotif('Contrase\u00f1a copiada.');
+    });
+}
+
+async function aplicarClaveUsuario() {
+  if (!requiereAdministrador()) return;
+  const id    = document.getElementById('editUserId').value;
+  const clave = document.getElementById('editClaveNueva').value;
+  const email = document.getElementById('editEmail').value;
+  const msg   = document.getElementById('mensajeResetUsuario');
+  if (!clave) { mostrarNotif('Primero genere una contrase\u00f1a.', true); return; }
+  if (!confirm('Se asignar\u00e1 una contrase\u00f1a nueva a ' + email +
+      '.\n\nLa anterior dejar\u00e1 de funcionar de inmediato. \u00bfContinuar?')) return;
+
+  const btn = document.getElementById('btnAplicarClave');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Asignando\u2026';
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const resp = await fetch(SUPA_URL + '/functions/v1/cambiar-clave', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + session.access_token,
+        'apikey': SUPA_KEY
+      },
+      body: JSON.stringify({ user_id: id, password: clave })
+    });
+    const result = await resp.json();
+    if (!resp.ok || result.error) throw new Error(result.error || 'Error desconocido');
+    msg.innerHTML = '\u2705 Contrase\u00f1a asignada. Entr\u00e9guesela al usuario: <strong>' + clave + '</strong>';
+    msg.style.color = '#2a6b1a';
+    mostrarNotif('Contrase\u00f1a actualizada.');
+  } catch (e) {
+    msg.textContent = 'No se pudo asignar: ' + e.message;
+    msg.style.color = '#b94a48';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Asignar esta contrase\u00f1a';
+  }
 }
 
 function cerrarModalEditar() {
@@ -7377,9 +7471,32 @@ if ('serviceWorker' in navigator) {
     <div class="campo" style="margin-bottom:14px;">
       <label for="editEmail">Correo del usuario</label>
       <input type="email" id="editEmail" readonly />
-      <p style="font-size:12px;color:#617384;">El usuario recibirá un enlace por correo para elegir una nueva contraseña.</p>
-      <button type="button" class="btn-secundario" id="btnResetUsuario" onclick="resetearClaveUsuario()">Resetear contraseña</button>
-      <div id="mensajeResetUsuario" role="status" aria-live="polite" style="margin-top:8px;font-size:13px;"></div>
+      <div id="editEmailAviso" style="font-size:11px;color:#b45309;margin-top:3px;display:none;">
+        Este usuario no tiene el correo guardado en su perfil. Ejecute la migración de correos para habilitar las opciones de contraseña.
+      </div>
+    </div>
+
+    <!-- CONTRASEÑA -->
+    <div style="margin-bottom:16px;border:1px solid #dce9f5;border-radius:10px;overflow:hidden;">
+      <div style="background:#f7fafd;padding:8px 14px;font-size:12px;font-weight:800;color:var(--azul-osc);border-bottom:1px solid #dce9f5;">
+        Contraseña
+      </div>
+      <div style="padding:12px 14px;">
+        <div style="font-size:12px;color:#617384;margin-bottom:8px;">
+          Genere una contraseña y entréguesela al usuario, o envíele un enlace para que la elija él mismo.
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <input type="text" id="editClaveNueva" readonly placeholder="Sin generar"
+                 style="flex:1;min-width:170px;font-family:monospace;font-size:14px;letter-spacing:.5px;background:#f7fafd;" />
+          <button type="button" class="btn-secundario btn-sm" onclick="generarClaveEdicion()" style="white-space:nowrap;">🔑 Generar</button>
+          <button type="button" class="btn-secundario btn-sm" id="btnCopiarClaveEdicion" onclick="copiarClaveEdicion()" style="white-space:nowrap;" disabled>📋 Copiar</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+          <button type="button" class="btn-primario btn-sm" id="btnAplicarClave" onclick="aplicarClaveUsuario()" disabled style="white-space:nowrap;">Asignar esta contraseña</button>
+          <button type="button" class="btn-secundario btn-sm" id="btnResetUsuario" onclick="resetearClaveUsuario()" style="white-space:nowrap;">✉️ Enviar enlace por correo</button>
+        </div>
+        <div id="mensajeResetUsuario" role="status" aria-live="polite" style="margin-top:8px;font-size:12.5px;"></div>
+      </div>
     </div>
     <div class="grid g-2" style="margin-bottom:14px;">
       <div class="campo" style="grid-column:span 2">
