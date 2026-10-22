@@ -1050,32 +1050,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
         <!-- TARJETAS RESUMEN -->
         <div class="cards-resumen" style="margin-top:20px;">
-          <div class="card-stat" onclick="filtrarDashboardPorStat('todos')" style="cursor:pointer;" title="Ver todos los registros">
+          <div class="card-stat" data-stat="todos" onclick="filtrarDashboardPorStat('todos')" style="cursor:pointer;" title="Ver todos los registros">
             <div class="icono"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M9 12h6M9 16h4"/></svg></div>
             <div class="numero" id="statTotal">—</div>
             <div class="etiqueta">Total acompañamientos</div>
           </div>
-          <div class="card-stat" onclick="filtrarDashboardPorStat('enviados')" style="cursor:pointer;" title="Ver solo enviados">
+          <div class="card-stat" data-stat="enviados" onclick="filtrarDashboardPorStat('enviados')" style="cursor:pointer;" title="Ver solo enviados">
             <div class="icono ic-verde"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.2l2.5 2.5 4.5-5"/></svg></div>
             <div class="numero" id="statEnviados">—</div>
             <div class="etiqueta">Enviados</div>
           </div>
-          <div class="card-stat" onclick="filtrarDashboardPorStat('borradores')" style="cursor:pointer;" title="Ver solo borradores">
+          <div class="card-stat" data-stat="borradores" onclick="filtrarDashboardPorStat('borradores')" style="cursor:pointer;" title="Ver solo borradores">
             <div class="icono ic-ambar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10a2.1 2.1 0 0 0-3-3L5 17z"/><path d="M14.5 6.5l3 3"/></svg></div>
             <div class="numero" id="statBorradores">—</div>
             <div class="etiqueta">Borradores</div>
           </div>
-          <div class="card-stat">
+          <div class="card-stat" data-stat="centros" onclick="filtrarDashboardPorStat('centros')" style="cursor:pointer;" title="Ver los centros acompañados y cuántas visitas tiene cada uno">
             <div class="icono"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20.5h18"/><path d="M5.5 20.5V9.5L12 5l6.5 4.5v11"/><path d="M10.2 20.5v-4.2h3.6v4.2"/><circle cx="9.3" cy="12" r="1.05"/><circle cx="14.7" cy="12" r="1.05"/></svg></div>
             <div class="numero" id="statCentros">—</div>
             <div class="etiqueta">Centros visitados</div>
           </div>
-          <div class="card-stat">
+          <div class="card-stat" data-stat="personas" onclick="filtrarDashboardPorStat('personas')" style="cursor:pointer;" title="Ver las personas acompañadas y cuántas veces">
             <div class="icono ic-indigo"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M16.5 6.2a3 3 0 0 1 0 5.6"/><path d="M17.5 14.9c1.9.5 3.2 2.1 3.2 4.6"/></svg></div>
             <div class="numero" id="statDocentes">—</div>
             <div class="etiqueta">Personas acompañadas</div>
           </div>
-          <div class="card-stat" onclick="filtrarDashboardPorStat('mes')" style="cursor:pointer;" title="Ver registros de este mes">
+          <div class="card-stat" data-stat="mes" onclick="filtrarDashboardPorStat('mes')" style="cursor:pointer;" title="Ver registros de este mes">
             <div class="icono ic-rosa"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17"/><path d="M8 3v4M16 3v4"/><circle cx="12" cy="15.5" r="1.6" fill="currentColor" stroke="none"/></svg></div>
             <div class="numero" id="statMes">—</div>
             <div class="etiqueta" id="statMesLabel">Este mes</div>
@@ -1140,10 +1140,14 @@ document.addEventListener('DOMContentLoaded', () => {
             <div id="tablaRegionales"></div>
           </div>
           <div class="grafica-card">
-            <div class="grafica-titulo">Últimos acompañamientos registrados</div>
+            <div class="grafica-titulo" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="tituloTablaRecientes">Últimos acompañamientos registrados</span>
+              <button id="btnLimpiarStat" onclick="filtrarDashboardPorStat('todos')"
+                      style="display:none;margin-left:auto;padding:3px 10px;background:#edf3f8;border:1px solid #cce0f0;border-radius:6px;font-size:11px;font-weight:700;color:#2d4a63;cursor:pointer;">✕ Ver todos</button>
+            </div>
             <div class="tabla-wrap-outer">
               <table class="tabla-registros" style="box-shadow:none;">
-                <thead><tr><th>Fecha</th><th>Acompañado</th><th>Área / Detalle</th><th>Centro</th><th>Estado</th></tr></thead>
+                <thead id="theadRecientes"><tr><th>Fecha</th><th>Acompañado</th><th>Área / Detalle</th><th>Centro</th><th>Estado</th></tr></thead>
                 <tbody id="cuerpoTablaRecientes"><tr><td colspan="5" style="text-align:center;color:#8fa5bb;padding:16px;">Cargando…</td></tr></tbody>
               </table>
             </div>
@@ -3061,6 +3065,16 @@ async function cargarDashboard() {
   renderRegionales(contarPor(todosRegistros, 'regional'));
 
   // Últimos registros (todos los tipos, mostrando nombre según instrumento)
+  // Restablecer la vista por defecto: el usuario pudo dejarla en un desglose
+  const _thead = document.getElementById('theadRecientes');
+  if (_thead) _thead.innerHTML =
+    '<tr><th>Fecha</th><th>Acompañado</th><th>Área / Detalle</th><th>Centro</th><th>Estado</th></tr>';
+  const _tit = document.getElementById('tituloTablaRecientes');
+  if (_tit) _tit.textContent = 'Últimos acompañamientos registrados';
+  const _btn = document.getElementById('btnLimpiarStat');
+  if (_btn) _btn.style.display = 'none';
+  document.querySelectorAll('.card-stat[data-stat]').forEach(c => { c.style.outline = 'none'; });
+
   const cuerpo = document.getElementById('cuerpoTablaRecientes');
   if (todosRegistros.length === 0) {
     cuerpo.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8fa5bb;padding:16px;">No hay registros con los filtros seleccionados.</td></tr>';
@@ -3858,11 +3872,84 @@ function cerrarDropdownNuevo() {
   if (dd) dd.style.display = 'none';
 }
 
+// Nombre de la persona acompañada, según el instrumento usado
+function _nombreAcompanado(r) {
+  const t = r.tipo_instrumento || 'docente';
+  if (t === 'coordinador')       return r.nombre_coordinador || r.nombre_docente || '';
+  if (t === 'tecnico_distrital') return r.nombre_tecnico || r.nombre_docente || '';
+  return r.nombre_docente || '';
+}
+
 function filtrarDashboardPorStat(tipo) {
   // Resalta la tabla de últimos registros filtrando por el stat clickeado
   const lista = todosRegistros || [];
   const cuerpo = document.getElementById('cuerpoTablaRecientes');
   if (!cuerpo) return;
+
+  const esc = s => String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const thead  = document.getElementById('theadRecientes');
+  const titulo = document.getElementById('tituloTablaRecientes');
+  const btnLimpiar = document.getElementById('btnLimpiarStat');
+
+  // Señalar qué tarjeta está activa
+  document.querySelectorAll('.card-stat[data-stat]').forEach(c => {
+    const act = c.dataset.stat === tipo && tipo !== 'todos';
+    c.style.outline = act ? '2px solid var(--azul)' : 'none';
+    c.style.outlineOffset = '-1px';
+  });
+  if (btnLimpiar) btnLimpiar.style.display = (tipo === 'todos') ? 'none' : 'inline-block';
+
+  const irATabla = () =>
+    cuerpo.closest('table')?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+
+  // ── Vistas de desglose: agrupan entidades en vez de filtrar registros ──────
+  if (tipo === 'centros' || tipo === 'personas') {
+    const porPersona = tipo === 'personas';
+    const grupos = new Map();
+    lista.forEach(r => {
+      const clave = porPersona
+        ? ((r.cedula_docente || r.cedula || '').replace(/\D/g,'') || _nombreAcompanado(r).toLowerCase())
+        : String(r.codigo_centro || '').trim();
+      if (!clave) return;
+      if (!grupos.has(clave)) grupos.set(clave, {
+        titulo: porPersona ? _nombreAcompanado(r) : (r.centro_educativo || '—'),
+        sub:    porPersona ? (r.cedula_docente || r.cedula || '') : (r.codigo_centro || ''),
+        extra:  porPersona ? (r.centro_educativo || '—') : (r.distrito || '—'),
+        n: 0, ultima: ''
+      });
+      const g = grupos.get(clave);
+      g.n++;
+      if (r.fecha && r.fecha > g.ultima) g.ultima = r.fecha;
+    });
+    const filas = [...grupos.values()].sort((a,b) => b.n - a.n || a.titulo.localeCompare(b.titulo));
+
+    if (thead) thead.innerHTML = porPersona
+      ? '<tr><th>Persona</th><th>Cédula</th><th>Centro</th><th style="width:106px;">Acompañam.</th><th style="width:104px;">Último</th></tr>'
+      : '<tr><th>Centro</th><th>Código</th><th>Distrito</th><th style="width:106px;">Acompañam.</th><th style="width:104px;">Último</th></tr>';
+    if (titulo) titulo.textContent = porPersona
+      ? `Personas acompañadas (${filas.length})`
+      : `Centros visitados (${filas.length})`;
+
+    cuerpo.innerHTML = filas.length
+      ? filas.slice(0,50).map(g => `<tr>
+          <td style="font-size:12px;font-weight:600;">${esc(g.titulo) || '—'}</td>
+          <td style="font-size:12px;font-family:monospace;color:#617384;">${esc(g.sub) || '—'}</td>
+          <td style="font-size:12px;color:#617384;">${esc(g.extra)}</td>
+          <td><span class="badge" style="background:var(--azul-claro);color:var(--azul-osc);">${g.n}</span></td>
+          <td style="font-size:12px;color:#617384;">${esc(g.ultima) || '—'}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="5" style="text-align:center;color:#8fa5bb;padding:24px;">Sin datos.</td></tr>';
+    if (filas.length > 50) {
+      cuerpo.innerHTML += `<tr><td colspan="5" style="text-align:center;color:#8fa5bb;font-size:11px;padding:10px;">Mostrando los 50 con más acompañamientos, de ${filas.length}.</td></tr>`;
+    }
+    irATabla();
+    return;
+  }
+
+  // ── Vistas de filtrado sobre los registros ─────────────────────────────────
+  if (thead) thead.innerHTML =
+    '<tr><th>Fecha</th><th>Acompañado</th><th>Área / Detalle</th><th>Centro</th><th>Estado</th></tr>';
 
   let filtrados;
   if (tipo === 'enviados')   filtrados = lista.filter(r => r.estado === 'Enviado');
@@ -3871,6 +3958,11 @@ function filtrarDashboardPorStat(tipo) {
     const mesActual = new Date().toISOString().slice(0,7);
     filtrados = lista.filter(r => r.fecha && r.fecha.startsWith(mesActual));
   } else filtrados = lista; // 'todos'
+
+  const rotulos = { todos:'Últimos acompañamientos registrados', enviados:'Acompañamientos enviados',
+                    borradores:'Borradores sin enviar', mes:'Acompañamientos de este mes' };
+  if (titulo) titulo.textContent = (rotulos[tipo] || rotulos.todos) +
+    (tipo === 'todos' ? '' : ` (${filtrados.length})`);
 
   if (!filtrados.length) {
     cuerpo.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8fa5bb;padding:24px;">Sin registros.</td></tr>';
