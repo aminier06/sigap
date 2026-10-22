@@ -535,6 +535,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .vr-tabla-ind td{padding:7px 10px;border-bottom:1px solid #f5f8fc;vertical-align:top;}
     .vr-tabla-ind tr:last-child td{border-bottom:none;}
     .vr-sec{background:#e8f0fa;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:7px 10px;color:#1a3a52;}
+    .vr-subsec{background:var(--verde-claro);font-weight:700;font-size:11.5px;padding:6px 10px 6px 24px;color:#2a5c18;border-left:3px solid #86b96e;}
     @media(max-width:600px){
       .vr-campo{grid-template-columns:1fr;gap:2px;}
       .vr-label{font-size:10px;}
@@ -1775,6 +1776,13 @@ document.addEventListener('DOMContentLoaded', () => {
               <div class="campo">
                 <label>Hora prevista</label>
                 <input type="time" id="planHora" />
+              </div>
+              <!-- Cédula: clave para cruzar la planificación con lo ejecutado -->
+              <div class="campo" id="planCedulaWrap">
+                <label id="planCedulaLabel">Cédula</label>
+                <input type="text" id="planCedula" placeholder="000-0000000-0" maxlength="13" inputmode="numeric"
+                       oninput="formatearCedula(this); buscarNombrePorCedulaPlan(this.value)" />
+                <div id="planCedulaEstado" style="font-size:11px;margin-top:3px;min-height:14px;"></div>
               </div>
               <!-- Campo dinámico según tipo -->
               <div class="campo" id="planNombreWrap">
@@ -4153,14 +4161,50 @@ function adaptarFormPlan(tipo) {
   }
 }
 
+// Prellena el nombre al escribir una cédula ya registrada en acompañamientos previos.
+let _planCedulaTimeout = null;
+function buscarNombrePorCedulaPlan(cedula) {
+  const estado = document.getElementById('planCedulaEstado');
+  const cedLimpia = String(cedula || '').replace(/\D/g, '');
+  if (!estado) return;
+  if (cedLimpia.length < 11) { estado.textContent = ''; return; }
+
+  clearTimeout(_planCedulaTimeout);
+  _planCedulaTimeout = setTimeout(async () => {
+    const tipo = document.querySelector('input[name="planTipoInstr"]:checked')?.value || 'docente';
+    const esTecnico = tipo === 'tecnico_distrital';
+    const col = esTecnico ? 'cedula' : 'cedula_docente';
+    const candidatos = [...new Set([String(cedula).trim(), cedLimpia])];
+
+    let q = sb.from('acompañamientos').select(`nombre_docente, ${col}`).in(col, candidatos);
+    if (tipo === 'coordinador')     q = q.eq('tipo_instrumento', 'coordinador');
+    else if (esTecnico)             q = q.eq('tipo_instrumento', 'tecnico_distrital');
+
+    const { data, error } = await q.order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (error) { console.error('buscarNombrePorCedulaPlan:', error); estado.textContent = ''; return; }
+
+    const nomInput = document.getElementById('planDocente');
+    if (data?.nombre_docente) {
+      if (nomInput && !nomInput.value.trim()) nomInput.value = data.nombre_docente;
+      estado.textContent = '✅ ' + data.nombre_docente;
+      estado.style.color = '#2a6b1a';
+    } else {
+      estado.textContent = 'Sin acompañamientos previos. Escriba el nombre.';
+      estado.style.color = '#8fa5bb';
+    }
+  }, 400);
+}
+
 function cancelarItemPlan() {
   document.getElementById('formNuevaPlan').style.display = 'none';
-  ['planFecha','planCodigoCentro','planCentro','planHora','planDocente','planFoco','planInsumos','planCargo'].forEach(id => {
+  ['planFecha','planCodigoCentro','planCentro','planHora','planDocente','planFoco','planInsumos','planCargo','planCedula'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
   document.getElementById('planArea').value = '';
   document.getElementById('estadoCentroPlan').textContent = '';
+  const cedEstado = document.getElementById('planCedulaEstado');
+  if (cedEstado) cedEstado.textContent = '';
   // Resetear al tipo docente
   const radioDocente = document.querySelector('input[name="planTipoInstr"][value="docente"]');
   if (radioDocente) { radioDocente.checked = true; adaptarFormPlan('docente'); }
@@ -4198,6 +4242,10 @@ async function guardarItemPlan() {
     estado:             'Pendiente',
   };
 
+  // Cédula del acompañado: clave para cruzar con lo ejecutado
+  const cedulaPlan = (document.getElementById('planCedula')?.value || '').trim();
+  if (cedulaPlan) payload.cedula_acompanado = cedulaPlan;
+
   if (tipoInstr === 'docente') {
     payload.nombre_docente  = nombre;
     payload.area_curricular = area;
@@ -4232,6 +4280,33 @@ async function eliminarItemPlan(id) {
 }
 
 // ── SEGUIMIENTO ───────────────────────────────────────────────────────────────
+// ── CRUCE ENTRE PLANIFICACIÓN Y EJECUCIÓN ─────────────────────────────────────
+// Normaliza una cédula a dígitos para comparar registros guardados en formatos distintos
+const _soloDigitos = v => String(v || '').replace(/\D/g, '');
+
+// Nombre del acompañado en un ítem planificado, sea docente, coordinador o técnico
+const _nombrePlanificado = p =>
+  p.nombre_docente || p.nombre_coordinador || p.nombre_tecnico || '';
+
+// ¿Este acompañamiento ejecutado corresponde a ese ítem planificado?
+// Si ambos registros tienen cédula, esa es la respuesta: identifica a la persona
+// sin ambigüedad, y dos cédulas distintas significan que NO es la misma visita.
+// Solo cuando falta la cédula se recurre al nombre y, en último término, al centro.
+function coincidePlanEjecutado(p, e) {
+  const dias = Math.abs(new Date(e.fecha) - new Date(p.fecha_prevista)) / 86400000;
+  if (!(dias <= 3)) return false;
+
+  const cedPlan = _soloDigitos(p.cedula_acompanado);
+  const cedEjec = _soloDigitos(e.cedula_docente || e.cedula);
+  if (cedPlan && cedEjec) return cedPlan === cedEjec;
+
+  const nomPlan = _nombrePlanificado(p).trim().toLowerCase();
+  const nomEjec = String(e.nombre_docente || '').trim().toLowerCase();
+  if (nomPlan && nomEjec && nomPlan === nomEjec) return true;
+
+  return !!p.codigo_centro && e.codigo_centro === p.codigo_centro;
+}
+
 async function cargarSeguimiento() {
   const desde = document.getElementById('segDesde').value;
   const hasta = document.getElementById('segHasta').value;
@@ -4280,16 +4355,8 @@ async function cargarSeguimiento() {
 
   // Tabla comparativa: cruzar planificados con ejecutados por fecha y centro
   const filas = plan.map(p => {
-    // Buscar ejecutado que coincida con centro y fecha cercana (±3 días)
-    const fechaPlan = new Date(p.fecha_prevista);
-    const match = ejec.find(e => {
-      const fechaEjec = new Date(e.fecha);
-      const diff = Math.abs(fechaEjec - fechaPlan) / (1000*60*60*24);
-      return diff <= 3 && (
-        e.codigo_centro === p.codigo_centro ||
-        e.nombre_docente?.toLowerCase() === p.nombre_docente?.toLowerCase()
-      );
-    });
+    // Buscar el ejecutado correspondiente: primero por cédula, si ambos la tienen
+    const match = ejec.find(e => coincidePlanEjecutado(p, e));
 
     const cumple = match ? 'badge-verde' : (new Date(p.fecha_prevista) < new Date() ? 'badge-rojo' : 'badge-amarillo');
     const label  = match ? '✅ Cumplido' : (new Date(p.fecha_prevista) < new Date() ? '❌ No ejecutado' : '⏳ Pendiente');
@@ -4297,7 +4364,11 @@ async function cargarSeguimiento() {
     return `<tr>
       <td>${p.fecha_prevista||'—'}</td>
       <td style="font-size:12px;">${p.centro_educativo||'—'}</td>
-      <td style="font-size:12px;">${p.nombre_docente||'—'}</td>
+      <td style="font-size:12px;">${_nombrePlanificado(p)||'—'}${
+        p.cedula_acompanado
+          ? `<div style="font-size:10px;color:#8fa5bb;font-family:monospace;">${p.cedula_acompanado}</div>`
+          : `<div style="font-size:10px;color:#c08a2e;" title="Sin cédula el cruce se hace por nombre o centro, que es menos preciso">sin cédula</div>`
+      }</td>
       <td style="font-size:12px;">${p.foco||'—'}</td>
       <td><span class="badge ${p.estado==='Ejecutado'?'badge-verde':'badge-amarillo'}">${p.estado||'Pendiente'}</span></td>
       <td>${match ? match.fecha : '—'}</td>
@@ -4307,17 +4378,7 @@ async function cargarSeguimiento() {
   });
 
   // Add executed with no planning match
-  const noPlaneados = ejec.filter(e => {
-    const fechaEjec = new Date(e.fecha);
-    return !plan.some(p => {
-      const fechaPlan = new Date(p.fecha_prevista);
-      const diff = Math.abs(fechaEjec - fechaPlan) / (1000*60*60*24);
-      return diff <= 3 && (
-        e.codigo_centro === p.codigo_centro ||
-        e.nombre_docente?.toLowerCase() === p.nombre_docente?.toLowerCase()
-      );
-    });
-  });
+  const noPlaneados = ejec.filter(e => !plan.some(p => coincidePlanEjecutado(p, e)));
 
   noPlaneados.forEach(e => {
     filas.push(`<tr style="background:#f0fdf4;">
@@ -7401,6 +7462,7 @@ function imprimirRegistro() {
       .vr-tabla-ind td{padding:7px 10px;border-bottom:1px solid #f5f8fc;vertical-align:top;}
       .vr-tabla-ind tr:last-child td{border-bottom:none;}
       .vr-sec{background:#e8f0fa;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:6px 10px;}
+      .vr-subsec{background:#eef7ea;font-weight:700;font-size:11.5px;padding:6px 10px 6px 24px;color:#2a5c18;border-left:3px solid #86b96e;}
       .badge-verde{background:#d1fae5;color:#065f46;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;}
       .badge-amarillo{background:#fef3c7;color:#92400e;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;}
       @media print{body{margin:10px;}}
@@ -7436,6 +7498,12 @@ function tablaIndicadoresVR(indicadoresArr, indicadoresData) {
       html += `<tr><td colspan="4" class="vr-sec">${item.titulo}</td></tr>`;
       return;
     }
+    if (item.tipo === 'subseccion') {
+      html += `<tr><td colspan="4" class="vr-subsec">${item.titulo}</td></tr>`;
+      return;
+    }
+    // Cualquier otra fila sin código no es un indicador: se omite
+    if (!item.codigo) return;
     const dato = indicadoresData?.[item.codigo] || {};
     const val  = dato.valor;
     const obs  = dato.observacion || '';
