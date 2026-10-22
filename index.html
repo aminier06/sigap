@@ -1322,6 +1322,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
           <div class="acciones">
             <button type="button" class="btn-primario" onclick="window.print()">🖨️ Imprimir / PDF</button>
+            <button type="button" class="btn-secundario" onclick="descargarInstrumentoBlanco('docente')" title="Genera el formulario vacío, listo para imprimir o guardar en PDF">📄 Instrumento en blanco</button>
             <button type="button" class="btn-secundario" id="btnBorrador" onclick="guardarBorrador()">💾 Guardar borrador</button>
             <button type="submit" class="btn-primario" id="btnEnviar">✅ Enviar registro</button>
             <button type="button" class="btn-peligro" onclick="limpiarFormulario()">🗑️ Limpiar</button>
@@ -1457,6 +1458,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
           <div class="acciones">
             <button type="button" class="btn-primario" onclick="window.print()">🖨️ Imprimir / PDF</button>
+            <button type="button" class="btn-secundario" onclick="descargarInstrumentoBlanco('coordinador')" title="Genera el formulario vacío, listo para imprimir o guardar en PDF">📄 Instrumento en blanco</button>
             <button type="button" class="btn-secundario" onclick="guardarBorradorCoord()">💾 Guardar borrador</button>
             <button type="submit" class="btn-primario" id="btnEnviarCoord">✅ Enviar registro</button>
             <button type="button" class="btn-peligro" onclick="limpiarFormularioCoord()">🗑️ Limpiar</button>
@@ -1620,6 +1622,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <div class="acciones">
             <button type="button" class="btn-primario" onclick="window.print()">🖨️ Imprimir / PDF</button>
+            <button type="button" class="btn-secundario" onclick="descargarInstrumentoBlanco('tecnico_distrital')" title="Genera el formulario vacío, listo para imprimir o guardar en PDF">📄 Instrumento en blanco</button>
             <button type="button" class="btn-secundario" onclick="guardarBorradorDist()">💾 Guardar borrador</button>
             <button type="submit" class="btn-primario" id="btnEnviarDist">✅ Enviar registro</button>
             <button type="button" class="btn-peligro" onclick="limpiarFormularioDist()">🗑️ Limpiar</button>
@@ -7773,6 +7776,211 @@ if ('serviceWorker' in navigator) {
 
 function cerrarVerRegistro() {
   document.getElementById('modalVerRegistro').style.display = 'none';
+}
+
+// ── INSTRUMENTOS EN BLANCO PARA IMPRIMIR ──────────────────────────────────────
+// Arma el formulario vacío a partir de los mismos arreglos de indicadores que
+// usa la aplicación, de modo que el impreso nunca quede desfasado del sistema.
+const _INSTRUMENTOS_BLANCO = {
+  docente: {
+    titulo: 'Instrumento de Acompañamiento al Docente',
+    arreglo: () => INDICADORES,
+    campos: [
+      ['Nombre del acompañante', 2], ['Rol del acompañante', 2],
+      ['Regional', 1], ['Distrito', 1], ['Código del centro', 1], ['Sector', 1],
+      ['Centro educativo', 3], ['Zona', 1],
+      ['Nombre del docente', 2], ['Cédula', 1], ['Grado académico', 1],
+      ['Especialidad', 2], ['Años de experiencia', 1], ['Modalidad', 1],
+      ['Área acompañada', 2], ['Ciclo', 1], ['Grado', 1],
+      ['Sección', 1], ['Inscritos', 1], ['Presentes', 1], ['Tipo de acompañamiento', 1],
+      ['Fecha', 1], ['Hora de inicio', 1], ['Hora de término', 1],
+    ],
+    narrativos: ['Foco / Propósito del acompañamiento', 'Intención pedagógica declarada por el docente', 'Contenido conceptual desarrollado'],
+  },
+  coordinador: {
+    titulo: 'Instrumento de Acompañamiento al Coordinador/a Pedagógico/a',
+    arreglo: () => INDICADORES_COORD,
+    campos: [
+      ['Nombre del acompañante', 2], ['Rol del acompañante', 2],
+      ['Regional', 1], ['Distrito', 1], ['Código del centro', 1], ['Sector', 1],
+      ['Centro educativo', 3], ['Zona', 1],
+      ['Nombre del coordinador/a', 2], ['Cédula', 1], ['Cargo / Función', 1],
+      ['Tipo de acompañamiento', 2], ['Fecha', 1], ['Hora', 1],
+    ],
+    narrativos: ['Foco / Propósito del acompañamiento'],
+  },
+  tecnico_distrital: {
+    titulo: 'Instrumento de Acompañamiento al Técnico/a Distrital',
+    arreglo: () => INDICADORES_DIST,
+    campos: [
+      ['Nombre del acompañante', 2], ['Rol del acompañante', 2],
+      ['Regional', 2], ['Distrito', 2],
+      ['Nombre del técnico/a', 2], ['Cédula', 1], ['Cargo en el distrito', 1],
+      ['Tipo de acompañamiento', 2], ['Fecha', 1], ['Hora', 1],
+    ],
+    narrativos: ['Foco / Propósito del acompañamiento'],
+  },
+};
+
+function descargarInstrumentoBlanco(tipo) {
+  const cfg = _INSTRUMENTOS_BLANCO[tipo];
+  if (!cfg) { mostrarNotif('Instrumento no reconocido.', true); return; }
+
+  const esc = s => String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const casilla = '<span class="cx"></span>';
+  const lineas  = n => Array.from({length:n}, () => '<div class="renglon"></div>').join('');
+
+  // Datos generales: cada campo ocupa 1, 2 o 3 columnas de una rejilla de 4
+  const campos = cfg.campos.map(([et, cols]) =>
+    `<div class="dg-campo" style="grid-column:span ${cols};">
+       <div class="dg-et">${esc(et)}</div><div class="dg-linea"></div>
+     </div>`).join('');
+
+  const narrativos = cfg.narrativos.map(t =>
+    `<div class="narr"><div class="narr-t">${esc(t)}</div>${lineas(3)}</div>`).join('');
+
+  // Tabla de indicadores
+  let filas = '';
+  cfg.arreglo().forEach(item => {
+    if (item.tipo === 'seccion') {
+      filas += `<tr class="no-cortar"><td colspan="7" class="t-sec">${esc(item.titulo)}</td></tr>`;
+      return;
+    }
+    if (item.tipo === 'subseccion') {
+      filas += `<tr class="no-cortar"><td colspan="7" class="t-subsec">${esc(item.titulo)}</td></tr>`;
+      return;
+    }
+    if (!item.codigo) return;
+    filas += `<tr class="no-cortar">
+      <td class="t-cod">${esc(item.codigo)}</td>
+      <td class="t-txt">${esc(item.texto)}</td>
+      <td class="t-cx">${casilla}</td><td class="t-cx">${casilla}</td>
+      <td class="t-cx">${casilla}</td><td class="t-cx">${casilla}</td>
+      <td class="t-obs"></td>
+    </tr>`;
+  });
+
+  const hoy = new Date().toLocaleDateString('es-DO', { year:'numeric', month:'long', day:'numeric' });
+
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8">
+<title>${esc(cfg.titulo)}</title>
+<style>
+  @page { size: letter; margin: 14mm 12mm 16mm 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, 'Times New Roman', serif; color:#1a2733; margin:0; font-size:10pt; }
+
+  .cab { border-bottom:2.5px solid #013777; padding-bottom:8px; margin-bottom:14px; }
+  .cab .org { font-size:8.5pt; letter-spacing:1.6px; text-transform:uppercase; color:#013777; font-weight:bold; }
+  .cab .sub { font-size:8pt; color:#5b6b7d; margin-top:2px; }
+  .cab h1 { font-size:14pt; margin:9px 0 0; color:#013777; font-weight:bold; letter-spacing:.2px; }
+  .cab .fecha { font-size:8pt; color:#8a97a5; margin-top:3px; font-style:italic; }
+
+  .bloque { margin-bottom:13px; }
+  .bloque-t { font-size:9pt; font-weight:bold; text-transform:uppercase; letter-spacing:1px;
+              color:#013777; border-left:3px solid #013777; padding-left:7px; margin-bottom:7px; }
+
+  .dg { display:grid; grid-template-columns:repeat(4,1fr); gap:9px 13px; }
+  .dg-et { font-size:7.5pt; text-transform:uppercase; letter-spacing:.5px; color:#5b6b7d; margin-bottom:11px; }
+  .dg-linea { border-bottom:.8px solid #9fb3c6; }
+
+  .escala { border:1px solid #c5d9ec; background:#f6fafd; padding:7px 10px; margin-bottom:11px;
+            font-size:8.5pt; display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
+  .escala b { color:#013777; }
+
+  table { width:100%; border-collapse:collapse; font-size:8.5pt; }
+  thead { display:table-header-group; }
+  th { background:#013777; color:#fff; font-size:7.5pt; text-transform:uppercase; letter-spacing:.5px;
+       padding:5px 4px; border:.6px solid #013777; font-weight:bold; }
+  td { border:.6px solid #b9cde0; padding:4px 5px; vertical-align:top; }
+  .no-cortar { page-break-inside:avoid; }
+  .t-sec { background:#dce9f5; font-weight:bold; font-size:8.5pt; text-transform:uppercase;
+           letter-spacing:.6px; color:#013777; padding:5px 7px; }
+  .t-subsec { background:#eef4ea; font-weight:bold; font-size:8.5pt; color:#2a5c18; padding:4px 7px 4px 20px; font-style:italic; }
+  .t-cod { width:36px; text-align:center; font-weight:bold; color:#4a5b6d; font-size:8pt; }
+  .t-txt { line-height:1.34; }
+  .t-cx  { width:26px; text-align:center; vertical-align:middle; }
+  .t-obs { width:118px; }
+  .cx { display:inline-block; width:11px; height:11px; border:1px solid #6b8299; }
+
+  .narr { margin-bottom:9px; }
+  .narr-t { font-size:7.5pt; text-transform:uppercase; letter-spacing:.5px; color:#5b6b7d; margin-bottom:5px; }
+  .renglon { border-bottom:.8px solid #c3d3e2; height:16px; }
+
+  .firmas { display:grid; grid-template-columns:1fr 1fr; gap:36px; margin-top:26px; page-break-inside:avoid; }
+  .firma { text-align:center; }
+  .firma .ln { border-top:.9px solid #5b6b7d; padding-top:4px; font-size:8pt; color:#5b6b7d; }
+
+  .pie { margin-top:14px; border-top:1px solid #dce9f5; padding-top:5px;
+         font-size:7.5pt; color:#8a97a5; display:flex; justify-content:space-between; }
+  @media print { .no-imprimir { display:none; } }
+  .no-imprimir { position:fixed; top:10px; right:10px; background:#013777; color:#fff; border:none;
+                 padding:9px 16px; font-size:12px; border-radius:6px; cursor:pointer; font-family:Arial,sans-serif; }
+</style></head><body>
+<button class="no-imprimir" onclick="window.print()">Guardar como PDF</button>
+
+<div class="cab">
+  <div class="org">Ministerio de Educación de la República Dominicana</div>
+  <div class="sub">Viceministerio de Servicios Técnicos y Pedagógicos · Dirección de Educación Primaria</div>
+  <h1>${esc(cfg.titulo)}</h1>
+  <div class="fecha">Sistema de Gestión de Acompañamiento Pedagógico (SIGAP) · Generado el ${esc(hoy)}</div>
+</div>
+
+<div class="bloque">
+  <div class="bloque-t">I. Datos generales</div>
+  <div class="dg">${campos}</div>
+</div>
+
+<div class="bloque">
+  <div class="bloque-t">II. Escala de estimación</div>
+  <div class="escala">
+    <span><b>1</b> No evidenciado</span>
+    <span><b>2</b> Medianamente evidenciado</span>
+    <span><b>3</b> Evidenciado</span>
+    <span><b>NA</b> No aplica</span>
+    <span style="color:#5b6b7d;">Marque con una X la casilla que corresponda.</span>
+  </div>
+  <table>
+    <thead><tr>
+      <th style="width:36px;">N°</th><th>Indicador</th>
+      <th style="width:26px;">1</th><th style="width:26px;">2</th>
+      <th style="width:26px;">3</th><th style="width:26px;">NA</th>
+      <th style="width:118px;">Observaciones</th>
+    </tr></thead>
+    <tbody>${filas}</tbody>
+  </table>
+</div>
+
+<div class="bloque">
+  <div class="bloque-t">III. Observaciones generales</div>
+  ${narrativos}
+</div>
+
+<div class="bloque" style="page-break-inside:avoid;">
+  <div class="bloque-t">IV. Acuerdos y compromisos</div>
+  <div style="font-size:7.5pt;color:#5b6b7d;margin-bottom:5px;">
+    Registre un acuerdo por renglón, indicando responsable y fecha de cumplimiento.
+  </div>
+  ${lineas(7)}
+</div>
+
+<div class="firmas">
+  <div class="firma"><div style="height:34px;"></div><div class="ln">Firma del acompañante</div></div>
+  <div class="firma"><div style="height:34px;"></div><div class="ln">Firma del acompañado/a</div></div>
+</div>
+
+<div class="pie">
+  <span>MINERD · Dirección de Educación Primaria</span>
+  <span>SIGAP · ${esc(cfg.titulo)}</span>
+</div>
+</body></html>`;
+
+  const ventana = window.open('', '_blank');
+  if (!ventana) { mostrarNotif('Permita las ventanas emergentes para generar el PDF.', true); return; }
+  ventana.document.write(html);
+  ventana.document.close();
+  ventana.focus();
+  setTimeout(() => ventana.print(), 500);
 }
 
 function imprimirRegistro() {
