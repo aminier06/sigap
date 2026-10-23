@@ -3064,7 +3064,7 @@ async function cargarDashboard() {
   if (filtroDesde)    query = query.gte('fecha', filtroDesde);
   if (filtroHasta)    query = query.lte('fecha', filtroHasta);
 
-  const { data } = await query;
+  const { data } = await traerTodo(query);
   todosRegistros = data || [];
   const hoy = new Date();
   const mesActual = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0');
@@ -4029,7 +4029,7 @@ function filtrarDashboardPorStat(tipo) {
 // ── MIS REGISTROS ─────────────────────────────────────────────────────────────
 async function cargarMisRegistros() {
   // Registros visibles según la demarcación del perfil
-  const { data } = await filtrarDemarcacion(sb.from('acompañamientos').select('*')).order('created_at', { ascending: false });
+  const { data } = await traerTodo(filtrarDemarcacion(sb.from('acompañamientos').select('*')).order('created_at', { ascending: false }));
   const registros = data || [];
   const cuerpo = document.getElementById('cuerpoMisRegistros');
   if (registros.length === 0) {
@@ -4205,7 +4205,7 @@ async function cargarPlanificacion() {
     query = query.eq('usuario_id', usuarioActual.id);
   }
 
-  const { data, error } = await query;
+  const { data, error } = await traerTodo(query);
   if (error) { mostrarNotif('Error: ' + error.message, true); return; }
 
   planActual = data || [];
@@ -4462,7 +4462,7 @@ async function cargarSeguimiento() {
     .order('fecha');
   
 
-  const [{ data: planificados }, { data: ejecutados }] = await Promise.all([qPlan, qEjec]);
+  const [{ data: planificados }, { data: ejecutados }] = await Promise.all([traerTodo(qPlan), traerTodo(qEjec)]);
 
   const plan = planificados || [];
   const ejec = ejecutados  || [];
@@ -5896,9 +5896,25 @@ function limpiarFiltrosAdmin() {
 // Usuarios cargados, para filtrar sin volver a consultar la base de datos
 let _usuariosCargados = [];
 
+// Supabase devuelve como máximo 1000 filas por consulta. Esta función recorre
+// la consulta por tramos y entrega el total, para que las listas y los conteos
+// no queden truncados en silencio al crecer los datos.
+async function traerTodo(consulta, tam = 1000) {
+  let filas = [];
+  for (let pagina = 0; ; pagina++) {
+    const { data, error } = await consulta.range(pagina * tam, (pagina + 1) * tam - 1);
+    if (error) return { data: null, error };
+    if (!data || data.length === 0) break;
+    filas = filas.concat(data);
+    if (data.length < tam) break;
+    if (pagina > 200) break;   // tope de seguridad
+  }
+  return { data: filas, error: null };
+}
+
 async function cargarUsuarios() {
   if (!requiereAdministrador()) return;
-  const { data } = await sb.from('perfiles').select('*').order('nombre');
+  const { data } = await traerTodo(sb.from('perfiles').select('*').order('nombre'));
   _usuariosCargados = data || [];
   poblarFiltrosUsuarios();
   filtrarUsuarios();
@@ -6012,8 +6028,8 @@ async function cargarTodosRegistros() {
   // Todos los registros: admin ve todos, usuario ve solo los suyos
   const esAdmin = perfilActual?.nivel === 'admin';
   let query = filtrarDemarcacion(sb.from('acompañamientos').select('*')).order('created_at', { ascending: false });
-  
-  const { data, error } = await query;
+
+  const { data, error } = await traerTodo(query);
   const cuerpo = document.getElementById('cuerpoAdminRegistros');
   if (error) { cuerpo.innerHTML='<tr><td colspan="8" style="text-align:center;color:#b42318;padding:24px;">Error al cargar: '+error.message+'</td></tr>'; return; }
   if (!data || data.length === 0) { cuerpo.innerHTML='<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">No hay registros.</td></tr>'; return; }
