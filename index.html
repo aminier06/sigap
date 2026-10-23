@@ -6428,6 +6428,64 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── EDITAR USUARIO ────────────────────────────────────────────────────────────
+// Muestra regional, distrito y centro según lo que exija el rol seleccionado
+function toggleDemarcacionEdicion() {
+  const rol = document.getElementById('editRol').value;
+  const reg = document.getElementById('editBloqueRegional');
+  const dis = document.getElementById('editBloqueDistrito');
+  const cen = document.getElementById('editBloqueCentro');
+  [reg, dis, cen].forEach(el => { if (el) el.style.display = 'none'; });
+  const ver = el => { if (el) el.style.display = ''; };
+  if (rol === 'Técnico/a Regional' || rol === 'Técnico/a Coordinador/a Regional') {
+    ver(reg);
+  } else if (rol === 'Técnico/a Distrital' || rol === 'Técnico/a Coordinador/a Distrital') {
+    ver(reg); ver(dis);
+  } else if (rol === 'Coordinador/a Pedagógico/a' || rol === 'Director/a de Centro') {
+    ver(reg); ver(dis); ver(cen);
+  }
+  // Técnico/a Nacional y Administrador/a no llevan demarcación
+}
+
+// Rellena los distritos de la regional elegida, conservando el que ya tenía
+function cargarDistritosEdicion(seleccionado) {
+  const reg = document.getElementById('editRegional').value;
+  const sel = document.getElementById('editDistrito');
+  if (!sel) return;
+  const previo = seleccionado !== undefined ? seleccionado : sel.value;
+  sel.innerHTML = '<option value="">Seleccione distrito</option>';
+  (DISTRITOS_POR_REGIONAL[reg] || []).forEach(d => {
+    const o = document.createElement('option');
+    o.textContent = d; o.value = d;
+    sel.appendChild(o);
+  });
+  if (previo && [...sel.options].some(o => o.value === previo)) sel.value = previo;
+}
+
+let _editCentroTimeout = null;
+async function buscarCentroEdicion(codigo) {
+  const estado = document.getElementById('editEstadoCentro');
+  const nom    = document.getElementById('editNombreCentro');
+  const campo  = document.getElementById('editCodigoCentro');
+  let cod = String(codigo || '').replace(/\D/g, '').slice(0, 5);
+  if (campo) campo.value = cod;
+  if (cod.length < 4) { if (estado) estado.textContent = ''; if (nom) nom.value = ''; return; }
+  clearTimeout(_editCentroTimeout);
+  _editCentroTimeout = setTimeout(async () => {
+    estado.textContent = 'Buscando\u2026'; estado.style.color = '#8fa5bb';
+    const { data } = await sb.from('centros').select('nombre')
+      .eq('codigo', cod.padStart(5, '0')).maybeSingle();
+    if (!data) {
+      nom.value = '';
+      estado.textContent = '\u26a0\ufe0f Código no encontrado en el padrón.';
+      estado.style.color = '#b45309';
+    } else {
+      nom.value = data.nombre;
+      estado.textContent = '\u2705 ' + data.nombre;
+      estado.style.color = '#2a6b1a';
+    }
+  }, 400);
+}
+
 function abrirModalEditar(u) {
   if (!requiereAdministrador()) return;
   document.getElementById('editUserId').value = u.id;
@@ -6447,6 +6505,16 @@ function abrirModalEditar(u) {
   document.getElementById('editNombre').value = u.nombre || '';
   document.getElementById('editRol').value = u.rol || '';
   document.getElementById('editNivel').value = u.nivel || 'usuario';
+
+  // Demarcación actual del usuario
+  document.getElementById('editRegional').value = u.regional || '';
+  cargarDistritosEdicion(u.distrito || '');
+  document.getElementById('editCodigoCentro').value = u.codigo_centro || '';
+  document.getElementById('editNombreCentro').value = u.nombre_centro || '';
+  document.getElementById('editEstadoCentro').textContent = '';
+  if (u.codigo_centro && !u.nombre_centro) buscarCentroEdicion(u.codigo_centro);
+  toggleDemarcacionEdicion();
+
   document.getElementById('modalEditarUsuario').style.display = 'flex';
 }
 
@@ -6547,10 +6615,30 @@ async function guardarEdicionUsuario() {
   const nivel  = document.getElementById('editNivel').value;
   if (!nombre) { mostrarNotif('El nombre no puede estar vacío.', true); return; }
 
+  // Demarcación: solo se guarda la que corresponde al rol; el resto se limpia,
+  // para que no quede un distrito viejo cuando alguien pasa a técnico regional.
+  const dem = { regional: null, distrito: null, codigo_centro: null, nombre_centro: null };
+  const gv = id2 => (document.getElementById(id2)?.value || '').trim() || null;
+  if (rol === 'Técnico/a Regional' || rol === 'Técnico/a Coordinador/a Regional') {
+    dem.regional = gv('editRegional');
+  } else if (rol === 'Técnico/a Distrital' || rol === 'Técnico/a Coordinador/a Distrital') {
+    dem.regional = gv('editRegional'); dem.distrito = gv('editDistrito');
+  } else if (rol === 'Coordinador/a Pedagógico/a' || rol === 'Director/a de Centro') {
+    dem.regional = gv('editRegional'); dem.distrito = gv('editDistrito');
+    dem.codigo_centro = gv('editCodigoCentro'); dem.nombre_centro = gv('editNombreCentro');
+  }
+
+  // Sin demarcación el usuario no vería ningún registro al entrar
+  const faltan = [];
+  if (!['Técnico/a Nacional','Administrador/a'].includes(rol) && !dem.regional) faltan.push('la regional');
+  if (['Técnico/a Distrital','Técnico/a Coordinador/a Distrital','Coordinador/a Pedagógico/a','Director/a de Centro'].includes(rol) && !dem.distrito) faltan.push('el distrito');
+  if (['Coordinador/a Pedagógico/a','Director/a de Centro'].includes(rol) && !dem.codigo_centro) faltan.push('el centro');
+  if (faltan.length && !confirm('Falta ' + faltan.join(' y ') + '.\n\nSin ese dato el usuario no verá ningún registro al entrar. ¿Guardar de todos modos?')) return;
+
   const btn = document.getElementById('btnGuardarEdicion');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Guardando…';
 
-  const { error } = await sb.from('perfiles').update({ nombre, rol, nivel }).eq('id', id);
+  const { error } = await sb.from('perfiles').update({ nombre, rol, nivel, ...dem }).eq('id', id);
   if (error) {
     mostrarNotif('Error al guardar: ' + error.message, true);
   } else {
@@ -7632,7 +7720,7 @@ if ('serviceWorker' in navigator) {
       </div>
       <div class="campo">
         <label>Rol</label>
-        <select id="editRol">
+        <select id="editRol" onchange="toggleDemarcacionEdicion()">
           <option value="Técnico/a Nacional">Técnico/a Nacional</option>
           <option value="Técnico/a Regional">Técnico/a Regional</option>
           <option value="Técnico/a Coordinador/a Regional">Técnico/a Coordinador/a Regional</option>
@@ -7649,6 +7737,50 @@ if ('serviceWorker' in navigator) {
           <option value="usuario">Usuario</option>
           <option value="admin">Administrador</option>
         </select>
+      </div>
+    </div>
+
+    <!-- DEMARCACIÓN: se muestra según el rol -->
+    <div id="editBloqueRegional" class="campo" style="margin-bottom:12px;display:none;">
+      <label>Regional asignada</label>
+      <select id="editRegional" onchange="cargarDistritosEdicion()">
+        <option value="">Seleccione regional</option>
+            <option>01 - Barahona</option>
+            <option>02 - San Juan de la Maguana</option>
+            <option>03 - Azua</option>
+            <option>04 - San Cristobal</option>
+            <option>05 - San Pedro de Macoris</option>
+            <option>06 - La Vega</option>
+            <option>07 - San Francisco de Macoris</option>
+            <option>08 - Santiago</option>
+            <option>09 - Mao</option>
+            <option>10 - Santo Domingo</option>
+            <option>11 - Puerto Plata</option>
+            <option>12 - Higuey</option>
+            <option>13 - Monte Cristi</option>
+            <option>14 - Nagua</option>
+            <option>15 - Santo Domingo</option>
+            <option>16 - Cotui</option>
+            <option>17 - Monte Plata</option>
+            <option>18 - Baoruco</option>
+      </select>
+    </div>
+    <div id="editBloqueDistrito" class="campo" style="margin-bottom:12px;display:none;">
+      <label>Distrito asignado</label>
+      <select id="editDistrito">
+        <option value="">Seleccione primero la regional</option>
+      </select>
+    </div>
+    <div id="editBloqueCentro" class="grid g-2" style="margin-bottom:14px;display:none;">
+      <div class="campo">
+        <label>Código del centro (SIGERD)</label>
+        <input type="text" id="editCodigoCentro" maxlength="5" placeholder="Ej. 02334"
+               oninput="buscarCentroEdicion(this.value)" />
+        <div id="editEstadoCentro" style="font-size:11px;margin-top:3px;min-height:14px;"></div>
+      </div>
+      <div class="campo">
+        <label>Nombre del centro</label>
+        <input type="text" id="editNombreCentro" readonly style="background:#f7fafd;" />
       </div>
     </div>
     <div class="modal-acciones">
