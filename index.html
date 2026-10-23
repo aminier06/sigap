@@ -7795,7 +7795,18 @@ const _INSTRUMENTOS_BLANCO = {
       ['Sección', 1], ['Inscritos', 1], ['Presentes', 1], ['Tipo de acompañamiento', 1],
       ['Fecha', 1], ['Hora de inicio', 1], ['Hora de término', 1],
     ],
-    narrativos: ['Foco / Propósito del acompañamiento', 'Intención pedagógica declarada por el docente', 'Contenido conceptual desarrollado'],
+    // Van antes de la escala, igual que en el formulario
+    antes: { titulo:'', campos:[
+      ['Describa el foco o propósito del acompañamiento', 3],
+      ['Describa la intención pedagógica del docente', 3],
+      ['Especifique el contenido conceptual abordado por el docente', 3],
+    ]},
+    despues: null,
+    acuerdos: 'Acuerdos / Compromisos',
+    firmas: [
+      'Nombre del/la docente acompañado(a)', 'Nombre del coordinador(a) docente',
+      'Director(a) del centro  ·  SELLO', 'Nombre del técnico(a) docente',
+    ],
   },
   coordinador: {
     titulo: 'Instrumento de Acompañamiento al Coordinador/a Pedagógico/a',
@@ -7807,7 +7818,13 @@ const _INSTRUMENTOS_BLANCO = {
       ['Nombre del coordinador/a', 2], ['Cédula', 1], ['Cargo / Función', 1],
       ['Tipo de acompañamiento', 2], ['Fecha', 1], ['Hora', 1],
     ],
-    narrativos: ['Foco / Propósito del acompañamiento'],
+    antes: { titulo:'', campos:[['Describa el foco o propósito del acompañamiento', 4]] },
+    despues: { titulo:'Observaciones generales', campos:[['Observaciones generales del acompañamiento', 5]] },
+    acuerdos: 'Acuerdos / Compromisos',
+    firmas: [
+      'Nombre del/la coordinador(a) pedagógico(a)', 'Nombre del director(a) del centro',
+      'Nombre del técnico(a) distrital  ·  SELLO', 'Nombre del técnico(a) regional',
+    ],
   },
   tecnico_distrital: {
     titulo: 'Instrumento de Acompañamiento al Técnico/a Distrital',
@@ -7818,9 +7835,22 @@ const _INSTRUMENTOS_BLANCO = {
       ['Nombre del técnico/a', 2], ['Cédula', 1], ['Cargo en el distrito', 1],
       ['Tipo de acompañamiento', 2], ['Fecha', 1], ['Hora', 1],
     ],
-    narrativos: ['Foco / Propósito del acompañamiento'],
+    antes: { titulo:'Foco del acompañamiento', campos:[['Describa brevemente el propósito principal de este acompañamiento', 4]] },
+    despues: { titulo:'Observaciones generales', campos:[['Fortalezas identificadas, aspectos a mejorar, contexto relevante', 5]] },
+    acuerdos: 'Acuerdos establecidos',
+    firmas: [
+      'Nombre del técnico/a distrital  ·  SELLO', 'Nombre del técnico/a regional',
+    ],
   },
 };
+
+// Numeral de la sección de acuerdos: depende de cuántos bloques narrativos tenga
+function _numAcuerdos(cfg) {
+  let n = 2;
+  if (cfg.antes)   n++;
+  if (cfg.despues) n++;
+  return ['I','II','III','IV','V','VI'][n];
+}
 
 function descargarInstrumentoBlanco(tipo) {
   const cfg = _INSTRUMENTOS_BLANCO[tipo];
@@ -7837,8 +7867,16 @@ function descargarInstrumentoBlanco(tipo) {
        <div class="dg-et">${esc(et)}</div><div class="dg-linea"></div>
      </div>`).join('');
 
-  const narrativos = cfg.narrativos.map(t =>
-    `<div class="narr"><div class="narr-t">${esc(t)}</div>${lineas(3)}</div>`).join('');
+  // Bloques narrativos: se arman en la posición que ocupan en el formulario
+  const bloqueNarr = (b, numeral) => {
+    if (!b) return '';
+    const cuerpo = b.campos.map(([et, n]) =>
+      `<div class="narr"><div class="narr-t">${esc(et)}</div>${lineas(n)}</div>`).join('');
+    const titulo = b.titulo
+      ? `<div class="bloque-t">${numeral}. ${esc(b.titulo)}</div>`
+      : `<div class="bloque-t">${numeral}. Descripción del acompañamiento</div>`;
+    return `<div class="bloque">${titulo}${cuerpo}</div>`;
+  };
 
   // Tabla de indicadores
   let filas = '';
@@ -7860,6 +7898,10 @@ function descargarInstrumentoBlanco(tipo) {
       <td class="t-obs"></td>
     </tr>`;
   });
+
+  // Firmas propias de cada instrumento
+  const firmasHtml = cfg.firmas.map(f =>
+    `<div class="firma"><div style="height:34px;"></div><div class="ln">${esc(f)}</div></div>`).join('');
 
   const hoy = new Date().toLocaleDateString('es-DO', { year:'numeric', month:'long', day:'numeric' });
 
@@ -7931,8 +7973,10 @@ function descargarInstrumentoBlanco(tipo) {
   <div class="dg">${campos}</div>
 </div>
 
+${bloqueNarr(cfg.antes, 'II')}
+
 <div class="bloque">
-  <div class="bloque-t">II. Escala de estimación</div>
+  <div class="bloque-t">${cfg.antes ? 'III' : 'II'}. Escala de estimación</div>
   <div class="escala">
     <span><b>1</b> No evidenciado</span>
     <span><b>2</b> Medianamente evidenciado</span>
@@ -7951,23 +7995,17 @@ function descargarInstrumentoBlanco(tipo) {
   </table>
 </div>
 
-<div class="bloque">
-  <div class="bloque-t">III. Observaciones generales</div>
-  ${narrativos}
-</div>
+${bloqueNarr(cfg.despues, cfg.antes ? 'IV' : 'III')}
 
 <div class="bloque" style="page-break-inside:avoid;">
-  <div class="bloque-t">IV. Acuerdos y compromisos</div>
+  <div class="bloque-t">${_numAcuerdos(cfg)}. ${esc(cfg.acuerdos)}</div>
   <div style="font-size:7.5pt;color:#5b6b7d;margin-bottom:5px;">
     Registre un acuerdo por renglón, indicando responsable y fecha de cumplimiento.
   </div>
   ${lineas(7)}
 </div>
 
-<div class="firmas">
-  <div class="firma"><div style="height:34px;"></div><div class="ln">Firma del acompañante</div></div>
-  <div class="firma"><div style="height:34px;"></div><div class="ln">Firma del acompañado/a</div></div>
-</div>
+<div class="firmas">${firmasHtml}</div>
 
 <div class="pie">
   <span>MINERD · Dirección de Educación Primaria</span>
