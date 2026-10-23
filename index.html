@@ -1321,7 +1321,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
 
           <div class="acciones">
-            <button type="button" class="btn-primario" onclick="window.print()">🖨️ Imprimir / PDF</button>
+            <button type="button" class="btn-primario" onclick="imprimirInstrumentoLleno('docente')" title="Genera el PDF con los datos capturados en este formulario">🖨️ Imprimir / PDF</button>
             <button type="button" class="btn-secundario" onclick="descargarInstrumentoBlanco('docente')" title="Genera el formulario vacío, listo para imprimir o guardar en PDF">📄 Instrumento en blanco</button>
             <button type="button" class="btn-secundario" id="btnBorrador" onclick="guardarBorrador()">💾 Guardar borrador</button>
             <button type="submit" class="btn-primario" id="btnEnviar">✅ Enviar registro</button>
@@ -1457,7 +1457,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
 
           <div class="acciones">
-            <button type="button" class="btn-primario" onclick="window.print()">🖨️ Imprimir / PDF</button>
+            <button type="button" class="btn-primario" onclick="imprimirInstrumentoLleno('coordinador')" title="Genera el PDF con los datos capturados en este formulario">🖨️ Imprimir / PDF</button>
             <button type="button" class="btn-secundario" onclick="descargarInstrumentoBlanco('coordinador')" title="Genera el formulario vacío, listo para imprimir o guardar en PDF">📄 Instrumento en blanco</button>
             <button type="button" class="btn-secundario" onclick="guardarBorradorCoord()">💾 Guardar borrador</button>
             <button type="submit" class="btn-primario" id="btnEnviarCoord">✅ Enviar registro</button>
@@ -1621,7 +1621,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           </div>
           <div class="acciones">
-            <button type="button" class="btn-primario" onclick="window.print()">🖨️ Imprimir / PDF</button>
+            <button type="button" class="btn-primario" onclick="imprimirInstrumentoLleno('tecnico_distrital')" title="Genera el PDF con los datos capturados en este formulario">🖨️ Imprimir / PDF</button>
             <button type="button" class="btn-secundario" onclick="descargarInstrumentoBlanco('tecnico_distrital')" title="Genera el formulario vacío, listo para imprimir o guardar en PDF">📄 Instrumento en blanco</button>
             <button type="button" class="btn-secundario" onclick="guardarBorradorDist()">💾 Guardar borrador</button>
             <button type="submit" class="btn-primario" id="btnEnviarDist">✅ Enviar registro</button>
@@ -7778,69 +7778,103 @@ function cerrarVerRegistro() {
   document.getElementById('modalVerRegistro').style.display = 'none';
 }
 
-// ── INSTRUMENTOS EN BLANCO PARA IMPRIMIR ──────────────────────────────────────
-// Arma el formulario vacío a partir de los mismos arreglos de indicadores que
-// usa la aplicación, de modo que el impreso nunca quede desfasado del sistema.
+// ── INSTRUMENTOS EN PDF (EN BLANCO O LLENOS) ──────────────────────────────────
+// Un solo generador produce ambos: si recibe datos los imprime, si no deja los
+// espacios en blanco. Así el formulario impreso y el registro archivado
+// comparten exactamente el mismo formato.
+// campos:  [etiqueta, columnas, claveDelRegistro]
+// form:    claveDelRegistro -> [idDelElemento, 'v' (valor) | 'r' (radio)]
 const _INSTRUMENTOS_BLANCO = {
   docente: {
     titulo: 'Instrumento de Acompañamiento al Docente',
     arreglo: () => INDICADORES,
     campos: [
-      ['Nombre del acompañante', 2], ['Rol del acompañante', 2],
-      ['Regional', 1], ['Distrito', 1], ['Código del centro', 1], ['Sector', 1],
-      ['Centro educativo', 3], ['Zona', 1],
-      ['Nombre del docente', 2], ['Cédula', 1], ['Grado académico', 1],
-      ['Especialidad', 2], ['Años de experiencia', 1], ['Modalidad', 1],
-      ['Área acompañada', 2], ['Ciclo', 1], ['Grado', 1],
-      ['Sección', 1], ['Inscritos', 1], ['Presentes', 1], ['Tipo de acompañamiento', 1],
-      ['Fecha', 1], ['Hora de inicio', 1], ['Hora de término', 1],
+      ['Nombre del acompañante', 2, 'nombre_acompanante'], ['Rol del acompañante', 2, 'rol_acompanante'],
+      ['Regional', 1, 'regional'], ['Distrito', 1, 'distrito'],
+      ['Código del centro', 1, 'codigo_centro'], ['Sector', 1, 'sector'],
+      ['Centro educativo', 3, 'centro_educativo'], ['Zona', 1, 'zona'],
+      ['Nombre del docente', 2, 'nombre_docente'], ['Cédula', 1, 'cedula_docente'],
+      ['Grado académico', 1, 'grado_academico'],
+      ['Especialidad', 2, 'especialidad'], ['Años de experiencia', 1, 'anios_experiencia'],
+      ['Modalidad', 1, 'modalidad'],
+      ['Área acompañada', 2, 'area_acompanada'], ['Ciclo', 1, 'ciclo'], ['Grado', 1, 'grado'],
+      ['Sección', 1, 'seccion'], ['Inscritos', 1, 'inscritos'], ['Presentes', 1, 'presentes'],
+      ['Tipo de acompañamiento', 1, 'tipo_acompanamiento'],
+      ['Fecha', 1, 'fecha'], ['Hora de inicio', 1, 'hora_inicio'], ['Hora de término', 1, 'hora_termino'],
     ],
-    // Van antes de la escala, igual que en el formulario
     antes: { titulo:'', campos:[
-      ['Describa el foco o propósito del acompañamiento', 3],
-      ['Describa la intención pedagógica del docente', 3],
-      ['Especifique el contenido conceptual abordado por el docente', 3],
+      ['Describa el foco o propósito del acompañamiento', 3, 'foco'],
+      ['Describa la intención pedagógica del docente', 3, 'intencion_docente'],
+      ['Especifique el contenido conceptual abordado por el docente', 3, 'contenido_conceptual'],
     ]},
     despues: null,
     acuerdos: 'Acuerdos / Compromisos',
-    firmas: [
-      'Nombre del/la docente acompañado(a)', 'Nombre del coordinador(a) docente',
-      'Director(a) del centro  ·  SELLO', 'Nombre del técnico(a) docente',
-    ],
+    firmas: ['Nombre del/la docente acompañado(a)', 'Nombre del coordinador(a) docente',
+             'Director(a) del centro  ·  SELLO', 'Nombre del técnico(a) docente'],
+    form: {
+      nombre_acompanante:['nombreAcompanante','v'], rol_acompanante:['rolAcompanante','v'],
+      regional:['regional','v'], distrito:['distrito','v'], centro_educativo:['centroEducativo','v'],
+      codigo_centro:['codigoCentro','v'], sector:['sectorCentro','v'], zona:['zona','r'],
+      nombre_docente:['nombreDocente','v'], cedula_docente:['cedulaDocente','v'],
+      grado_academico:['gradoAcademicoDocente','v'], especialidad:['especialidadDocente','v'],
+      anios_experiencia:['aniosExp','v'], modalidad:['modalidad','r'],
+      area_acompanada:['areaAcompanada','v'], ciclo:['ciclo','r'], grado:['gradoUnico','r'],
+      seccion:['seccion','v'], inscritos:['inscritos','v'], presentes:['presentes','v'],
+      fecha:['fecha','v'], hora_inicio:['horaInicio','v'], hora_termino:['horaTermino','v'],
+      tipo_acompanamiento:['tipoAcompanamiento','r'], foco:['foco','v'],
+      intencion_docente:['intencionDocente','v'], contenido_conceptual:['contenidoConceptual','v'],
+      acuerdos:['acuerdos','v'],
+    },
   },
   coordinador: {
     titulo: 'Instrumento de Acompañamiento al Coordinador/a Pedagógico/a',
     arreglo: () => INDICADORES_COORD,
     campos: [
-      ['Nombre del acompañante', 2], ['Rol del acompañante', 2],
-      ['Regional', 1], ['Distrito', 1], ['Código del centro', 1], ['Sector', 1],
-      ['Centro educativo', 3], ['Zona', 1],
-      ['Nombre del coordinador/a', 2], ['Cédula', 1], ['Cargo / Función', 1],
-      ['Tipo de acompañamiento', 2], ['Fecha', 1], ['Hora', 1],
+      ['Nombre del acompañante', 2, 'nombre_acompanante'], ['Rol del acompañante', 2, 'rol_acompanante'],
+      ['Regional', 1, 'regional'], ['Distrito', 1, 'distrito'],
+      ['Código del centro', 1, 'codigo_centro'], ['Sector', 1, 'sector'],
+      ['Centro educativo', 3, 'centro_educativo'], ['Zona', 1, 'zona'],
+      ['Nombre del coordinador/a', 2, 'nombre_docente'], ['Cédula', 1, 'cedula_docente'],
+      ['Cargo / Función', 1, 'cargo_coordinador'],
+      ['Tipo de acompañamiento', 2, 'tipo_acompanamiento'], ['Fecha', 1, 'fecha'], ['Hora', 1, 'hora_inicio'],
     ],
-    antes: { titulo:'', campos:[['Describa el foco o propósito del acompañamiento', 4]] },
-    despues: { titulo:'Observaciones generales', campos:[['Observaciones generales del acompañamiento', 5]] },
+    antes: { titulo:'', campos:[['Describa el foco o propósito del acompañamiento', 4, 'foco']] },
+    despues: { titulo:'Observaciones generales', campos:[['Observaciones generales del acompañamiento', 5, 'observaciones']] },
     acuerdos: 'Acuerdos / Compromisos',
-    firmas: [
-      'Nombre del/la coordinador(a) pedagógico(a)', 'Nombre del director(a) del centro',
-      'Nombre del técnico(a) distrital  ·  SELLO', 'Nombre del técnico(a) regional',
-    ],
+    firmas: ['Nombre del/la coordinador(a) pedagógico(a)', 'Nombre del director(a) del centro',
+             'Nombre del técnico(a) distrital  ·  SELLO', 'Nombre del técnico(a) regional'],
+    form: {
+      nombre_acompanante:['cNombreAcompanante','v'], rol_acompanante:['cRolAcompanante','v'],
+      regional:['cRegional','v'], distrito:['cDistrito','v'], centro_educativo:['cCentroEducativo','v'],
+      codigo_centro:['cCodigoCentro','v'], sector:['cSectorCentro','v'], zona:['cZona','r'],
+      nombre_docente:['cNombreCoord','v'], cedula_docente:['cCedulaCoord','v'],
+      cargo_coordinador:['cCargoCoord','v'], tipo_acompanamiento:['cTipoAcomp','r'],
+      fecha:['cFechaCoord','v'], hora_inicio:['cHoraCoord','v'], foco:['cFocoCoord','v'],
+      observaciones:['cObservacionesCoord','v'], acuerdos:['cAcuerdosCoord','v'],
+    },
   },
   tecnico_distrital: {
     titulo: 'Instrumento de Acompañamiento al Técnico/a Distrital',
     arreglo: () => INDICADORES_DIST,
     campos: [
-      ['Nombre del acompañante', 2], ['Rol del acompañante', 2],
-      ['Regional', 2], ['Distrito', 2],
-      ['Nombre del técnico/a', 2], ['Cédula', 1], ['Cargo en el distrito', 1],
-      ['Tipo de acompañamiento', 2], ['Fecha', 1], ['Hora', 1],
+      ['Nombre del acompañante', 2, 'nombre_acompanante'], ['Rol del acompañante', 2, 'rol_acompanante'],
+      ['Regional', 2, 'regional'], ['Distrito', 2, 'distrito'],
+      ['Nombre del técnico/a', 2, 'nombre_docente'], ['Cédula', 1, 'cedula'],
+      ['Cargo en el distrito', 1, 'cargo_tecnico'],
+      ['Tipo de acompañamiento', 2, 'tipo_acompanamiento'], ['Fecha', 1, 'fecha'], ['Hora', 1, 'hora_inicio'],
     ],
-    antes: { titulo:'Foco del acompañamiento', campos:[['Describa brevemente el propósito principal de este acompañamiento', 4]] },
-    despues: { titulo:'Observaciones generales', campos:[['Fortalezas identificadas, aspectos a mejorar, contexto relevante', 5]] },
+    antes: { titulo:'Foco del acompañamiento', campos:[['Describa brevemente el propósito principal de este acompañamiento', 4, 'foco']] },
+    despues: { titulo:'Observaciones generales', campos:[['Fortalezas identificadas, aspectos a mejorar, contexto relevante', 5, 'observaciones']] },
     acuerdos: 'Acuerdos establecidos',
-    firmas: [
-      'Nombre del técnico/a distrital  ·  SELLO', 'Nombre del técnico/a regional',
-    ],
+    firmas: ['Nombre del técnico/a distrital  ·  SELLO', 'Nombre del técnico/a regional'],
+    form: {
+      nombre_acompanante:['dNombreAcompanante','v'], rol_acompanante:['dRolAcompanante','v'],
+      regional:['dRegional','v'], distrito:['dDistrito','v'],
+      nombre_docente:['dNombreTecnico','v'], cedula:['dCedulaTecnico','v'],
+      cargo_tecnico:['dCargoTecnico','v'], tipo_acompanamiento:['dTipoAcomp','r'],
+      fecha:['dFechaDist','v'], hora_inicio:['dHoraDist','v'], foco:['dFocoDist','v'],
+      observaciones:['dObservacionesDist','v'], acuerdos:['dAcuerdosDist','v'],
+    },
   },
 };
 
@@ -7852,58 +7886,93 @@ function _numAcuerdos(cfg) {
   return ['I','II','III','IV','V','VI'][n];
 }
 
-function descargarInstrumentoBlanco(tipo) {
+// Arma un objeto con la forma de un registro leyendo el formulario en pantalla
+function _leerFormulario(tipo) {
+  const cfg = _INSTRUMENTOS_BLANCO[tipo];
+  const v = id => (document.getElementById(id)||{}).value || '';
+  const r = name => { const el = document.querySelector('input[name="'+name+'"]:checked'); return el ? el.value : ''; };
+  const datos = { tipo_instrumento: tipo };
+  Object.entries(cfg.form).forEach(([clave, [id, modo]]) => {
+    datos[clave] = modo === 'r' ? r(id) : v(id);
+  });
+  // Multigrado: varios grados marcados
+  if (tipo === 'docente' && !datos.grado) {
+    datos.grado = Array.from(document.querySelectorAll('input[name="gradosMultigrado"]:checked'))
+      .map(c => c.value).join(', ');
+  }
+  const ind = {};
+  cfg.arreglo().forEach(item => {
+    if (!item.codigo) return;
+    const sel = document.querySelector('input[name="val_'+item.codigo+'"]:checked');
+    const obs = document.querySelector('textarea[name="obs_'+item.codigo+'"]');
+    ind[item.codigo] = { valor: sel ? parseInt(sel.value) : null, observacion: obs ? obs.value : '' };
+  });
+  datos.indicadores = ind;
+  return datos;
+}
+
+function descargarInstrumentoBlanco(tipo) { generarInstrumentoPDF(tipo, null); }
+function imprimirInstrumentoLleno(tipo)   { generarInstrumentoPDF(tipo, _leerFormulario(tipo)); }
+
+function generarInstrumentoPDF(tipo, datos) {
   const cfg = _INSTRUMENTOS_BLANCO[tipo];
   if (!cfg) { mostrarNotif('Instrumento no reconocido.', true); return; }
+  const lleno = !!datos;
 
   const esc = s => String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const casilla = '<span class="cx"></span>';
-  const lineas  = n => Array.from({length:n}, () => '<div class="renglon"></div>').join('');
+  const val = c => { const x = datos ? datos[c] : ''; return (x === null || x === undefined) ? '' : String(x); };
+  const lineas = n => Array.from({length:n}, () => '<div class="renglon"></div>').join('');
 
-  // Datos generales: cada campo ocupa 1, 2 o 3 columnas de una rejilla de 4
-  const campos = cfg.campos.map(([et, cols]) =>
-    `<div class="dg-campo" style="grid-column:span ${cols};">
-       <div class="dg-et">${esc(et)}</div><div class="dg-linea"></div>
-     </div>`).join('');
+  // Datos generales
+  const campos = cfg.campos.map(([et, cols, clave]) => {
+    const texto = lleno ? esc(val(clave)) : '';
+    return `<div class="dg-campo" style="grid-column:span ${cols};">
+       <div class="dg-et">${esc(et)}</div>
+       <div class="dg-linea${lleno ? ' con-dato' : ''}">${texto}</div>
+     </div>`;
+  }).join('');
 
-  // Bloques narrativos: se arman en la posición que ocupan en el formulario
+  // Bloques narrativos, en la posición que ocupan en el formulario
   const bloqueNarr = (b, numeral) => {
     if (!b) return '';
-    const cuerpo = b.campos.map(([et, n]) =>
-      `<div class="narr"><div class="narr-t">${esc(et)}</div>${lineas(n)}</div>`).join('');
-    const titulo = b.titulo
-      ? `<div class="bloque-t">${numeral}. ${esc(b.titulo)}</div>`
-      : `<div class="bloque-t">${numeral}. Descripción del acompañamiento</div>`;
-    return `<div class="bloque">${titulo}${cuerpo}</div>`;
+    const cuerpo = b.campos.map(([et, n, clave]) => {
+      const texto = lleno ? esc(val(clave)) : '';
+      return `<div class="narr"><div class="narr-t">${esc(et)}</div>` +
+        (lleno ? `<div class="narr-v">${texto || '—'}</div>` : lineas(n)) + `</div>`;
+    }).join('');
+    const titulo = b.titulo ? esc(b.titulo) : 'Descripción del acompañamiento';
+    return `<div class="bloque"><div class="bloque-t">${numeral}. ${titulo}</div>${cuerpo}</div>`;
   };
 
   // Tabla de indicadores
+  const marca = (codigo, n) => {
+    if (!lleno) return '<span class="cx"></span>';
+    const v2 = datos.indicadores?.[codigo]?.valor;
+    return v2 === n ? '<span class="cx marcada">X</span>' : '<span class="cx"></span>';
+  };
   let filas = '';
   cfg.arreglo().forEach(item => {
-    if (item.tipo === 'seccion') {
-      filas += `<tr class="no-cortar"><td colspan="7" class="t-sec">${esc(item.titulo)}</td></tr>`;
-      return;
-    }
-    if (item.tipo === 'subseccion') {
-      filas += `<tr class="no-cortar"><td colspan="7" class="t-subsec">${esc(item.titulo)}</td></tr>`;
-      return;
-    }
+    if (item.tipo === 'seccion')    { filas += `<tr class="no-cortar"><td colspan="7" class="t-sec">${esc(item.titulo)}</td></tr>`; return; }
+    if (item.tipo === 'subseccion') { filas += `<tr class="no-cortar"><td colspan="7" class="t-subsec">${esc(item.titulo)}</td></tr>`; return; }
     if (!item.codigo) return;
+    const obs = lleno ? esc(datos.indicadores?.[item.codigo]?.observacion || '') : '';
     filas += `<tr class="no-cortar">
       <td class="t-cod">${esc(item.codigo)}</td>
       <td class="t-txt">${esc(item.texto)}</td>
-      <td class="t-cx">${casilla}</td><td class="t-cx">${casilla}</td>
-      <td class="t-cx">${casilla}</td><td class="t-cx">${casilla}</td>
-      <td class="t-obs"></td>
+      <td class="t-cx">${marca(item.codigo,1)}</td><td class="t-cx">${marca(item.codigo,2)}</td>
+      <td class="t-cx">${marca(item.codigo,3)}</td><td class="t-cx">${marca(item.codigo,4)}</td>
+      <td class="t-obs">${obs}</td>
     </tr>`;
   });
 
-  // Firmas propias de cada instrumento
   const firmasHtml = cfg.firmas.map(f =>
     `<div class="firma"><div style="height:34px;"></div><div class="ln">${esc(f)}</div></div>`).join('');
 
   const hoy = new Date().toLocaleDateString('es-DO', { year:'numeric', month:'long', day:'numeric' });
+  const pie = lleno
+    ? `Registro ${datos.estado ? esc(datos.estado).toLowerCase() : 'en captura'}${datos.fecha ? ' · ' + esc(datos.fecha) : ''}`
+    : 'Formulario en blanco';
 
   const html = `<!doctype html><html lang="es"><head><meta charset="utf-8">
 <title>${esc(cfg.titulo)}</title>
@@ -7911,25 +7980,21 @@ function descargarInstrumentoBlanco(tipo) {
   @page { size: letter; margin: 14mm 12mm 16mm 12mm; }
   * { box-sizing: border-box; }
   body { font-family: Georgia, 'Times New Roman', serif; color:#1a2733; margin:0; font-size:10pt; }
-
   .cab { border-bottom:2.5px solid #013777; padding-bottom:8px; margin-bottom:14px; }
   .cab .org { font-size:8.5pt; letter-spacing:1.6px; text-transform:uppercase; color:#013777; font-weight:bold; }
   .cab .sub { font-size:8pt; color:#5b6b7d; margin-top:2px; }
-  .cab h1 { font-size:14pt; margin:9px 0 0; color:#013777; font-weight:bold; letter-spacing:.2px; }
+  .cab h1 { font-size:14pt; margin:9px 0 0; color:#013777; font-weight:bold; }
   .cab .fecha { font-size:8pt; color:#8a97a5; margin-top:3px; font-style:italic; }
-
   .bloque { margin-bottom:13px; }
   .bloque-t { font-size:9pt; font-weight:bold; text-transform:uppercase; letter-spacing:1px;
               color:#013777; border-left:3px solid #013777; padding-left:7px; margin-bottom:7px; }
-
   .dg { display:grid; grid-template-columns:repeat(4,1fr); gap:9px 13px; }
-  .dg-et { font-size:7.5pt; text-transform:uppercase; letter-spacing:.5px; color:#5b6b7d; margin-bottom:11px; }
-  .dg-linea { border-bottom:.8px solid #9fb3c6; }
-
+  .dg-et { font-size:7.5pt; text-transform:uppercase; letter-spacing:.5px; color:#5b6b7d; margin-bottom:2px; }
+  .dg-linea { border-bottom:.8px solid #9fb3c6; min-height:13px; }
+  .dg-linea.con-dato { font-size:9.5pt; color:#13314d; padding-bottom:1px; min-height:14px; }
   .escala { border:1px solid #c5d9ec; background:#f6fafd; padding:7px 10px; margin-bottom:11px;
             font-size:8.5pt; display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
   .escala b { color:#013777; }
-
   table { width:100%; border-collapse:collapse; font-size:8.5pt; }
   thead { display:table-header-group; }
   th { background:#013777; color:#fff; font-size:7.5pt; text-transform:uppercase; letter-spacing:.5px;
@@ -7942,17 +8007,18 @@ function descargarInstrumentoBlanco(tipo) {
   .t-cod { width:36px; text-align:center; font-weight:bold; color:#4a5b6d; font-size:8pt; }
   .t-txt { line-height:1.34; }
   .t-cx  { width:26px; text-align:center; vertical-align:middle; }
-  .t-obs { width:118px; }
-  .cx { display:inline-block; width:11px; height:11px; border:1px solid #6b8299; }
-
+  .t-obs { width:118px; font-size:8pt; line-height:1.3; }
+  .cx { display:inline-block; width:11px; height:11px; border:1px solid #6b8299;
+        line-height:10px; font-size:9px; font-weight:bold; text-align:center; font-family:Arial,sans-serif; }
+  .cx.marcada { background:#013777; color:#fff; border-color:#013777; }
   .narr { margin-bottom:9px; }
-  .narr-t { font-size:7.5pt; text-transform:uppercase; letter-spacing:.5px; color:#5b6b7d; margin-bottom:5px; }
+  .narr-t { font-size:7.5pt; text-transform:uppercase; letter-spacing:.5px; color:#5b6b7d; margin-bottom:4px; }
+  .narr-v { font-size:9.5pt; line-height:1.45; white-space:pre-wrap; border:.7px solid #d4e1ed;
+            background:#fbfdfe; padding:6px 8px; min-height:30px; }
   .renglon { border-bottom:.8px solid #c3d3e2; height:16px; }
-
   .firmas { display:grid; grid-template-columns:1fr 1fr; gap:36px; margin-top:26px; page-break-inside:avoid; }
   .firma { text-align:center; }
   .firma .ln { border-top:.9px solid #5b6b7d; padding-top:4px; font-size:8pt; color:#5b6b7d; }
-
   .pie { margin-top:14px; border-top:1px solid #dce9f5; padding-top:5px;
          font-size:7.5pt; color:#8a97a5; display:flex; justify-content:space-between; }
   @media print { .no-imprimir { display:none; } }
@@ -7960,29 +8026,23 @@ function descargarInstrumentoBlanco(tipo) {
                  padding:9px 16px; font-size:12px; border-radius:6px; cursor:pointer; font-family:Arial,sans-serif; }
 </style></head><body>
 <button class="no-imprimir" onclick="window.print()">Guardar como PDF</button>
-
 <div class="cab">
   <div class="org">Ministerio de Educación de la República Dominicana</div>
   <div class="sub">Viceministerio de Servicios Técnicos y Pedagógicos · Dirección de Educación Primaria</div>
   <h1>${esc(cfg.titulo)}</h1>
-  <div class="fecha">Sistema de Gestión de Acompañamiento Pedagógico (SIGAP) · Generado el ${esc(hoy)}</div>
+  <div class="fecha">Sistema de Gestión de Acompañamiento Pedagógico (SIGAP) · ${esc(hoy)}</div>
 </div>
-
 <div class="bloque">
   <div class="bloque-t">I. Datos generales</div>
   <div class="dg">${campos}</div>
 </div>
-
 ${bloqueNarr(cfg.antes, 'II')}
-
 <div class="bloque">
   <div class="bloque-t">${cfg.antes ? 'III' : 'II'}. Escala de estimación</div>
   <div class="escala">
-    <span><b>1</b> No evidenciado</span>
-    <span><b>2</b> Medianamente evidenciado</span>
-    <span><b>3</b> Evidenciado</span>
-    <span><b>NA</b> No aplica</span>
-    <span style="color:#5b6b7d;">Marque con una X la casilla que corresponda.</span>
+    <span><b>1</b> No evidenciado</span><span><b>2</b> Medianamente evidenciado</span>
+    <span><b>3</b> Evidenciado</span><span><b>NA</b> No aplica</span>
+    <span style="color:#5b6b7d;">${lleno ? 'Valoración registrada en el sistema.' : 'Marque con una X la casilla que corresponda.'}</span>
   </div>
   <table>
     <thead><tr>
@@ -7994,22 +8054,17 @@ ${bloqueNarr(cfg.antes, 'II')}
     <tbody>${filas}</tbody>
   </table>
 </div>
-
 ${bloqueNarr(cfg.despues, cfg.antes ? 'IV' : 'III')}
-
 <div class="bloque" style="page-break-inside:avoid;">
   <div class="bloque-t">${_numAcuerdos(cfg)}. ${esc(cfg.acuerdos)}</div>
-  <div style="font-size:7.5pt;color:#5b6b7d;margin-bottom:5px;">
-    Registre un acuerdo por renglón, indicando responsable y fecha de cumplimiento.
-  </div>
-  ${lineas(7)}
+  ${lleno
+    ? `<div class="narr-v">${esc(val('acuerdos')) || '—'}</div>`
+    : `<div style="font-size:7.5pt;color:#5b6b7d;margin-bottom:5px;">Registre un acuerdo por renglón, indicando responsable y fecha de cumplimiento.</div>${lineas(7)}`}
 </div>
-
 <div class="firmas">${firmasHtml}</div>
-
 <div class="pie">
   <span>MINERD · Dirección de Educación Primaria</span>
-  <span>SIGAP · ${esc(cfg.titulo)}</span>
+  <span>${esc(pie)}</span>
 </div>
 </body></html>`;
 
@@ -8022,34 +8077,12 @@ ${bloqueNarr(cfg.despues, cfg.antes ? 'IV' : 'III')}
 }
 
 function imprimirRegistro() {
-  const contenido = document.getElementById('vrCuerpo').innerHTML;
-  const titulo = document.getElementById('vrTitulo').textContent;
-  const ventana = window.open('', '_blank');
-  ventana.document.write(`<!doctype html><html><head><meta charset="utf-8">
-    <title>${titulo}</title>
-    <style>
-      body{font-family:Arial,sans-serif;font-size:13px;color:#1a3a52;margin:24px;}
-      .vr-bloque{border:1px solid #dce9f5;border-radius:10px;margin-bottom:16px;overflow:hidden;}
-      .vr-titulo{background:#f7fafd;font-weight:800;font-size:13px;padding:10px 16px;border-bottom:1px solid #dce9f5;}
-      .vr-grid{display:grid;gap:0;padding:0;}
-      .vr-campo{padding:9px 16px;border-bottom:1px solid #f0f5fa;display:grid;grid-template-columns:200px 1fr;gap:8px;}
-      .vr-campo:last-child{border-bottom:none;}
-      .vr-label{font-size:11px;color:#617384;font-weight:700;text-transform:uppercase;letter-spacing:.4px;align-self:start;padding-top:1px;}
-      .vr-valor{font-size:13px;color:#1a3a52;font-weight:600;white-space:pre-wrap;}
-      .vr-tabla-ind{width:100%;border-collapse:collapse;font-size:12px;}
-      .vr-tabla-ind th{background:#f7fafd;padding:7px 10px;text-align:left;border-bottom:1px solid #dce9f5;font-size:11px;}
-      .vr-tabla-ind td{padding:7px 10px;border-bottom:1px solid #f5f8fc;vertical-align:top;}
-      .vr-tabla-ind tr:last-child td{border-bottom:none;}
-      .vr-sec{background:#e8f0fa;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:6px 10px;}
-      .vr-subsec{background:#eef7ea;font-weight:700;font-size:11.5px;padding:6px 10px 6px 24px;color:#2a5c18;border-left:3px solid #86b96e;}
-      .badge-verde{background:#d1fae5;color:#065f46;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;}
-      .badge-amarillo{background:#fef3c7;color:#92400e;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;}
-      @media print{body{margin:10px;}}
-    </style></head><body>${contenido}</body></html>`);
-  ventana.document.close();
-  ventana.focus();
-  setTimeout(() => ventana.print(), 400);
+  // Reutiliza el formato profesional del instrumento, con los datos del registro
+  const r = _registroVisible;
+  if (!r) { mostrarNotif('No hay registro abierto.', true); return; }
+  generarInstrumentoPDF(r.tipo_instrumento || 'docente', r);
 }
+
 
 function campo(label, valor) {
   const v = (valor === null || valor === undefined || valor === '') ? '—' : String(valor);
@@ -8100,7 +8133,10 @@ function tablaIndicadoresVR(indicadoresArr, indicadoresData) {
   return html;
 }
 
+let _registroVisible = null;
+
 function verRegistro(r) {
+  _registroVisible = r;
   const modal = document.getElementById('modalVerRegistro');
   const tipo = r.tipo_instrumento || 'docente';
   const esCoord = tipo === 'coordinador';
