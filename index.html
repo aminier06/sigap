@@ -1459,7 +1459,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="acciones">
             <button type="button" class="btn-primario" onclick="imprimirInstrumentoLleno('coordinador')" title="Genera el PDF con los datos capturados en este formulario">🖨️ Imprimir / PDF</button>
             <button type="button" class="btn-secundario" onclick="descargarInstrumentoBlanco('coordinador')" title="Genera el formulario vacío, listo para imprimir o guardar en PDF">📄 Instrumento en blanco</button>
-            <button type="button" class="btn-secundario" onclick="guardarBorradorCoord()">💾 Guardar borrador</button>
+            <button type="button" class="btn-secundario" id="btnBorradorCoord" onclick="guardarBorradorCoord()">💾 Guardar borrador</button>
             <button type="submit" class="btn-primario" id="btnEnviarCoord">✅ Enviar registro</button>
             <button type="button" class="btn-peligro" onclick="limpiarFormularioCoord()">🗑️ Limpiar</button>
           </div>
@@ -1623,7 +1623,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="acciones">
             <button type="button" class="btn-primario" onclick="imprimirInstrumentoLleno('tecnico_distrital')" title="Genera el PDF con los datos capturados en este formulario">🖨️ Imprimir / PDF</button>
             <button type="button" class="btn-secundario" onclick="descargarInstrumentoBlanco('tecnico_distrital')" title="Genera el formulario vacío, listo para imprimir o guardar en PDF">📄 Instrumento en blanco</button>
-            <button type="button" class="btn-secundario" onclick="guardarBorradorDist()">💾 Guardar borrador</button>
+            <button type="button" class="btn-secundario" id="btnBorradorDist" onclick="guardarBorradorDist()">💾 Guardar borrador</button>
             <button type="submit" class="btn-primario" id="btnEnviarDist">✅ Enviar registro</button>
             <button type="button" class="btn-peligro" onclick="limpiarFormularioDist()">🗑️ Limpiar</button>
           </div>
@@ -2955,22 +2955,159 @@ document.addEventListener('click', e => {
 let autoguardadoTimer = null;
 let ultimoAutoguardado = null;
 
+// ── BORRADORES AUTOMÁTICOS (LOS TRES INSTRUMENTOS) ────────────────────────────
+// Cada acompañamiento en curso ocupa UNA fila: el primer guardado la crea y los
+// siguientes la actualizan. Al enviar, esa misma fila pasa a Enviado.
+const _BORRADOR = {
+  docente: {
+    panel:'panel-formDocente', form:'formAcompDocente',
+    minimos:['fecha','nombreDocente'],
+    payload: () => {
+      const v = id => (document.getElementById(id)||{}).value || '';
+      const r = n => { const e = document.querySelector('input[name="'+n+'"]:checked'); return e?e.value:''; };
+      const grado = r('gradoUnico') || Array.from(document.querySelectorAll('input[name="gradosMultigrado"]:checked')).map(c=>c.value).join(', ');
+      const ind = {};
+      INDICADORES.forEach(i => { if (!i.codigo) return;
+        const sel = document.querySelector('input[name="val_'+i.codigo+'"]:checked');
+        const obs = document.querySelector('textarea[name="obs_'+i.codigo+'"]');
+        ind[i.codigo] = { valor: sel?parseInt(sel.value):null, observacion: obs?obs.value:'' }; });
+      return { usuario_id: usuarioActual?.id,
+        nombre_acompanante:v('nombreAcompanante'), rol_acompanante:v('rolAcompanante'),
+        regional:v('regional'), distrito:v('distrito'), centro_educativo:v('centroEducativo'),
+        codigo_centro:v('codigoCentro'), sector:v('sectorCentro'), zona:r('zona'),
+        nombre_docente:v('nombreDocente'), cedula_docente:v('cedulaDocente'),
+        grado_academico:v('gradoAcademicoDocente'), especialidad:v('especialidadDocente'),
+        anios_experiencia: parseInt(v('aniosExp')) || null, modalidad:r('modalidad'),
+        area_acompanada:v('areaAcompanada'), ciclo:r('ciclo'), grado, seccion:v('seccion'),
+        inscritos: parseInt(v('inscritos'))||null, presentes: parseInt(v('presentes'))||null,
+        fecha:v('fecha')||null, hora_inicio:v('horaInicio')||null, hora_termino:v('horaTermino')||null,
+        tipo_acompanamiento:r('tipoAcompanamiento'), foco:v('foco'),
+        intencion_docente:v('intencionDocente'), contenido_conceptual:v('contenidoConceptual'),
+        acuerdos:v('acuerdos'), indicadores:ind, tipo_instrumento:'docente', estado:'Borrador' };
+    },
+  },
+  coordinador: {
+    panel:'panel-formCoord', form:'formAcompCoord',
+    minimos:['cFechaCoord','cNombreCoord'],
+    payload: () => {
+      const v = id => (document.getElementById(id)||{}).value || '';
+      const r = n => { const e = document.querySelector('input[name="'+n+'"]:checked'); return e?e.value:''; };
+      const ind = {};
+      INDICADORES_COORD.forEach(i => { if (!i.codigo) return;
+        const sel = document.querySelector('input[name="val_'+i.codigo+'"]:checked');
+        const obs = document.querySelector('textarea[name="obs_'+i.codigo+'"]');
+        ind[i.codigo] = { valor: sel?parseInt(sel.value):null, observacion: obs?obs.value:'' }; });
+      return { usuario_id: usuarioActual?.id,
+        nombre_acompanante:v('cNombreAcompanante'), rol_acompanante:v('cRolAcompanante'),
+        regional:v('cRegional'), distrito:v('cDistrito'), centro_educativo:v('cCentroEducativo'),
+        codigo_centro:v('cCodigoCentro'), sector:v('cSectorCentro'),
+        nombre_docente:v('cNombreCoord'), cedula_docente:v('cCedulaCoord'),
+        tipo_acompanamiento:r('cTipoAcomp'), fecha:v('cFechaCoord')||null, foco:v('cFocoCoord'),
+        observaciones:v('cObservacionesCoord'), acuerdos:v('cAcuerdosCoord'),
+        indicadores:ind, tipo_instrumento:'coordinador', estado:'Borrador' };
+    },
+  },
+  tecnico_distrital: {
+    panel:'panel-formDist', form:'formAcompDist',
+    minimos:['dFechaDist','dNombreTecnico'],
+    payload: () => {
+      const v = id => (document.getElementById(id)||{}).value || '';
+      const r = n => { const e = document.querySelector('input[name="'+n+'"]:checked'); return e?e.value:''; };
+      const valores = {};
+      INDICADORES_DIST.filter(i=>i.codigo).forEach(i => {
+        const sel = document.querySelector('input[name="val_'+i.codigo+'"]:checked');
+        valores[i.codigo] = sel ? parseInt(sel.value) : null; });
+      return { usuario_id: usuarioActual?.id,
+        nombre_acompanante:v('dNombreAcompanante'), rol_acompanante:v('dRolAcompanante'),
+        regional:v('dRegional'), distrito:v('dDistrito'), centro_educativo:v('dCentroEducativo'),
+        codigo_centro:v('dCodigoCentro'), nombre_docente:v('dNombreTecnico'),
+        cedula:v('dCedulaTecnico'), tipo_acompanamiento:r('dTipoAcomp'),
+        fecha:v('dFechaDist')||null, foco:v('dFocoDist'),
+        observaciones:v('dObservacionesDist'), acuerdos:v('dAcuerdosDist'),
+        valores_json: JSON.stringify(valores),
+        tipo_instrumento:'tecnico_distrital', estado:'Borrador' };
+    },
+  },
+};
+
+const _borradorId    = { docente:null, coordinador:null, tecnico_distrital:null };
+const _firmaBorrador = { docente:'',   coordinador:'',   tecnico_distrital:'' };
+
+// Huella del formulario, para no reescribir cuando nada ha cambiado
+function _firmaFormulario(idForm) {
+  const f = document.getElementById(idForm);
+  if (!f) return '';
+  const partes = [];
+  f.querySelectorAll('input, select, textarea').forEach(el => {
+    if (el.type === 'radio' || el.type === 'checkbox') {
+      if (el.checked) partes.push((el.name||el.id) + '=' + el.value);
+    } else partes.push((el.name||el.id) + '=' + el.value);
+  });
+  return partes.join('|');
+}
+
+// ¿Hay algo que valga la pena guardar?
+function _tieneDatosMinimos(tipo) {
+  return _BORRADOR[tipo].minimos.some(id => (document.getElementById(id)?.value || '').trim());
+}
+
+// Guarda (o actualiza) el borrador del instrumento indicado
+async function guardarBorradorInstrumento(tipo, silencioso = false) {
+  const cfg = _BORRADOR[tipo];
+  if (!cfg || !usuarioActual) return false;
+  if (!_tieneDatosMinimos(tipo)) {
+    if (!silencioso) mostrarNotif('Complete al menos la fecha o el nombre para guardar un borrador.', true);
+    return false;
+  }
+  const registro = cfg.payload();
+  let error = null;
+
+  if (_borradorId[tipo]) {
+    const res = await sb.from('acompañamientos').update(registro).eq('id', _borradorId[tipo]).select('id');
+    error = res.error;
+    if (!error && (!res.data || res.data.length === 0)) _borradorId[tipo] = null;
+  }
+  if (!error && !_borradorId[tipo]) {
+    const res = await sb.from('acompañamientos').insert(registro).select('id').single();
+    error = res.error;
+    if (!error && res.data) _borradorId[tipo] = res.data.id;
+  }
+  if (error) {
+    if (!silencioso) mostrarNotif('Error al guardar el borrador: ' + error.message, true);
+    return false;
+  }
+  _firmaBorrador[tipo] = _firmaFormulario(cfg.form);
+  if (!silencioso) mostrarNotif('Borrador guardado.');
+  return true;
+}
+
+// Al enviar, el borrador deja de estar en curso
+function cerrarBorrador(tipo) {
+  _borradorId[tipo] = null;
+  _firmaBorrador[tipo] = '';
+}
+
+// Id del borrador en curso, para que el envío actualice esa fila en vez de duplicarla
+function idBorradorEnCurso(tipo) { return _borradorId[tipo]; }
+
 function iniciarAutoguardado() {
   if (autoguardadoTimer) clearInterval(autoguardadoTimer);
   autoguardadoTimer = setInterval(async () => {
-    // Solo autoguardar si hay datos mínimos en el formulario
-    const fecha   = document.getElementById('fecha')?.value;
-    const docente = document.getElementById('nombreDocente')?.value?.trim();
-    if (!fecha && !docente) return;
+    // Detectar qué instrumento está abierto
+    const tipo = Object.keys(_BORRADOR).find(t =>
+      document.getElementById(_BORRADOR[t].panel)?.classList.contains('activo'));
+    if (!tipo) return;
+    if (!_tieneDatosMinimos(tipo)) return;
 
-    // No autoguardar si el panel activo no es el formulario
-    if (!document.getElementById('panel-formDocente')?.classList.contains('activo')) return;
+    // No reescribir si nada cambió desde el último autoguardado
+    const firma = _firmaFormulario(_BORRADOR[tipo].form);
+    if (firma === _firmaBorrador[tipo]) return;
 
-    await guardarRegistro('Borrador');
-    ultimoAutoguardado = new Date();
-    mostrarIndicadorAutoguardado();
+    const ok = await guardarBorradorInstrumento(tipo, true);
+    if (ok) { ultimoAutoguardado = new Date(); mostrarIndicadorAutoguardado(); }
   }, 3 * 60 * 1000); // cada 3 minutos
 }
+
 
 function mostrarIndicadorAutoguardado() {
   const hora = ultimoAutoguardado.toLocaleTimeString('es-DO', { hour:'2-digit', minute:'2-digit' });
@@ -4699,8 +4836,14 @@ async function buscarCentro(codigo) {
       return;
     }
     document.getElementById('centroEducativo').value = data.nombre;
-    const regionalVal = data.regional_codigo + ' – ' + data.regional_nombre;
-    const distritoVal = data.distrito_codigo + ' – ' + data.distrito_nombre;
+    // Resolver contra el catálogo canónico del sistema. Antes se componía el
+    // texto con los nombres de la tabla de centros y un guion largo, lo que
+    // generaba variantes como '08 – SANTIAGO' frente a '08 - Santiago' y hacía
+    // que la misma regional se contara dos veces en los agrupamientos.
+    const regionalVal = regionalCanonica(data.regional_codigo) ||
+                        (data.regional_codigo + ' - ' + data.regional_nombre);
+    const distritoVal = distritoCanonico(data.distrito_codigo) ||
+                        (data.distrito_codigo + ' - ' + data.distrito_nombre);
     const selReg = document.getElementById('regional');
     if (!Array.from(selReg.options).some(o=>o.value===regionalVal)) {
       const o = document.createElement('option'); o.value=regionalVal; o.textContent=regionalVal; selReg.appendChild(o);
@@ -4821,13 +4964,30 @@ async function guardarRegistro(estado) {
     estado,
   };
 
-  const { error } = await sb.from('acompañamientos').insert(registro);
+  // Un acompañamiento en curso ocupa UNA sola fila: el primer guardado la crea
+  // y los siguientes la actualizan. Al enviar, ese mismo borrador pasa a
+  // Enviado, de modo que no queda un duplicado por cada autoguardado.
+  let error = null;
+  if (_borradorId.docente) {
+    const res = await sb.from('acompañamientos')
+      .update(registro).eq('id', _borradorId.docente).select('id');
+    error = res.error;
+    // Si el borrador fue borrado desde otra pantalla, se crea uno nuevo
+    if (!error && (!res.data || res.data.length === 0)) _borradorId.docente = null;
+  }
+  if (!error && !_borradorId.docente) {
+    const res = await sb.from('acompañamientos').insert(registro).select('id').single();
+    error = res.error;
+    if (!error && res.data) _borradorId.docente = res.data.id;
+  }
+
   if (error) { mostrarNotif('Error al guardar: ' + error.message, true); return; }
   mostrarNotif(estado === 'Enviado' ? 'Registro enviado correctamente.' : 'Borrador guardado.');
-  if (estado === 'Enviado') limpiarFormulario();
+  if (estado === 'Enviado') { cerrarBorrador('docente'); limpiarFormulario(); }
 }
 
 function limpiarFormulario() {
+  cerrarBorrador('docente');        // el siguiente guardado abre una fila nueva
   document.getElementById('formAcompDocente').reset();
   document.getElementById('nombreAcompanante').value = perfilActual?.nombre || '';
   document.getElementById('rolAcompanante').value = perfilActual?.rol || '';
@@ -5363,6 +5523,7 @@ async function buscarCentroDist(codigo) {
 }
 
 function limpiarFormularioDist() {
+  cerrarBorrador('tecnico_distrital');
   if (!confirm('¿Limpiar todo el formulario del técnico distrital?')) return;
   document.getElementById('formAcompDist').reset();
   document.getElementById('dNombreAcompanante').value = perfilActual?.nombre || '';
@@ -5375,7 +5536,12 @@ function limpiarFormularioDist() {
   document.getElementById('dEstadoBusquedaCentro').textContent = '';
 }
 
-async function guardarBorradorDist() { mostrarNotif('Borrador guardado localmente.'); }
+async function guardarBorradorDist() {
+  const btn = document.getElementById('btnBorradorDist');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Guardando…'; }
+  await guardarBorradorInstrumento('tecnico_distrital');
+  if (btn) { btn.disabled = false; btn.textContent = '💾 Guardar borrador'; }
+}
 
 async function enviarFormularioDist(event) {
   event.preventDefault();
@@ -5432,9 +5598,12 @@ async function enviarFormularioDist(event) {
       valores_json: JSON.stringify(valores),
       tipo_instrumento: 'tecnico_distrital',
       usuario_id: usuarioActual?.id,
-      estado: 'enviado'
+      estado: 'Enviado'
     };
-    const { error } = await sb.from('acompañamientos').insert([payload]);
+    const _bid = idBorradorEnCurso('tecnico_distrital');
+    const { error } = _bid
+      ? await sb.from('acompañamientos').update(payload).eq('id', _bid)
+      : await sb.from('acompañamientos').insert([payload]);
     if (error) throw error;
     mostrarNotif('Acompañamiento al técnico distrital enviado correctamente.');
     limpiarFormularioDist();
@@ -5525,6 +5694,7 @@ async function buscarCentroCoord(codigo) {
 }
 
 function limpiarFormularioCoord() {
+  cerrarBorrador('coordinador');
   document.getElementById('formAcompCoord').reset();
   document.getElementById('cNombreAcompanante').value = perfilActual?.nombre || '';
   document.getElementById('cRolAcompanante').value = perfilActual?.rol || '';
@@ -5533,7 +5703,10 @@ function limpiarFormularioCoord() {
 }
 
 async function guardarBorradorCoord() {
-  mostrarNotif('Borrador guardado localmente.');
+  const btn = document.getElementById('btnBorradorCoord');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Guardando…'; }
+  await guardarBorradorInstrumento('coordinador');
+  if (btn) { btn.disabled = false; btn.textContent = '💾 Guardar borrador'; }
 }
 
 async function enviarFormularioCoord(event) {
@@ -5593,7 +5766,10 @@ async function enviarFormularioCoord(event) {
   };
   const btn = document.getElementById('btnEnviarCoord');
   btn.disabled = true; btn.textContent = 'Guardando…';
-  const { error } = await sb.from('acompañamientos').insert([registro]);
+  const _bid = idBorradorEnCurso('coordinador');
+  const { error } = _bid
+    ? await sb.from('acompañamientos').update(registro).eq('id', _bid)
+    : await sb.from('acompañamientos').insert([registro]);
   btn.disabled = false; btn.textContent = '✅ Enviar registro';
   if (error) { mostrarNotif('Error al guardar: ' + error.message, true); return; }
   mostrarNotif('Registro enviado correctamente.');
@@ -5607,6 +5783,22 @@ async function enviarFormularioCoord(event) {
 
 // ── DATOS DE REGIONALES Y DISTRITOS ──────────────────────────────────────────
 const DISTRITOS_POR_REGIONAL = {"01 - Barahona": ["0101 - Pedernales", "0102 - Enriquillo", "0103 - Barahona", "0104 - Cabral", "0105 - Vicente Noble"], "02 - San Juan de la Maguana": ["0201 - Comendador", "0202 - Pedro Santana", "0203 - Las Matas de Farfan", "0204 - El Cercado", "0205 - San Juan Este", "0206 - San Juan Oeste", "0207 - Hondo Valle"], "03 - Azua": ["0301 - Azua", "0302 - Padre de las Casas", "0303 - San Jose de Ocoa", "0304 - Bani", "0305 - Nizao"], "04 - San Cristobal": ["0401 - Cambita Garabitos", "0402 - San Cristobal Norte", "0403 - San Cristobal Sur", "0404 - Villa Altagracia", "0405 - Yaguate", "0406 - Haina", "0407 - San Gregorio de Nigua"], "05 - San Pedro de Macoris": ["0501 - San Pedro de Macoris Este", "0502 - San Pedro de Macoris Oeste", "0503 - La Romana", "0504 - Hato Mayor", "0505 - Sabana de la Mar", "0506 - Consuelo", "0507 - San Jose de los Llanos", "0508 - Quisqueya", "0509 - El Valle", "0510 - Guaymate", "0511 - Villa Hermosa"], "06 - La Vega": ["0601 - Jose Contreras", "0602 - Constanza", "0603 - Jarabacoa", "0604 - La Vega Oeste", "0605 - La Vega Este", "0606 - Moca", "0607 - Gaspar Hernandez", "0608 - Jamao al Norte", "0609 - San Victor", "0610 - Jima Abajo"], "07 - San Francisco de Macoris": ["0701 - Tenares", "0702 - Salcedo", "0703 - Castillo", "0704 - Villa Riva", "0705 - San Francisco de Macoris Sur-e", "0706 - San Francisco de Macoris Nor-o", "0707 - Villa Tapia"], "08 - Santiago": ["0801 - San Jose de las Matas", "0802 - Janico", "0803 - Santiago Sur-este", "0804 - Santiago Noroeste", "0805 - Santiago Centro-oeste", "0806 - Santiago Noreste", "0807 - Villa Bisono (navarrete)", "0808 - Licey al Medio", "0809 - Tamboril", "0810 - Villa Gonzalez"], "09 - Mao": ["0901 - Mao", "0902 - Esperanza", "0903 - San Ignacio de Sabaneta", "0904 - Moncion", "0905 - Laguna Salada", "0906 - Villa los Almacigos"], "10 - Santo Domingo": ["1001 - Villa Mella", "1002 - Sabana Perdida", "1003 - Santo Domingo Noreste", "1004 - Santo Domingo Oriental", "1005 - Boca Chica", "1006 - Mendoza", "1007 - San Antonio de Guerra"], "11 - Puerto Plata": ["1101 - Sosua", "1102 - Puerto Plata", "1103 - Imbert", "1104 - Luperon", "1105 - Altamira", "1106 - El Mamey", "1107 - Villa Isabela"], "12 - Higuey": ["1201 - Higuey", "1202 - San Rafael del Yuma", "1203 - El Seibo", "1204 - Miches"], "13 - Monte Cristi": ["1301 - Monte Cristi", "1302 - Guayubin", "1303 - Villa Vasquez", "1304 - Dajabon", "1305 - Loma de Cabrera", "1306 - Restauracion"], "14 - Nagua": ["1401 - Nagua", "1402 - Cabrera", "1403 - Rio San Juan", "1404 - Samana", "1405 - Sanchez", "1406 - El Factor", "1407 - Las Terrenas"], "15 - Santo Domingo": ["1501 - Los Alcarrizos", "1502 - Santo Domingo Centro", "1503 - Santo Domingo Surcentral", "1504 - Santo Domingo Noroeste", "1505 - Herrera", "1506 - Pedro Brand"], "16 - Cotui": ["1601 - Cotui", "1602 - Fantino", "1603 - Cevicos", "1604 - Bonao Suroeste", "1605 - Piedra Blanca", "1606 - Bonao Nordeste", "1607 - Villa la Mata"], "17 - Monte Plata": ["1701 - Yamasa", "1702 - Monte Plata", "1703 - Bayaguana", "1704 - Sabana Grande de Boya", "1705 - Peralvillo"], "18 - Baoruco": ["1801 - Neiba", "1802 - Tamayo", "1803 - Villa Jaragua", "1804 - Jimani", "1805 - Duverge"]};
+
+// Devuelve el nombre canónico de una demarcación a partir de su código.
+// Evita que se guarden variantes con guion largo, mayúsculas o nombres
+// distintos a los del catálogo, que luego aparecen como demarcaciones aparte.
+function regionalCanonica(codigo) {
+  const c = String(codigo || '').trim().padStart(2, '0');
+  return Object.keys(DISTRITOS_POR_REGIONAL).find(r => r.slice(0, 2) === c) || '';
+}
+function distritoCanonico(codigo) {
+  const c = String(codigo || '').trim().padStart(4, '0');
+  for (const lista of Object.values(DISTRITOS_POR_REGIONAL)) {
+    const d = lista.find(x => x.slice(0, 4) === c);
+    if (d) return d;
+  }
+  return '';
+}
 
 function cargarDistritosUsuario() {
   const reg = document.getElementById('nuRegional').value;
@@ -7576,7 +7768,7 @@ enviarFormularioDist = async function(event) {
     valores_json: JSON.stringify(valores),
     tipo_instrumento: 'tecnico_distrital',
     usuario_id: usuarioActual?.id,
-    estado: 'enviado',
+    estado: 'Enviado',
   });
   await actualizarIndicadorSync();
   mostrarNotif('💾 Guardado localmente. Se sincronizará al reconectar.');
