@@ -3013,10 +3013,13 @@ const _BORRADOR = {
     payload: () => {
       const v = id => (document.getElementById(id)||{}).value || '';
       const r = n => { const e = document.querySelector('input[name="'+n+'"]:checked'); return e?e.value:''; };
-      const valores = {};
+      const valores = {}, indicadoresDist = {};
       INDICADORES_DIST.filter(i=>i.codigo).forEach(i => {
         const sel = document.querySelector('input[name="val_'+i.codigo+'"]:checked');
-        valores[i.codigo] = sel ? parseInt(sel.value) : null; });
+        const obs = document.querySelector('[name="obs_'+i.codigo+'"]');
+        valores[i.codigo] = sel ? parseInt(sel.value) : null;
+        indicadoresDist[i.codigo] = { valor: sel ? parseInt(sel.value) : null,
+                                      observacion: obs ? obs.value : '' }; });
       return { usuario_id: usuarioActual?.id,
         nombre_acompanante:v('dNombreAcompanante'), rol_acompanante:v('dRolAcompanante'),
         regional:v('dRegional'), distrito:v('dDistrito'), centro_educativo:v('dCentroEducativo'),
@@ -3024,7 +3027,7 @@ const _BORRADOR = {
         cedula:v('dCedulaTecnico'), tipo_acompanamiento:r('dTipoAcomp'),
         fecha:v('dFechaDist')||null, foco:v('dFocoDist'),
         observaciones:v('dObservacionesDist'), acuerdos:v('dAcuerdosDist'),
-        valores_json: JSON.stringify(valores),
+        valores_json: JSON.stringify(valores), indicadores: indicadoresDist,
         tipo_instrumento:'tecnico_distrital', estado:'Borrador' };
     },
   },
@@ -5576,9 +5579,15 @@ async function enviarFormularioDist(event) {
   try {
     const fd = new FormData(document.getElementById('formAcompDist'));
     const valores = {};
+    // Formato estándar con observación, que es el que leen la vista de
+    // registro, el historial y los análisis. Antes solo se guardaba el valor.
+    const indicadoresDist = {};
     INDICADORES_DIST.filter(i=>i.codigo).forEach(i => {
       const sel = document.querySelector(`input[name="val_${i.codigo}"]:checked`);
+      const obs = document.querySelector(`[name="obs_${i.codigo}"]`);
       valores[i.codigo] = sel ? parseInt(sel.value) : null;
+      indicadoresDist[i.codigo] = { valor: sel ? parseInt(sel.value) : null,
+                                    observacion: obs ? obs.value : '' };
     });
     const acuerdos = (document.getElementById('dAcuerdosDist')?.value || '').trim();
     const payload = {
@@ -5596,6 +5605,7 @@ async function enviarFormularioDist(event) {
       observaciones: fd.get('dObservacionesDist'),
       acuerdos,
       valores_json: JSON.stringify(valores),
+      indicadores: indicadoresDist,
       tipo_instrumento: 'tecnico_distrital',
       usuario_id: usuarioActual?.id,
       estado: 'Enviado'
