@@ -1724,11 +1724,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     <th>Foco del acompañamiento</th>
                     <th>Insumos a utilizar</th>
                     <th>Estado</th>
+                    <th>Observación</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="cuerpoPlanificacion">
-                  <tr><td colspan="9" style="text-align:center;color:#8fa5bb;padding:32px;">
+                  <tr><td colspan="10" style="text-align:center;color:#8fa5bb;padding:32px;">
                     Seleccione una semana y haga clic en "Cargar semana", o cree una nueva planificación.
                   </td></tr>
                 </tbody>
@@ -1843,7 +1844,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         <!-- Filtros -->
         <div class="filtros-bar" style="margin-bottom:20px;">
-          <div class="filtros-grid" style="grid-template-columns:repeat(3,1fr);align-items:end;">
+          <div class="filtros-grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));align-items:end;gap:10px;">
             <div class="campo">
               <label>Desde</label>
               <input type="date" id="segDesde" />
@@ -1852,10 +1853,40 @@ document.addEventListener('DOMContentLoaded', () => {
               <label>Hasta</label>
               <input type="date" id="segHasta" />
             </div>
-            <div>
-              <button class="btn-primario" onclick="cargarSeguimiento()" style="margin-top:20px;">📊 Ver seguimiento</button>
+            <div class="campo">
+              <label>Acompañante</label>
+              <select id="segAcompanante" onchange="filtrarSeguimiento()">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label>Instrumento</label>
+              <select id="segInstrumento" onchange="filtrarSeguimiento()">
+                <option value="">Todos</option>
+                <option value="docente">Docente</option>
+                <option value="coordinador">Coordinador/a</option>
+                <option value="tecnico_distrital">Técnico distrital</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label>Cumplimiento</label>
+              <select id="segCumplimiento" onchange="filtrarSeguimiento()">
+                <option value="">Todos</option>
+                <option value="cumplido">Cumplidos</option>
+                <option value="pendiente">Pendientes</option>
+                <option value="noejecutado">No ejecutados</option>
+              </select>
+            </div>
+            <div class="campo" style="grid-column:span 2;">
+              <label>Buscar acompañado o centro</label>
+              <input type="text" id="segBuscar" placeholder="Nombre, cédula o centro…" oninput="filtrarSeguimiento()" />
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-primario" onclick="cargarSeguimiento()" style="white-space:nowrap;">📊 Ver seguimiento</button>
+              <button class="btn-secundario" onclick="limpiarFiltrosSeguimiento()" style="white-space:nowrap;">✕ Limpiar</button>
             </div>
           </div>
+          <div id="segContador" style="font-size:12px;color:#617384;margin-top:8px;"></div>
         </div>
 
         <!-- Tarjetas resumen -->
@@ -2532,10 +2563,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 <option value="planificaciones">Planificaciones</option>
               </select>
             </div>
-            <div class="campo" style="display:flex;align-items:flex-end;">
-              <button class="btn-primario" onclick="cargarSeguimientoTecnicos()">Consultar</button>
+            <div class="campo">
+              <label>Técnico</label>
+              <select id="stTecnico" onchange="filtrarSeguimientoTecnicos()">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label>Rol</label>
+              <select id="stRol" onchange="filtrarSeguimientoTecnicos()">
+                <option value="">Todos</option>
+                <option value="Técnico/a Regional">Técnico/a Regional</option>
+                <option value="Técnico/a Distrital">Técnico/a Distrital</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label>Distrito</label>
+              <select id="stDistrito" onchange="filtrarSeguimientoTecnicos()">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="campo" style="grid-column:span 2;">
+              <label>Buscar</label>
+              <input type="text" id="stBuscar" placeholder="Centro, docente o foco…" oninput="filtrarSeguimientoTecnicos()">
+            </div>
+            <div class="campo" style="display:flex;align-items:flex-end;gap:8px;">
+              <button class="btn-primario" onclick="cargarSeguimientoTecnicos()" style="white-space:nowrap;">Consultar</button>
+              <button class="btn-secundario" onclick="limpiarFiltrosTecnicos()" style="white-space:nowrap;">✕ Limpiar</button>
             </div>
           </div>
+          <div id="stContador" style="font-size:12px;color:#617384;margin-top:8px;"></div>
         </div>
 
         <!-- Tarjetas resumen -->
@@ -4415,10 +4472,89 @@ async function cargarPlanificacion() {
   document.getElementById('accionesPlan').style.display = 'flex';
 }
 
+const _esc = x => String(x == null ? '' : x)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+// Observación: por qué un acompañamiento planificado no se ha ejecutado
+async function editarObservacionPlan(id) {
+  const p = planActual.find(x => String(x.id) === String(id));
+  if (!p) return;
+  const texto = prompt(
+    'Razón o circunstancia por la que este acompañamiento no se ha ejecutado:\n\n' +
+    (p.centro_educativo || '') + (p.fecha_prevista ? '  ·  ' + p.fecha_prevista : ''),
+    p.observacion || '');
+  if (texto === null) return;                 // canceló
+  const valor = texto.trim() || null;
+  const { error } = await sb.from('planificaciones')
+    .update({ observacion: valor }).eq('id', id);
+  if (error) { mostrarNotif('Error al guardar la observación: ' + error.message, true); return; }
+  p.observacion = valor;
+  renderizarPlanificacion();
+  mostrarNotif(valor ? 'Observación guardada.' : 'Observación eliminada.');
+}
+
+// Planificación desde la que se inició el acompañamiento en curso.
+// Permite marcarla como ejecutada al enviarlo, sin volver a la pantalla.
+let _planEnCurso = null;
+
+// Abre el instrumento que corresponda con los datos de la planificación
+async function iniciarAcompanamientoDesdePlan(id) {
+  const p = planActual.find(x => String(x.id) === String(id));
+  if (!p) { mostrarNotif('No se encontró la planificación.', true); return; }
+
+  const tipo = p.tipo_instrumento || 'docente';
+  const panel = tipo === 'coordinador' ? 'formCoord'
+              : tipo === 'tecnico_distrital' ? 'formDist' : 'formDocente';
+
+  // Avisar si ya hay un borrador en curso de ese instrumento
+  if (_borradorId[tipo]) {
+    if (!confirm('Hay un acompañamiento sin enviar en ese formulario.\n\n' +
+                 'Si continúa, los datos de esta planificación lo reemplazarán. ¿Seguir?')) return;
+    cerrarBorrador(tipo);
+  }
+
+  mostrarPanel(panel);
+  const poner = (idCampo, valor) => {
+    const el = document.getElementById(idCampo);
+    if (el && valor) el.value = valor;
+  };
+  const nombre = p.nombre_docente || p.nombre_coordinador || p.nombre_tecnico || '';
+
+  if (tipo === 'coordinador') {
+    poner('cCodigoCentro', p.codigo_centro); if (p.codigo_centro) buscarCentroCoord(p.codigo_centro);
+    poner('cNombreCoord', nombre); poner('cCedulaCoord', p.cedula_acompanado);
+    poner('cFechaCoord', p.fecha_prevista); poner('cHoraCoord', p.hora_prevista);
+    poner('cFocoCoord', p.foco); poner('cCargoCoord', p.cargo_coordinador);
+  } else if (tipo === 'tecnico_distrital') {
+    poner('dCodigoCentro', p.codigo_centro); if (p.codigo_centro) buscarCentroDist(p.codigo_centro);
+    poner('dNombreTecnico', nombre); poner('dCedulaTecnico', p.cedula_acompanado);
+    poner('dFechaDist', p.fecha_prevista); poner('dHoraDist', p.hora_prevista);
+    poner('dFocoDist', p.foco); poner('dCargoTecnico', p.cargo_tecnico);
+  } else {
+    poner('codigoCentro', p.codigo_centro); if (p.codigo_centro) buscarCentro(p.codigo_centro);
+    poner('nombreDocente', nombre); poner('cedulaDocente', p.cedula_acompanado);
+    poner('fecha', p.fecha_prevista); poner('horaInicio', p.hora_prevista);
+    poner('foco', p.foco); poner('areaAcompanada', p.area_curricular);
+  }
+
+  _planEnCurso = { id: p.id, tipo };
+  mostrarNotif('Instrumento abierto con los datos de la planificación. Complete y envíe.');
+}
+
+// Al enviarse el acompañamiento, la planificación de la que partió queda ejecutada
+async function cerrarPlanEnCurso(tipo) {
+  if (!_planEnCurso || _planEnCurso.tipo !== tipo) return;
+  const id = _planEnCurso.id;
+  _planEnCurso = null;
+  try {
+    await sb.from('planificaciones').update({ estado: 'Ejecutado' }).eq('id', id);
+  } catch (e) {}
+}
+
 function renderizarPlanificacion() {
   const cuerpo = document.getElementById('cuerpoPlanificacion');
   if (!planActual.length) {
-    cuerpo.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#8fa5bb;padding:32px;">No hay acompañamientos planificados para esta semana.<br><button class="btn-primario" onclick="nuevaPlanificacion()" style="margin-top:12px;">+ Agregar</button></td></tr>';
+    cuerpo.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#8fa5bb;padding:32px;">No hay acompañamientos planificados para esta semana.<br><button class="btn-primario" onclick="nuevaPlanificacion()" style="margin-top:12px;">+ Agregar</button></td></tr>';
     return;
   }
   cuerpo.innerHTML = planActual.map((p, i) => {
@@ -4447,9 +4583,18 @@ function renderizarPlanificacion() {
           p.estado === 'Pendiente' ? 'badge-amarillo' : 'badge-rojo'
         }">${p.estado || 'Pendiente'}</span>
       </td>
+      <td style="font-size:12px;max-width:200px;">
+        ${p.observacion
+          ? `<div style="color:#8a5d00;white-space:pre-wrap;">${_esc(p.observacion)}</div>
+             <button class="btn-secundario btn-sm" style="margin-top:4px;" onclick="editarObservacionPlan('${p.id}')">✏️ Editar</button>`
+          : `<button class="btn-secundario btn-sm" onclick="editarObservacionPlan('${p.id}')"
+                     title="Explique por qué no se ha ejecutado">+ Observación</button>`}
+      </td>
       <td style="display:flex;gap:6px;flex-wrap:wrap;">
         ${p.estado !== 'Ejecutado'
-          ? `<button class="btn-secundario btn-sm" onclick="marcarEjecutado('${p.id}')">✅ Ejecutado</button>
+          ? `<button class="btn-primario btn-sm" onclick="iniciarAcompanamientoDesdePlan('${p.id}')"
+                     title="Abre el instrumento con los datos de esta planificación">▶️ Iniciar</button>
+             <button class="btn-secundario btn-sm" onclick="marcarEjecutado('${p.id}')">✅ Ejecutado</button>
              <button class="btn-peligro btn-sm" onclick="eliminarItemPlan('${p.id}')">🗑️</button>`
           : '<span style="font-size:12px;color:#2a6b1a;">Realizado</span>'}
       </td>
@@ -4666,36 +4811,83 @@ async function cargarSeguimiento() {
 
   const [{ data: planificados }, { data: ejecutados }] = await Promise.all([traerTodo(qPlan), traerTodo(qEjec)]);
 
-  const plan = planificados || [];
-  const ejec = ejecutados  || [];
+  _segPlan = planificados || [];
+  _segEjec = ejecutados  || [];
+  _poblarAcompanantesSeguimiento();
+  filtrarSeguimiento();
+}
 
-  const totalPlan  = plan.length;
-  const totalEjec  = ejec.length;
-  const pendientes = plan.filter(p => p.estado !== 'Ejecutado').length;
-  const pct        = totalPlan > 0 ? Math.round((Math.min(totalEjec, totalPlan) / totalPlan) * 100) : 0;
+// Datos cargados, para filtrar sin volver a consultar la base
+let _segPlan = [], _segEjec = [];
 
-  // Tarjetas
+function _poblarAcompanantesSeguimiento() {
+  const sel = document.getElementById('segAcompanante');
+  if (!sel) return;
+  const previo = sel.value;
+  const nombres = [...new Set(_segPlan.concat(_segEjec)
+    .map(x => (x.nombre_acompanante || '').trim()).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todos</option>' +
+    nombres.map(n => `<option value="${n}">${n}</option>`).join('');
+  if (nombres.includes(previo)) sel.value = previo;
+}
+
+function limpiarFiltrosSeguimiento() {
+  ['segAcompanante','segInstrumento','segCumplimiento','segBuscar'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  filtrarSeguimiento();
+}
+
+// Aplica los filtros sobre lo ya cargado y recalcula tarjetas, barra y tabla.
+function filtrarSeguimiento() {
+  const acomp  = document.getElementById('segAcompanante')?.value || '';
+  const instr  = document.getElementById('segInstrumento')?.value || '';
+  const cumpl  = document.getElementById('segCumplimiento')?.value || '';
+  const texto  = _norm(document.getElementById('segBuscar')?.value);
+  const palabras = texto ? texto.split(/\s+/) : [];
+
+  const coincideTexto = (...campos) => {
+    if (!palabras.length) return true;
+    const heno = _norm(campos.join(' '));
+    return palabras.every(w => heno.includes(w));
+  };
+  const porAcomp  = x => !acomp || (x.nombre_acompanante || '').trim() === acomp;
+  const porInstr  = x => !instr || (x.tipo_instrumento || 'docente') === instr;
+
+  const plan = _segPlan.filter(p => porAcomp(p) && porInstr(p) &&
+    coincideTexto(_nombrePlanificado(p), p.cedula_acompanado, p.centro_educativo, p.codigo_centro));
+  const ejec = _segEjec.filter(e => porAcomp(e) && porInstr(e) &&
+    coincideTexto(e.nombre_docente, e.cedula_docente, e.cedula, e.centro_educativo, e.codigo_centro));
+
+  // Estado de cumplimiento de cada planificación
+  const hoy = new Date();
+  const evaluadas = plan.map(p => {
+    const match = ejec.find(e => coincidePlanEjecutado(p, e));
+    const estado = match ? 'cumplido'
+                 : (new Date(p.fecha_prevista) < hoy ? 'noejecutado' : 'pendiente');
+    return { p, match, estado };
+  }).filter(x => !cumpl || x.estado === cumpl);
+
+  const totalPlan  = evaluadas.length;
+  const totalEjec  = evaluadas.filter(x => x.match).length;
+  const pendientes = evaluadas.filter(x => x.estado !== 'cumplido').length;
+  const pct = totalPlan > 0 ? Math.round((totalEjec / totalPlan) * 100) : 0;
+
   document.getElementById('segTotalPlan').textContent  = totalPlan;
   document.getElementById('segTotalEjec').textContent  = totalEjec;
   document.getElementById('segPendientes').textContent = pendientes;
   document.getElementById('segPorcentaje').textContent = pct + '%';
   document.getElementById('cardsSeguimiento').style.display = 'grid';
 
-  // Barra
   document.getElementById('barraCumplimiento').style.display = 'block';
   document.getElementById('pctCumplimiento').textContent = pct + '%';
-  setTimeout(() => {
-    document.getElementById('rellenoCumplimiento').style.width = pct + '%';
-  }, 100);
+  setTimeout(() => { document.getElementById('rellenoCumplimiento').style.width = pct + '%'; }, 100);
 
-  // Tabla comparativa: cruzar planificados con ejecutados por fecha y centro
-  const filas = plan.map(p => {
-    // Buscar el ejecutado correspondiente: primero por cédula, si ambos la tienen
-    const match = ejec.find(e => coincidePlanEjecutado(p, e));
-
-    const cumple = match ? 'badge-verde' : (new Date(p.fecha_prevista) < new Date() ? 'badge-rojo' : 'badge-amarillo');
-    const label  = match ? '✅ Cumplido' : (new Date(p.fecha_prevista) < new Date() ? '❌ No ejecutado' : '⏳ Pendiente');
-
+  const etiquetas = { cumplido:['badge-verde','✅ Cumplido'],
+                      noejecutado:['badge-rojo','❌ No ejecutado'],
+                      pendiente:['badge-amarillo','⏳ Pendiente'] };
+  const filas = evaluadas.map(({ p, match, estado }) => {
+    const [clase, texto2] = etiquetas[estado];
     return `<tr>
       <td>${p.fecha_prevista||'—'}</td>
       <td style="font-size:12px;">${p.centro_educativo||'—'}</td>
@@ -4708,33 +4900,146 @@ async function cargarSeguimiento() {
       <td><span class="badge ${p.estado==='Ejecutado'?'badge-verde':'badge-amarillo'}">${p.estado||'Pendiente'}</span></td>
       <td>${match ? match.fecha : '—'}</td>
       <td style="font-size:12px;">${match ? match.nombre_docente : '—'}</td>
-      <td><span class="badge ${cumple}">${label}</span></td>
+      <td><span class="badge ${clase}">${texto2}</span></td>
     </tr>`;
   });
 
-  // Add executed with no planning match
-  const noPlaneados = ejec.filter(e => !plan.some(p => coincidePlanEjecutado(p, e)));
+  // Ejecutados sin planificación previa: solo si no se filtra por cumplimiento
+  let extras = 0;
+  if (!cumpl) {
+    const noPlaneados = ejec.filter(e => !plan.some(p => coincidePlanEjecutado(p, e)));
+    extras = noPlaneados.length;
+    noPlaneados.forEach(e => {
+      filas.push(`<tr style="background:#f0fdf4;">
+        <td>—</td>
+        <td style="font-size:12px;">${e.centro_educativo||'—'}</td>
+        <td style="font-size:12px;">${e.nombre_docente||'—'}</td>
+        <td style="font-size:12px;">—</td>
+        <td><span class="badge badge-azul">No planificado</span></td>
+        <td>${e.fecha||'—'}</td>
+        <td style="font-size:12px;">${e.nombre_docente||'—'}</td>
+        <td><span class="badge badge-azul">➕ Extra</span></td>
+      </tr>`);
+    });
+  }
 
-  noPlaneados.forEach(e => {
-    filas.push(`<tr style="background:#f0fdf4;">
-      <td>—</td>
-      <td style="font-size:12px;">${e.centro_educativo||'—'}</td>
-      <td style="font-size:12px;">—</td>
-      <td style="font-size:12px;">—</td>
-      <td><span class="badge badge-azul">No planificado</span></td>
-      <td>${e.fecha||'—'}</td>
-      <td style="font-size:12px;">${e.nombre_docente||'—'}</td>
-      <td><span class="badge badge-azul">➕ Extra</span></td>
-    </tr>`);
-  });
+  const cont = document.getElementById('segContador');
+  if (cont) {
+    const hayFiltro = acomp || instr || cumpl || palabras.length;
+    cont.textContent = hayFiltro
+      ? `${totalPlan} de ${_segPlan.length} planificaciones` + (extras ? `, más ${extras} sin planificar` : '')
+      : `${_segPlan.length} planificaciones` + (extras ? `, más ${extras} sin planificar` : '');
+  }
 
   document.getElementById('cuerpSeguimiento').innerHTML =
-    filas.length ? filas.join('') : '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Sin datos en el período seleccionado.</td></tr>';
-
+    filas.length ? filas.join('') : '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Ningún registro coincide con los filtros.</td></tr>';
   document.getElementById('tablaSeguimientoWrap').style.display = 'block';
 }
 
 // ── SEGUIMIENTO DE TÉCNICOS ───────────────────────────────────────────────────
+// Datos cargados del seguimiento a técnicos, para filtrar sin reconsultar
+let _stDatos = [], _stPerf = {}, _stVista = 'acompanamientos';
+
+// Nombre y distrito de cada fila, según la vista
+const _stNombre   = r => _stVista === 'planificaciones'
+  ? (_stPerf[r.usuario_id]?.nombre || '') : (r.nombre_acompanante || '');
+const _stRol      = r => _stVista === 'planificaciones'
+  ? (_stPerf[r.usuario_id]?.rol || '') : (r.rol_acompanante || '');
+const _stDistrito = r => _stVista === 'planificaciones'
+  ? (_stPerf[r.usuario_id]?.distrito || '') : (r.distrito || '');
+
+function _poblarFiltrosTecnicos() {
+  const selT = document.getElementById('stTecnico');
+  const selD = document.getElementById('stDistrito');
+  if (selT) {
+    const previo = selT.value;
+    const nombres = [...new Set(_stDatos.map(_stNombre).map(x => x.trim()).filter(Boolean))].sort();
+    selT.innerHTML = '<option value="">Todos</option>' +
+      nombres.map(n => `<option value="${n}">${n}</option>`).join('');
+    if (nombres.includes(previo)) selT.value = previo;
+  }
+  if (selD) {
+    const previo = selD.value;
+    const dis = [...new Set(_stDatos.map(_stDistrito).map(x => x.trim()).filter(Boolean))].sort();
+    selD.innerHTML = '<option value="">Todos</option>' +
+      dis.map(d => `<option value="${d}">${d}</option>`).join('');
+    if (dis.includes(previo)) selD.value = previo;
+  }
+}
+
+function limpiarFiltrosTecnicos() {
+  ['stTecnico','stRol','stDistrito','stBuscar'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  filtrarSeguimientoTecnicos();
+}
+
+function filtrarSeguimientoTecnicos() {
+  const cuerpo = document.getElementById('stCuerpo');
+  if (!cuerpo) return;
+  const tec   = document.getElementById('stTecnico')?.value || '';
+  const rolF  = document.getElementById('stRol')?.value || '';
+  const disF  = document.getElementById('stDistrito')?.value || '';
+  const texto = _norm(document.getElementById('stBuscar')?.value);
+  const palabras = texto ? texto.split(/\s+/) : [];
+
+  const filtrados = _stDatos.filter(r => {
+    if (tec  && _stNombre(r).trim()   !== tec)  return false;
+    if (disF && _stDistrito(r).trim() !== disF) return false;
+    if (rolF && !_norm(_stRol(r)).includes(_norm(rolF))) return false;
+    if (!palabras.length) return true;
+    const heno = _norm([r.centro_educativo, r.nombre_docente, r.nombre_coordinador,
+                        r.nombre_tecnico, r.foco, r.codigo_centro].join(' '));
+    return palabras.every(w => heno.includes(w));
+  });
+
+  const esPlan = _stVista === 'planificaciones';
+  const marca  = esPlan ? 'Ejecutado' : 'Enviado';
+  document.getElementById('stTotalReg').textContent   = filtrados.length;
+  document.getElementById('stEnviados').textContent   = filtrados.filter(r => r.estado === marca).length;
+  document.getElementById('stBorradores').textContent = filtrados.filter(r => r.estado !== marca).length;
+  document.getElementById('stTotalTec').textContent   =
+    new Set(filtrados.map(r => _stNombre(r).trim()).filter(Boolean)).size;
+  document.getElementById('stCards').style.display = 'grid';
+
+  const cont = document.getElementById('stContador');
+  if (cont) cont.textContent = (tec || rolF || disF || palabras.length)
+    ? `${filtrados.length} de ${_stDatos.length} registros`
+    : `${_stDatos.length} registros`;
+
+  const esc = x => String(x == null ? '' : x)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const acompanado = r => r.tipo_instrumento === 'coordinador'
+    ? (r.nombre_coordinador || r.nombre_docente || '—')
+    : r.tipo_instrumento === 'tecnico_distrital'
+      ? (r.nombre_tecnico || r.nombre_docente || '—')
+      : (r.nombre_docente || '—');
+
+  cuerpo.innerHTML = filtrados.length
+    ? filtrados.map(r => esPlan
+        ? `<tr>
+            <td>${esc(r.fecha_prevista) || '—'}</td>
+            <td style="font-size:12px;">${esc(_stNombre(r)) || '—'}</td>
+            <td style="font-size:12px;">${esc(_stPerf[r.usuario_id]?.regional) || '—'}</td>
+            <td style="font-size:12px;">${esc(_stDistrito(r)) || '—'}</td>
+            <td style="font-size:12px;">${esc(r.centro_educativo) || '—'}</td>
+            <td style="font-size:12px;">${esc(r.nombre_docente) || '—'}</td>
+            <td style="font-size:12px;">${esc(r.foco) || '—'}</td>
+            <td><span class="badge ${r.estado==='Ejecutado'?'badge-verde':'badge-amarillo'}">${esc(r.estado)||'Pendiente'}</span></td>
+          </tr>`
+        : `<tr onclick="verRegistroST('${r.id}')" style="cursor:pointer;" title="Ver formulario completo">
+            <td>${esc(r.fecha) || '—'}</td>
+            <td style="font-size:12px;">${esc(r.nombre_acompanante) || '—'}</td>
+            <td style="font-size:11px;color:#8fa5bb;">${esc(r.rol_acompanante) || '—'}</td>
+            <td style="font-size:12px;">${esc(r.regional) || '—'}</td>
+            <td style="font-size:12px;">${esc(r.distrito) || '—'}</td>
+            <td style="font-size:12px;">${esc(r.centro_educativo) || '—'}</td>
+            <td style="font-size:12px;">${esc(acompanado(r))}</td>
+            <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${esc(r.estado)||'Borrador'}</span></td>
+          </tr>`).join('')
+    : '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Ningún registro coincide con los filtros.</td></tr>';
+}
+
 async function cargarSeguimientoTecnicos() {
   const desde = document.getElementById('stDesde').value;
   const hasta = document.getElementById('stHasta').value;
@@ -4796,24 +5101,9 @@ async function cargarSeguimientoTecnicos() {
     document.getElementById('stCards').style.display = 'grid';
 
     window._stRegistrosList = datos;
-    cuerpo.innerHTML = datos.length
-      ? datos.map(r => `<tr onclick="verRegistroST('${r.id}')" style="cursor:pointer;" title="Ver formulario completo">
-          <td>${r.fecha || '—'}</td>
-          <td style="font-size:12px;">${r.nombre_acompanante || '—'}</td>
-          <td style="font-size:11px;color:#8fa5bb;">${r.rol_acompanante || '—'}</td>
-          <td style="font-size:12px;">${r.regional || '—'}</td>
-          <td style="font-size:12px;">${r.distrito || '—'}</td>
-          <td style="font-size:12px;">${r.centro_educativo || '—'}</td>
-          <td style="font-size:12px;">${
-            r.tipo_instrumento === 'coordinador'
-              ? (r.nombre_coordinador || r.nombre_docente || '—')
-              : r.tipo_instrumento === 'tecnico_distrital'
-                ? (r.nombre_tecnico || r.nombre_docente || '—')
-                : (r.nombre_docente || '—')
-          }</td>
-          <td><span class="badge ${r.estado === 'Enviado' ? 'badge-verde' : 'badge-amarillo'}">${r.estado || 'Borrador'}</span></td>
-        </tr>`).join('')
-      : '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Sin registros en el período.</td></tr>';
+    _stDatos = datos; _stPerf = {}; _stVista = 'acompanamientos';
+    _poblarFiltrosTecnicos();
+    filtrarSeguimientoTecnicos();
 
   } else {
     // Planificaciones
@@ -4857,21 +5147,9 @@ async function cargarSeguimientoTecnicos() {
     document.getElementById('stBorradores').textContent = datos.filter(r => r.estado !== 'Ejecutado').length;
     document.getElementById('stCards').style.display = 'grid';
 
-    cuerpo.innerHTML = datos.length
-      ? datos.map(r => {
-          const perf = mapaPerf[r.usuario_id] || {};
-          return `<tr>
-            <td>${r.fecha_prevista || '—'}</td>
-            <td style="font-size:12px;">${perf.nombre || r.usuario_id || '—'}</td>
-            <td style="font-size:12px;">${perf.regional || '—'}</td>
-            <td style="font-size:12px;">${perf.distrito || '—'}</td>
-            <td style="font-size:12px;">${r.centro_educativo || '—'}</td>
-            <td style="font-size:12px;">${r.nombre_docente || '—'}</td>
-            <td style="font-size:12px;">${r.foco || '—'}</td>
-            <td><span class="badge ${r.estado === 'Ejecutado' ? 'badge-verde' : 'badge-amarillo'}">${r.estado || 'Pendiente'}</span></td>
-          </tr>`;
-        }).join('')
-      : '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Sin planificaciones en el período.</td></tr>';
+    _stDatos = datos; _stPerf = mapaPerf; _stVista = 'planificaciones';
+    _poblarFiltrosTecnicos();
+    filtrarSeguimientoTecnicos();
   }
 }
 
@@ -5049,7 +5327,7 @@ async function guardarRegistro(estado) {
 
   if (error) { mostrarNotif('Error al guardar: ' + error.message, true); return; }
   mostrarNotif(estado === 'Enviado' ? 'Registro enviado correctamente.' : 'Borrador guardado.');
-  if (estado === 'Enviado') { cerrarBorrador('docente'); limpiarFormulario(); }
+  if (estado === 'Enviado') { cerrarBorrador('docente'); cerrarPlanEnCurso('docente'); limpiarFormulario(); }
 }
 
 function limpiarFormulario() {
@@ -5679,6 +5957,7 @@ async function enviarFormularioDist(event) {
       : await sb.from('acompañamientos').insert([payload]);
     if (error) throw error;
     mostrarNotif('Acompañamiento al técnico distrital enviado correctamente.');
+    cerrarPlanEnCurso('tecnico_distrital');
     limpiarFormularioDist();
   } catch(e) {
     mostrarNotif('Error al enviar: ' + e.message, true);
@@ -5846,6 +6125,7 @@ async function enviarFormularioCoord(event) {
   btn.disabled = false; btn.textContent = '✅ Enviar registro';
   if (error) { mostrarNotif('Error al guardar: ' + error.message, true); return; }
   mostrarNotif('Registro enviado correctamente.');
+  cerrarPlanEnCurso('coordinador');
   limpiarFormularioCoord();
   mostrarPanel('registros', null);
   cargarMisRegistros();
