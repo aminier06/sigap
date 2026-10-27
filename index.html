@@ -3033,8 +3033,57 @@ const _BORRADOR = {
   },
 };
 
-const _borradorId    = { docente:null, coordinador:null, tecnico_distrital:null };
+// El identificador del borrador en curso se guarda en el navegador, no solo en
+// memoria. Si la persona recarga la página, el móvil descarga la aplicación o
+// vuelve más tarde a continuar, se sigue actualizando la MISMA fila en vez de
+// crear otra. Esto es lo que producía borradores repetidos pese a la
+// corrección anterior.
+const _CLAVE_BORRADOR = t => 'sigap_borrador_' + t + '_' + (usuarioActual?.id || 'anon');
+
+const _borradorId = new Proxy({ docente:null, coordinador:null, tecnico_distrital:null }, {
+  get(destino, tipo) {
+    if (!(tipo in destino)) return undefined;
+    if (destino[tipo] === null) {
+      try { destino[tipo] = localStorage.getItem(_CLAVE_BORRADOR(tipo)) || null; } catch (e) {}
+    }
+    return destino[tipo];
+  },
+  set(destino, tipo, valor) {
+    destino[tipo] = valor;
+    try {
+      if (valor) localStorage.setItem(_CLAVE_BORRADOR(tipo), valor);
+      else       localStorage.removeItem(_CLAVE_BORRADOR(tipo));
+    } catch (e) {}
+    return true;
+  }
+});
+
 const _firmaBorrador = { docente:'',   coordinador:'',   tecnico_distrital:'' };
+
+// Identidad del acompañamiento que hay en pantalla: cédula, centro y fecha.
+// Sirve para distinguir "sigo llenando el mismo" de "empecé otro distinto".
+function _identidadAcomp(tipo) {
+  const v = id => (document.getElementById(id)||{}).value || '';
+  if (tipo === 'coordinador')       return [v('cCedulaCoord'),  v('cCodigoCentro'), v('cFechaCoord')].join('|');
+  if (tipo === 'tecnico_distrital') return [v('dCedulaTecnico'), v('dCodigoCentro'), v('dFechaDist')].join('|');
+  return [v('cedulaDocente'), v('codigoCentro'), v('fecha')].join('|');
+}
+
+// Decide si el guardado debe continuar la fila existente o abrir una nueva.
+// Sin esto, tras recargar la página un acompañamiento distinto sobrescribiría
+// el borrador anterior en vez de crear el suyo.
+function _prepararBorrador(tipo) {
+  const actual = _identidadAcomp(tipo);
+  if (!actual.replace(/\|/g, '')) return;          // formulario aún vacío
+  const claveId = _CLAVE_BORRADOR(tipo) + '_ident';
+  let guardada = '';
+  try { guardada = localStorage.getItem(claveId) || ''; } catch (e) {}
+  if (guardada && guardada !== actual) {
+    _borradorId[tipo] = null;                       // es otro acompañamiento
+    _firmaBorrador[tipo] = '';
+  }
+  try { localStorage.setItem(claveId, actual); } catch (e) {}
+}
 
 // Huella del formulario, para no reescribir cuando nada ha cambiado
 function _firmaFormulario(idForm) {
@@ -3062,6 +3111,7 @@ async function guardarBorradorInstrumento(tipo, silencioso = false) {
     if (!silencioso) mostrarNotif('Complete al menos la fecha o el nombre para guardar un borrador.', true);
     return false;
   }
+  _prepararBorrador(tipo);
   const registro = cfg.payload();
   let error = null;
 
@@ -3088,6 +3138,7 @@ async function guardarBorradorInstrumento(tipo, silencioso = false) {
 function cerrarBorrador(tipo) {
   _borradorId[tipo] = null;
   _firmaBorrador[tipo] = '';
+  try { localStorage.removeItem(_CLAVE_BORRADOR(tipo) + '_ident'); } catch (e) {}
 }
 
 // Id del borrador en curso, para que el envío actualice esa fila en vez de duplicarla
@@ -4978,6 +5029,7 @@ async function guardarRegistro(estado) {
     estado,
   };
 
+  _prepararBorrador('docente');
   // Un acompañamiento en curso ocupa UNA sola fila: el primer guardado la crea
   // y los siguientes la actualizan. Al enviar, ese mismo borrador pasa a
   // Enviado, de modo que no queda un duplicado por cada autoguardado.
