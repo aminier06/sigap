@@ -1860,6 +1860,24 @@ document.addEventListener('DOMContentLoaded', () => {
               </select>
             </div>
             <div class="campo">
+              <label>Regional</label>
+              <select id="segRegional" onchange="filtrarSeguimiento()">
+                <option value="">Todas</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label>Distrito</label>
+              <select id="segDistrito" onchange="filtrarSeguimiento()">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label>Centro</label>
+              <select id="segCentro" onchange="filtrarSeguimiento()">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="campo">
               <label>Instrumento</label>
               <select id="segInstrumento" onchange="filtrarSeguimiento()">
                 <option value="">Todos</option>
@@ -4900,26 +4918,63 @@ async function cargarSeguimiento() {
 
   _segPlan = planificados || [];
   _segEjec = ejecutados  || [];
-  _poblarAcompanantesSeguimiento();
+  await _cargarCentrosSeguimiento();
+  _poblarFiltrosSeguimiento();
   filtrarSeguimiento();
 }
+
+// Demarcación de cada centro presente en el período.
+// La tabla de planificaciones solo guarda el código, así que la regional y el
+// distrito se resuelven desde el padrón de centros.
+let _segCentros = {};
+
+async function _cargarCentrosSeguimiento() {
+  const codigos = [...new Set(
+    _segPlan.concat(_segEjec)
+      .map(x => String(x.codigo_centro || '').trim())
+      .filter(Boolean))];
+  _segCentros = {};
+  if (!codigos.length) return;
+  const { data } = await traerTodo(
+    sb.from('centros').select('codigo,nombre,regional_nombre,distrito_nombre,regional_codigo,distrito_codigo')
+      .in('codigo', codigos));
+  (data || []).forEach(c => {
+    _segCentros[String(c.codigo).trim()] = {
+      nombre:   c.nombre || '',
+      regional: c.regional_codigo ? `${c.regional_codigo} - ${c.regional_nombre || ''}`.trim() : (c.regional_nombre || ''),
+      distrito: c.distrito_codigo ? `${c.distrito_codigo} - ${c.distrito_nombre || ''}`.trim() : (c.distrito_nombre || ''),
+    };
+  });
+}
+
+// Demarcación de una fila: la del padrón y, si falta, la que traiga el registro
+const _segRegionalDe = x => _segCentros[String(x.codigo_centro || '').trim()]?.regional || x.regional || '';
+const _segDistritoDe = x => _segCentros[String(x.codigo_centro || '').trim()]?.distrito || x.distrito || '';
+const _segCentroDe   = x => x.centro_educativo
+  || _segCentros[String(x.codigo_centro || '').trim()]?.nombre || '';
 
 // Datos cargados, para filtrar sin volver a consultar la base
 let _segPlan = [], _segEjec = [];
 
-function _poblarAcompanantesSeguimiento() {
-  const sel = document.getElementById('segAcompanante');
-  if (!sel) return;
-  const previo = sel.value;
-  const nombres = [...new Set(_segPlan.concat(_segEjec)
-    .map(x => (x.nombre_acompanante || '').trim()).filter(Boolean))].sort();
-  sel.innerHTML = '<option value="">Todos</option>' +
-    nombres.map(n => `<option value="${n}">${n}</option>`).join('');
-  if (nombres.includes(previo)) sel.value = previo;
+function _poblarFiltrosSeguimiento() {
+  const todos = _segPlan.concat(_segEjec);
+  const llenar = (id, valores, etiquetaTodos) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const previo = sel.value;
+    const lista = [...new Set(valores.map(v => (v || '').trim()).filter(Boolean))].sort();
+    sel.innerHTML = `<option value="">${etiquetaTodos}</option>` +
+      lista.map(v => `<option value="${v}">${v}</option>`).join('');
+    if (lista.includes(previo)) sel.value = previo;
+  };
+  llenar('segAcompanante', todos.map(x => x.nombre_acompanante), 'Todos');
+  llenar('segRegional',    todos.map(_segRegionalDe),            'Todas');
+  llenar('segDistrito',    todos.map(_segDistritoDe),            'Todos');
+  llenar('segCentro',      todos.map(_segCentroDe),              'Todos');
 }
 
 function limpiarFiltrosSeguimiento() {
-  ['segAcompanante','segInstrumento','segCumplimiento','segBuscar'].forEach(id => {
+  ['segAcompanante','segInstrumento','segCumplimiento','segRegional','segDistrito','segCentro','segBuscar'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   filtrarSeguimiento();
@@ -4930,6 +4985,9 @@ function filtrarSeguimiento() {
   const acomp  = document.getElementById('segAcompanante')?.value || '';
   const instr  = document.getElementById('segInstrumento')?.value || '';
   const cumpl  = document.getElementById('segCumplimiento')?.value || '';
+  const regF   = document.getElementById('segRegional')?.value || '';
+  const disF   = document.getElementById('segDistrito')?.value || '';
+  const cenF   = document.getElementById('segCentro')?.value || '';
   const texto  = _norm(document.getElementById('segBuscar')?.value);
   const palabras = texto ? texto.split(/\s+/) : [];
 
@@ -4940,10 +4998,13 @@ function filtrarSeguimiento() {
   };
   const porAcomp  = x => !acomp || (x.nombre_acompanante || '').trim() === acomp;
   const porInstr  = x => !instr || (x.tipo_instrumento || 'docente') === instr;
+  const porZona   = x => (!regF || _segRegionalDe(x).trim() === regF)
+                      && (!disF || _segDistritoDe(x).trim() === disF)
+                      && (!cenF || _segCentroDe(x).trim()   === cenF);
 
-  const plan = _segPlan.filter(p => porAcomp(p) && porInstr(p) &&
+  const plan = _segPlan.filter(p => porAcomp(p) && porInstr(p) && porZona(p) &&
     coincideTexto(_nombrePlanificado(p), p.cedula_acompanado, p.centro_educativo, p.codigo_centro));
-  const ejec = _segEjec.filter(e => porAcomp(e) && porInstr(e) &&
+  const ejec = _segEjec.filter(e => porAcomp(e) && porInstr(e) && porZona(e) &&
     coincideTexto(e.nombre_docente, e.cedula_docente, e.cedula, e.centro_educativo, e.codigo_centro));
 
   // Estado de cumplimiento de cada planificación
@@ -5012,7 +5073,7 @@ function filtrarSeguimiento() {
 
   const cont = document.getElementById('segContador');
   if (cont) {
-    const hayFiltro = acomp || instr || cumpl || palabras.length;
+    const hayFiltro = acomp || instr || cumpl || regF || disF || cenF || palabras.length;
     cont.textContent = hayFiltro
       ? `${totalPlan} de ${_segPlan.length} planificaciones` + (extras ? `, más ${extras} sin planificar` : '')
       : `${_segPlan.length} planificaciones` + (extras ? `, más ${extras} sin planificar` : '');
