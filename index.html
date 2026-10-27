@@ -1705,6 +1705,13 @@ document.addEventListener('DOMContentLoaded', () => {
               <button class="btn-secundario" onclick="cargarPlanificacion()">🔍 Cargar semana</button>
               <button class="btn-primario" onclick="nuevaPlanificacion()">+ Nueva planificación</button>
             </div>
+            <div class="campo" style="grid-column:1 / -1;">
+              <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;">
+                <input type="checkbox" id="planIncluirVencidos" checked
+                       onchange="cargarPlanificacion()" style="width:auto;margin:0;" />
+                Incluir acompañamientos pendientes de semanas anteriores, para registrar su observación
+              </label>
+            </div>
           </div>
         </div>
 
@@ -4545,28 +4552,73 @@ async function cargarPlanificacion() {
   const { data, error } = await traerTodo(query);
   if (error) { mostrarNotif('Error: ' + error.message, true); return; }
 
-  planActual = data || [];
+  let filas = data || [];
+
+  // Un acompañamiento que no se ejecutó en su semana deja de verse al avanzar
+  // el calendario, y con él desaparece la posibilidad de explicar por qué.
+  // Por eso el rezago pendiente se arrastra a la semana que se esté viendo.
+  if (document.getElementById('planIncluirVencidos')?.checked) {
+    let qv = sb.from('planificaciones').select('*')
+      .lt('fecha_prevista', desde)
+      .neq('estado', 'Ejecutado')
+      .order('fecha_prevista');
+    if (!esAdmin && rol !== 'Técnico/a Nacional') qv = qv.eq('usuario_id', usuarioActual.id);
+    const { data: vencidos } = await traerTodo(qv);
+    const yaEstan = new Set(filas.map(f => String(f.id)));
+    filas = (vencidos || []).filter(v => !yaEstan.has(String(v.id))).concat(filas);
+  }
+
+  planActual = filas;
   renderizarPlanificacion();
   document.getElementById('accionesPlan').style.display = 'flex';
+}
+
+// Pendiente cuya fecha prevista ya pasó
+function _planVencido(p) {
+  if (p.estado === 'Ejecutado') return false;
+  if (!p.fecha_prevista) return false;
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  return new Date(p.fecha_prevista + 'T00:00:00') < hoy;
 }
 
 const _esc = x => String(x == null ? '' : x)
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
 // Observación: por qué un acompañamiento planificado no se ha ejecutado
+let _obsPlanId = null;
+
 async function editarObservacionPlan(id) {
   const p = planActual.find(x => String(x.id) === String(id));
   if (!p) return;
-  const texto = prompt(
-    'Razón o circunstancia por la que este acompañamiento no se ha ejecutado:\n\n' +
-    (p.centro_educativo || '') + (p.fecha_prevista ? '  ·  ' + p.fecha_prevista : ''),
-    p.observacion || '');
-  if (texto === null) return;                 // canceló
-  const valor = texto.trim() || null;
+  _obsPlanId = id;
+  const ctx = [p.centro_educativo, p.fecha_prevista].filter(Boolean).join(', ');
+  document.getElementById('obsPlanContexto').textContent = ctx || 'Acompañamiento planificado';
+  const aviso = document.getElementById('obsPlanAviso');
+  aviso.style.display = _planVencido(p) ? 'block' : 'none';
+  const area = document.getElementById('obsPlanTexto');
+  area.value = p.observacion || '';
+  document.getElementById('modalObsPlan').style.display = 'flex';
+  area.focus();
+}
+
+function cerrarModalObsPlan() {
+  document.getElementById('modalObsPlan').style.display = 'none';
+  _obsPlanId = null;
+}
+
+async function guardarObservacionPlan() {
+  if (!_obsPlanId) return;
+  const id = _obsPlanId;
+  const p = planActual.find(x => String(x.id) === String(id));
+  const valor = document.getElementById('obsPlanTexto').value.trim() || null;
+  const btn = document.getElementById('btnGuardarObsPlan');
+  btn.disabled = true; btn.textContent = 'Guardando…';
   const { error } = await sb.from('planificaciones')
     .update({ observacion: valor }).eq('id', id);
+  btn.disabled = false; btn.textContent = '💾 Guardar observación';
   if (error) { mostrarNotif('Error al guardar la observación: ' + error.message, true); return; }
-  p.observacion = valor;
+  if (p) p.observacion = valor;
+  cerrarModalObsPlan();
   renderizarPlanificacion();
   mostrarNotif(valor ? 'Observación guardada.' : 'Observación eliminada.');
 }
@@ -4647,9 +4699,11 @@ function renderizarPlanificacion() {
       : tInstr === 'tecnico_distrital'
         ? (p.nombre_tecnico || p.nombre_docente || '—')
         : (p.nombre_docente || '—');
-    return `<tr>
+    const vencido = _planVencido(p);
+    return `<tr${vencido ? ' style="background:#fffaf0;"' : ''}>
       <td style="text-align:center;font-weight:700;color:#8fa5bb;">${i+1}</td>
-      <td>${p.fecha_prevista || '—'}</td>
+      <td>${p.fecha_prevista || '—'}${vencido
+        ? '<div style="font-size:10px;color:#b45309;font-weight:700;margin-top:2px;">VENCIDO</div>' : ''}</td>
       <td>${p.centro_educativo || '—'}</td>
       <td>${p.hora_prevista || '—'}</td>
       <td>${badgePlan}${nombrePlan}</td>
@@ -4661,12 +4715,16 @@ function renderizarPlanificacion() {
           p.estado === 'Pendiente' ? 'badge-amarillo' : 'badge-rojo'
         }">${p.estado || 'Pendiente'}</span>
       </td>
-      <td style="font-size:12px;max-width:200px;">
+      <td style="font-size:12px;max-width:220px;">
         ${p.observacion
           ? `<div style="color:#8a5d00;white-space:pre-wrap;">${_esc(p.observacion)}</div>
              <button class="btn-secundario btn-sm" style="margin-top:4px;" onclick="editarObservacionPlan('${p.id}')">✏️ Editar</button>`
-          : `<button class="btn-secundario btn-sm" onclick="editarObservacionPlan('${p.id}')"
-                     title="Explique por qué no se ha ejecutado">+ Observación</button>`}
+          : vencido
+            ? `<button class="btn-secundario btn-sm" onclick="editarObservacionPlan('${p.id}')"
+                       style="border-color:#e0a106;color:#8a5d00;background:#fff7e6;"
+                       title="Esta fecha ya pasó: explique la razón o circunstancia">⚠️ Explicar</button>`
+            : `<button class="btn-secundario btn-sm" onclick="editarObservacionPlan('${p.id}')"
+                       title="Razón o circunstancia por la que no se ha ejecutado">+ Observación</button>`}
       </td>
       <td style="display:flex;gap:6px;flex-wrap:wrap;">
         ${p.estado !== 'Ejecutado'
@@ -8585,6 +8643,27 @@ if ('serviceWorker' in navigator) {
 </script>
 
 <!-- MODAL CONFIRMAR ELIMINAR USUARIO -->
+<!-- MODAL OBSERVACIÓN DE PLANIFICACIÓN -->
+<div id="modalObsPlan" style="display:none;" class="modal-overlay">
+  <div class="modal">
+    <h3>📝 Observación del acompañamiento</h3>
+    <p id="obsPlanContexto" style="font-weight:600;color:#1a3a52;"></p>
+    <div id="obsPlanAviso" style="display:none;background:#fff7e6;border:1px solid #f0d49a;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;color:#8a5d00;">
+      La fecha prevista ya pasó. Deje constancia de la razón o circunstancia por la que
+      el acompañamiento no se realizó; puede hacerlo en cualquier momento.
+    </div>
+    <div class="campo">
+      <label>Razón o circunstancia</label>
+      <textarea id="obsPlanTexto" rows="5"
+        placeholder="Ej.: El centro suspendió docencia por alerta meteorológica y el acompañamiento se reprogramó."></textarea>
+    </div>
+    <div class="modal-acciones">
+      <button class="btn-secundario" onclick="cerrarModalObsPlan()">Cancelar</button>
+      <button class="btn-primario" id="btnGuardarObsPlan" onclick="guardarObservacionPlan()">💾 Guardar observación</button>
+    </div>
+  </div>
+</div>
+
 <div id="modalEliminarUsuario" style="display:none;" class="modal-overlay">
   <div class="modal">
     <h3>⚠️ Eliminar usuario</h3>
