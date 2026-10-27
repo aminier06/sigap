@@ -1185,8 +1185,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <div id="avisoBorrador_docente" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;
              background:#fff7e6;border:1px solid #f0d49a;border-radius:10px;
              padding:12px 14px;margin:12px 0;font-size:13px;color:#8a5d00;">
-          <span style="flex:1;min-width:240px;">Hay un borrador guardado de este instrumento.
-            Lo que complete aquí se guardará sobre esa misma fila, sin crear otra.</span>
+          <span style="flex:1;min-width:240px;" id="textoBorrador_docente">Hay un borrador guardado
+            de este instrumento.</span>
           <button type="button" class="btn-secundario btn-sm"
                   onclick="descartarBorradorInstrumento('docente')">🗑️ Descartar borrador</button>
         </div>
@@ -1353,8 +1353,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <div id="avisoBorrador_coordinador" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;
              background:#fff7e6;border:1px solid #f0d49a;border-radius:10px;
              padding:12px 14px;margin:12px 0;font-size:13px;color:#8a5d00;">
-          <span style="flex:1;min-width:240px;">Hay un borrador guardado de este instrumento.
-            Lo que complete aquí se guardará sobre esa misma fila, sin crear otra.</span>
+          <span style="flex:1;min-width:240px;" id="textoBorrador_coordinador">Hay un borrador guardado
+            de este instrumento.</span>
           <button type="button" class="btn-secundario btn-sm"
                   onclick="descartarBorradorInstrumento('coordinador')">🗑️ Descartar borrador</button>
         </div>
@@ -1491,8 +1491,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <div id="avisoBorrador_tecnico_distrital" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;
              background:#fff7e6;border:1px solid #f0d49a;border-radius:10px;
              padding:12px 14px;margin:12px 0;font-size:13px;color:#8a5d00;">
-          <span style="flex:1;min-width:240px;">Hay un borrador guardado de este instrumento.
-            Lo que complete aquí se guardará sobre esa misma fila, sin crear otra.</span>
+          <span style="flex:1;min-width:240px;" id="textoBorrador_tecnico_distrital">Hay un borrador guardado
+            de este instrumento.</span>
           <button type="button" class="btn-secundario btn-sm"
                   onclick="descartarBorradorInstrumento('tecnico_distrital')">🗑️ Descartar borrador</button>
         </div>
@@ -3218,6 +3218,7 @@ const _BORRADOR = {
 const _borradorId      = { docente:null, coordinador:null, tecnico_distrital:null };
 const _firmaBorrador   = { docente:'',   coordinador:'',   tecnico_distrital:'' };
 const _borradorResuelto = { docente:false, coordinador:false, tecnico_distrital:false };
+const _borradoresPendientes = { docente:0, coordinador:0, tecnico_distrital:0 };
 
 // Acota una consulta al instrumento indicado. El instrumento de docente es el
 // más antiguo y sus filas pueden tener tipo_instrumento nulo.
@@ -3238,16 +3239,9 @@ async function _resolverBorrador(tipo) {
       .eq('usuario_id', usuarioActual.id)
       .eq('estado', 'Borrador')
       .order('created_at', { ascending: false }), tipo);
-  if (error || !data || !data.length) return null;
+  if (error || !data || !data.length) { _borradoresPendientes[tipo] = 0; return null; }
   _borradorId[tipo] = data[0].id;
-  if (data.length > 1) {
-    try {
-      await sb.from('acompañamientos').delete()
-        .in('id', data.slice(1).map(x => x.id))
-        .eq('usuario_id', usuarioActual.id)
-        .eq('estado', 'Borrador');
-    } catch (e) {}
-  }
+  _borradoresPendientes[tipo] = data.length;
   return _borradorId[tipo];
 }
 
@@ -3255,15 +3249,6 @@ async function _asegurarBorradorResuelto(tipo) {
   if (!_borradorResuelto[tipo]) await _resolverBorrador(tipo);
 }
 
-// Borra los borradores sobrantes del instrumento, salvo el que se indique
-async function _limpiarBorradoresSobrantes(tipo, excepto) {
-  if (!usuarioActual) return;
-  let q = sb.from('acompañamientos').delete()
-    .eq('usuario_id', usuarioActual.id)
-    .eq('estado', 'Borrador');
-  if (excepto) q = q.neq('id', excepto);
-  try { await _filtroInstrumento(q, tipo); } catch (e) {}
-}
 
 // Huella del formulario, para no reescribir cuando nada ha cambiado
 function _firmaFormulario(idForm) {
@@ -3341,7 +3326,6 @@ async function enviarRegistroInstrumento(tipo, registro) {
     id = res.data?.id || null;
   }
 
-  await _limpiarBorradoresSobrantes(tipo, null);
   cerrarBorrador(tipo);
   return { id, error: null };
 }
@@ -3363,17 +3347,29 @@ async function avisarBorradorEnCurso(tipo) {
   if (!usuarioActual) return;
   const id = await _resolverBorrador(tipo);
   const aviso = document.getElementById('avisoBorrador_' + tipo);
-  if (aviso) {
-    aviso.style.display = id ? 'flex' : 'none';
+  const texto = document.getElementById('textoBorrador_' + tipo);
+  if (aviso) aviso.style.display = id ? 'flex' : 'none';
+  if (texto) {
+    const n = _borradoresPendientes[tipo];
+    texto.textContent = n > 1
+      ? 'Tiene ' + n + ' borradores sin enviar de este instrumento. Se continuará ' +
+        'sobre el más reciente; los otros siguen en Mis registros, para terminarlos ' +
+        'o eliminarlos desde ahí.'
+      : 'Hay un borrador guardado de este instrumento. Lo que complete aquí se ' +
+        'guardará sobre esa misma fila, sin crear otra.';
   }
   if (id) _firmaBorrador[tipo] = '';
 }
 
 // Descarta el borrador del instrumento y deja el formulario en limpio
 async function descartarBorradorInstrumento(tipo) {
-  if (!confirm('¿Descartar el borrador guardado de este instrumento?\n\n' +
-               'Se eliminará de la base de datos y el formulario quedará en blanco.')) return;
-  await _limpiarBorradoresSobrantes(tipo, null);
+  const id = _borradorId[tipo];
+  if (!id) { mostrarNotif('No hay borrador en curso que descartar.', true); return; }
+  if (!confirm('¿Descartar este borrador?\n\n' +
+               'Se eliminará de la base de datos y el formulario quedará en blanco. ' +
+               'Los demás borradores que tenga sin enviar no se tocan.')) return;
+  await sb.from('acompañamientos').delete()
+    .eq('id', id).eq('usuario_id', usuarioActual.id).eq('estado', 'Borrador');
   cerrarBorrador(tipo);
   const aviso = document.getElementById('avisoBorrador_' + tipo);
   if (aviso) aviso.style.display = 'none';
