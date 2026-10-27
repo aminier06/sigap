@@ -1182,6 +1182,14 @@ document.addEventListener('DOMContentLoaded', () => {
                    padding:6px 12px;opacity:0;transition:opacity .5s;white-space:nowrap;align-self:center;">
           </div>
         </div>
+        <div id="avisoBorrador_docente" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;
+             background:#fff7e6;border:1px solid #f0d49a;border-radius:10px;
+             padding:12px 14px;margin:12px 0;font-size:13px;color:#8a5d00;">
+          <span style="flex:1;min-width:240px;">Hay un borrador guardado de este instrumento.
+            Lo que complete aquí se guardará sobre esa misma fila, sin crear otra.</span>
+          <button type="button" class="btn-secundario btn-sm"
+                  onclick="descartarBorradorInstrumento('docente')">🗑️ Descartar borrador</button>
+        </div>
         <form id="formAcompDocente" onsubmit="enviarFormulario(event)">
 
           <div class="bloque">
@@ -1342,6 +1350,14 @@ document.addEventListener('DOMContentLoaded', () => {
                    padding:6px 12px;opacity:0;transition:opacity .5s;white-space:nowrap;align-self:center;">
           </div>
         </div>
+        <div id="avisoBorrador_coordinador" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;
+             background:#fff7e6;border:1px solid #f0d49a;border-radius:10px;
+             padding:12px 14px;margin:12px 0;font-size:13px;color:#8a5d00;">
+          <span style="flex:1;min-width:240px;">Hay un borrador guardado de este instrumento.
+            Lo que complete aquí se guardará sobre esa misma fila, sin crear otra.</span>
+          <button type="button" class="btn-secundario btn-sm"
+                  onclick="descartarBorradorInstrumento('coordinador')">🗑️ Descartar borrador</button>
+        </div>
         <form id="formAcompCoord" onsubmit="enviarFormularioCoord(event)">
 
           <div class="bloque">
@@ -1471,6 +1487,14 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="form-cabecera">
           <div class="form-titulo">Instrumento de Acompañamiento al Técnico/a Distrital</div>
           <div class="form-subtitulo">Dirección de Educación Primaria · MINERD</div>
+        </div>
+        <div id="avisoBorrador_tecnico_distrital" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;
+             background:#fff7e6;border:1px solid #f0d49a;border-radius:10px;
+             padding:12px 14px;margin:12px 0;font-size:13px;color:#8a5d00;">
+          <span style="flex:1;min-width:240px;">Hay un borrador guardado de este instrumento.
+            Lo que complete aquí se guardará sobre esa misma fila, sin crear otra.</span>
+          <button type="button" class="btn-secundario btn-sm"
+                  onclick="descartarBorradorInstrumento('tecnico_distrital')">🗑️ Descartar borrador</button>
         </div>
         <form id="formAcompDist" onsubmit="enviarFormularioDist(event)">
           <!-- DATOS GENERALES -->
@@ -2912,8 +2936,9 @@ function mostrarPanel(id, el) {
     }
     if (d?.value && h?.value) cargarSeguimientoTecnicos();
   }
-  // Autoguardado: activar solo en el formulario
-  if (id === 'formDocente') iniciarAutoguardado();
+  // Autoguardado en los tres instrumentos
+  const tipoForm = { formDocente:'docente', formCoord:'coordinador', formDist:'tecnico_distrital' }[id];
+  if (tipoForm) { iniciarAutoguardado(); avisarBorradorEnCurso(tipoForm); }
   else detenerAutoguardado();
 }
 
@@ -3180,51 +3205,64 @@ const _BORRADOR = {
 // vuelve más tarde a continuar, se sigue actualizando la MISMA fila en vez de
 // crear otra. Esto es lo que producía borradores repetidos pese a la
 // corrección anterior.
-const _CLAVE_BORRADOR = t => 'sigap_borrador_' + t + '_' + (usuarioActual?.id || 'anon');
+// Un solo borrador por usuario e instrumento.
+//
+// Las versiones anteriores guardaban el identificador del borrador en el
+// navegador y decidían con una "identidad" del acompañamiento (cédula, centro
+// y fecha) si continuar la fila o abrir otra. Esa identidad cambia mientras la
+// persona llena el formulario, así que cada vez que escribía la cédula o
+// corregía la fecha se abría una fila nueva y la anterior quedaba huérfana.
+// Ahora la fila se resuelve contra la base de datos, que es la única fuente
+// fiable, y al enviar se borra cualquier borrador sobrante del instrumento.
 
-const _borradorId = new Proxy({ docente:null, coordinador:null, tecnico_distrital:null }, {
-  get(destino, tipo) {
-    if (!(tipo in destino)) return undefined;
-    if (destino[tipo] === null) {
-      try { destino[tipo] = localStorage.getItem(_CLAVE_BORRADOR(tipo)) || null; } catch (e) {}
-    }
-    return destino[tipo];
-  },
-  set(destino, tipo, valor) {
-    destino[tipo] = valor;
-    try {
-      if (valor) localStorage.setItem(_CLAVE_BORRADOR(tipo), valor);
-      else       localStorage.removeItem(_CLAVE_BORRADOR(tipo));
-    } catch (e) {}
-    return true;
-  }
-});
+const _borradorId      = { docente:null, coordinador:null, tecnico_distrital:null };
+const _firmaBorrador   = { docente:'',   coordinador:'',   tecnico_distrital:'' };
+const _borradorResuelto = { docente:false, coordinador:false, tecnico_distrital:false };
 
-const _firmaBorrador = { docente:'',   coordinador:'',   tecnico_distrital:'' };
-
-// Identidad del acompañamiento que hay en pantalla: cédula, centro y fecha.
-// Sirve para distinguir "sigo llenando el mismo" de "empecé otro distinto".
-function _identidadAcomp(tipo) {
-  const v = id => (document.getElementById(id)||{}).value || '';
-  if (tipo === 'coordinador')       return [v('cCedulaCoord'),  v('cCodigoCentro'), v('cFechaCoord')].join('|');
-  if (tipo === 'tecnico_distrital') return [v('dCedulaTecnico'), v('dCodigoCentro'), v('dFechaDist')].join('|');
-  return [v('cedulaDocente'), v('codigoCentro'), v('fecha')].join('|');
+// Acota una consulta al instrumento indicado. El instrumento de docente es el
+// más antiguo y sus filas pueden tener tipo_instrumento nulo.
+function _filtroInstrumento(q, tipo) {
+  return tipo === 'docente'
+    ? q.or('tipo_instrumento.is.null,tipo_instrumento.eq.docente')
+    : q.eq('tipo_instrumento', tipo);
 }
 
-// Decide si el guardado debe continuar la fila existente o abrir una nueva.
-// Sin esto, tras recargar la página un acompañamiento distinto sobrescribiría
-// el borrador anterior en vez de crear el suyo.
-function _prepararBorrador(tipo) {
-  const actual = _identidadAcomp(tipo);
-  if (!actual.replace(/\|/g, '')) return;          // formulario aún vacío
-  const claveId = _CLAVE_BORRADOR(tipo) + '_ident';
-  let guardada = '';
-  try { guardada = localStorage.getItem(claveId) || ''; } catch (e) {}
-  if (guardada && guardada !== actual) {
-    _borradorId[tipo] = null;                       // es otro acompañamiento
-    _firmaBorrador[tipo] = '';
+// Busca el borrador del usuario para ese instrumento. Si hay varios, conserva
+// el más reciente y elimina el resto.
+async function _resolverBorrador(tipo) {
+  _borradorResuelto[tipo] = true;
+  _borradorId[tipo] = null;
+  if (!usuarioActual) return null;
+  const { data, error } = await _filtroInstrumento(
+    sb.from('acompañamientos').select('id')
+      .eq('usuario_id', usuarioActual.id)
+      .eq('estado', 'Borrador')
+      .order('created_at', { ascending: false }), tipo);
+  if (error || !data || !data.length) return null;
+  _borradorId[tipo] = data[0].id;
+  if (data.length > 1) {
+    try {
+      await sb.from('acompañamientos').delete()
+        .in('id', data.slice(1).map(x => x.id))
+        .eq('usuario_id', usuarioActual.id)
+        .eq('estado', 'Borrador');
+    } catch (e) {}
   }
-  try { localStorage.setItem(claveId, actual); } catch (e) {}
+  return _borradorId[tipo];
+}
+
+async function _asegurarBorradorResuelto(tipo) {
+  if (!_borradorResuelto[tipo]) await _resolverBorrador(tipo);
+}
+
+// Borra los borradores sobrantes del instrumento, salvo el que se indique
+async function _limpiarBorradoresSobrantes(tipo, excepto) {
+  if (!usuarioActual) return;
+  let q = sb.from('acompañamientos').delete()
+    .eq('usuario_id', usuarioActual.id)
+    .eq('estado', 'Borrador');
+  if (excepto) q = q.neq('id', excepto);
+  try { await _filtroInstrumento(q, tipo); } catch (e) {}
 }
 
 // Huella del formulario, para no reescribir cuando nada ha cambiado
@@ -3245,7 +3283,7 @@ function _tieneDatosMinimos(tipo) {
   return _BORRADOR[tipo].minimos.some(id => (document.getElementById(id)?.value || '').trim());
 }
 
-// Guarda (o actualiza) el borrador del instrumento indicado
+// Guarda el borrador del instrumento: siempre sobre la misma fila
 async function guardarBorradorInstrumento(tipo, silencioso = false) {
   const cfg = _BORRADOR[tipo];
   if (!cfg || !usuarioActual) return false;
@@ -3253,14 +3291,25 @@ async function guardarBorradorInstrumento(tipo, silencioso = false) {
     if (!silencioso) mostrarNotif('Complete al menos la fecha o el nombre para guardar un borrador.', true);
     return false;
   }
-  _prepararBorrador(tipo);
+  await _asegurarBorradorResuelto(tipo);
   const registro = cfg.payload();
   let error = null;
 
   if (_borradorId[tipo]) {
-    const res = await sb.from('acompañamientos').update(registro).eq('id', _borradorId[tipo]).select('id');
+    // El filtro por estado evita que un autoguardado tardío devuelva a
+    // borrador un acompañamiento que ya se envió.
+    const res = await sb.from('acompañamientos').update(registro)
+      .eq('id', _borradorId[tipo]).eq('estado', 'Borrador').select('id');
     error = res.error;
-    if (!error && (!res.data || res.data.length === 0)) _borradorId[tipo] = null;
+    if (!error && (!res.data || !res.data.length)) {
+      // La fila no se actualizó: o ya se envió, o alguien la eliminó. Solo en
+      // el segundo caso corresponde abrir una fila nueva; en el primero el
+      // acompañamiento está cerrado y crear otro borrador lo duplicaría.
+      const chk = await sb.from('acompañamientos').select('estado')
+        .eq('id', _borradorId[tipo]).maybeSingle();
+      if (!chk.error && chk.data) { cerrarBorrador(tipo); return true; }
+      _borradorId[tipo] = null;
+    }
   }
   if (!error && !_borradorId[tipo]) {
     const res = await sb.from('acompañamientos').insert(registro).select('id').single();
@@ -3276,26 +3325,73 @@ async function guardarBorradorInstrumento(tipo, silencioso = false) {
   return true;
 }
 
-// Al enviar, el borrador deja de estar en curso
+// Envío: el borrador se convierte en el registro enviado y deja de ser borrador
+async function enviarRegistroInstrumento(tipo, registro) {
+  await _asegurarBorradorResuelto(tipo);
+  let id = _borradorId[tipo];
+
+  if (id) {
+    const res = await sb.from('acompañamientos').update(registro).eq('id', id).select('id');
+    if (res.error) return { error: res.error };
+    if (!res.data || !res.data.length) id = null;   // la fila ya no está
+  }
+  if (!id) {
+    const res = await sb.from('acompañamientos').insert(registro).select('id').single();
+    if (res.error) return { error: res.error };
+    id = res.data?.id || null;
+  }
+
+  await _limpiarBorradoresSobrantes(tipo, null);
+  cerrarBorrador(tipo);
+  return { id, error: null };
+}
+
+// El borrador deja de estar en curso; la próxima apertura vuelve a resolverlo
 function cerrarBorrador(tipo) {
   _borradorId[tipo] = null;
   _firmaBorrador[tipo] = '';
-  try { localStorage.removeItem(_CLAVE_BORRADOR(tipo) + '_ident'); } catch (e) {}
+  _borradorResuelto[tipo] = false;
 }
 
 // Id del borrador en curso, para que el envío actualice esa fila en vez de duplicarla
 function idBorradorEnCurso(tipo) { return _borradorId[tipo]; }
 
+// Al abrir un formulario se resuelve el borrador del instrumento contra la
+// base de datos y se avisa, para que nadie crea que empieza en limpio cuando
+// en realidad continuará sobre una fila ya existente.
+async function avisarBorradorEnCurso(tipo) {
+  if (!usuarioActual) return;
+  const id = await _resolverBorrador(tipo);
+  const aviso = document.getElementById('avisoBorrador_' + tipo);
+  if (aviso) {
+    aviso.style.display = id ? 'flex' : 'none';
+  }
+  if (id) _firmaBorrador[tipo] = '';
+}
+
+// Descarta el borrador del instrumento y deja el formulario en limpio
+async function descartarBorradorInstrumento(tipo) {
+  if (!confirm('¿Descartar el borrador guardado de este instrumento?\n\n' +
+               'Se eliminará de la base de datos y el formulario quedará en blanco.')) return;
+  await _limpiarBorradoresSobrantes(tipo, null);
+  cerrarBorrador(tipo);
+  const aviso = document.getElementById('avisoBorrador_' + tipo);
+  if (aviso) aviso.style.display = 'none';
+  if (tipo === 'docente')                limpiarFormulario();
+  else if (tipo === 'coordinador')       limpiarFormularioCoord();
+  else if (tipo === 'tecnico_distrital') limpiarFormularioDist(true);
+  mostrarNotif('Borrador descartado.');
+}
+
+// Autoguardado en los tres instrumentos
 function iniciarAutoguardado() {
   if (autoguardadoTimer) clearInterval(autoguardadoTimer);
   autoguardadoTimer = setInterval(async () => {
-    // Detectar qué instrumento está abierto
     const tipo = Object.keys(_BORRADOR).find(t =>
       document.getElementById(_BORRADOR[t].panel)?.classList.contains('activo'));
     if (!tipo) return;
     if (!_tieneDatosMinimos(tipo)) return;
 
-    // No reescribir si nada cambió desde el último autoguardado
     const firma = _firmaFormulario(_BORRADOR[tipo].form);
     if (firma === _firmaBorrador[tipo]) return;
 
@@ -3303,7 +3399,6 @@ function iniciarAutoguardado() {
     if (ok) { ultimoAutoguardado = new Date(); mostrarIndicadorAutoguardado(); }
   }, 3 * 60 * 1000); // cada 3 minutos
 }
-
 
 function mostrarIndicadorAutoguardado() {
   const hora = ultimoAutoguardado.toLocaleTimeString('es-DO', { hour:'2-digit', minute:'2-digit' });
@@ -5714,27 +5809,18 @@ async function guardarRegistro(estado) {
     estado,
   };
 
-  _prepararBorrador('docente');
-  // Un acompañamiento en curso ocupa UNA sola fila: el primer guardado la crea
-  // y los siguientes la actualizan. Al enviar, ese mismo borrador pasa a
-  // Enviado, de modo que no queda un duplicado por cada autoguardado.
-  let error = null;
-  if (_borradorId.docente) {
-    const res = await sb.from('acompañamientos')
-      .update(registro).eq('id', _borradorId.docente).select('id');
-    error = res.error;
-    // Si el borrador fue borrado desde otra pantalla, se crea uno nuevo
-    if (!error && (!res.data || res.data.length === 0)) _borradorId.docente = null;
-  }
-  if (!error && !_borradorId.docente) {
-    const res = await sb.from('acompañamientos').insert(registro).select('id').single();
-    error = res.error;
-    if (!error && res.data) _borradorId.docente = res.data.id;
+  // Un acompañamiento ocupa UNA sola fila: el borrador se crea una vez, se
+  // actualiza mientras se llena, y al enviar esa misma fila pasa a Enviado.
+  if (estado !== 'Enviado') {
+    await guardarBorradorInstrumento('docente');
+    return;
   }
 
+  const { error } = await enviarRegistroInstrumento('docente', registro);
   if (error) { mostrarNotif('Error al guardar: ' + error.message, true); return; }
-  mostrarNotif(estado === 'Enviado' ? 'Registro enviado correctamente.' : 'Borrador guardado.');
-  if (estado === 'Enviado') { cerrarBorrador('docente'); cerrarPlanEnCurso('docente'); limpiarFormulario(); }
+  mostrarNotif('Registro enviado correctamente.');
+  cerrarPlanEnCurso('docente');
+  limpiarFormulario();
 }
 
 function limpiarFormulario() {
@@ -6281,9 +6367,11 @@ async function buscarCentroDist(codigo) {
   }, 400);
 }
 
-function limpiarFormularioDist() {
+function limpiarFormularioDist(trasEnviar) {
+  // El borrador se descartaba antes de preguntar: si la persona cancelaba,
+  // el siguiente guardado abría una fila nueva y dejaba la anterior suelta.
+  if (!trasEnviar && !confirm('¿Limpiar todo el formulario del técnico distrital?')) return;
   cerrarBorrador('tecnico_distrital');
-  if (!confirm('¿Limpiar todo el formulario del técnico distrital?')) return;
   document.getElementById('formAcompDist').reset();
   document.getElementById('dNombreAcompanante').value = perfilActual?.nombre || '';
   document.getElementById('dRolAcompanante').value = perfilActual?.rol || '';
@@ -6366,14 +6454,11 @@ async function enviarFormularioDist(event) {
       usuario_id: usuarioActual?.id,
       estado: 'Enviado'
     };
-    const _bid = idBorradorEnCurso('tecnico_distrital');
-    const { error } = _bid
-      ? await sb.from('acompañamientos').update(payload).eq('id', _bid)
-      : await sb.from('acompañamientos').insert([payload]);
+    const { error } = await enviarRegistroInstrumento('tecnico_distrital', payload);
     if (error) throw error;
     mostrarNotif('Acompañamiento al técnico distrital enviado correctamente.');
     cerrarPlanEnCurso('tecnico_distrital');
-    limpiarFormularioDist();
+    limpiarFormularioDist(true);
   } catch(e) {
     mostrarNotif('Error al enviar: ' + e.message, true);
   } finally {
@@ -6533,10 +6618,7 @@ async function enviarFormularioCoord(event) {
   };
   const btn = document.getElementById('btnEnviarCoord');
   btn.disabled = true; btn.textContent = 'Guardando…';
-  const _bid = idBorradorEnCurso('coordinador');
-  const { error } = _bid
-    ? await sb.from('acompañamientos').update(registro).eq('id', _bid)
-    : await sb.from('acompañamientos').insert([registro]);
+  const { error } = await enviarRegistroInstrumento('coordinador', registro);
   btn.disabled = false; btn.textContent = '✅ Enviar registro';
   if (error) { mostrarNotif('Error al guardar: ' + error.message, true); return; }
   mostrarNotif('Registro enviado correctamente.');
