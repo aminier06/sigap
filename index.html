@@ -2564,7 +2564,7 @@ document.addEventListener('DOMContentLoaded', () => {
               </select>
             </div>
             <div class="campo">
-              <label>Técnico</label>
+              <label>Acompañante</label>
               <select id="stTecnico" onchange="filtrarSeguimientoTecnicos()">
                 <option value="">Todos</option>
               </select>
@@ -2578,8 +2578,20 @@ document.addEventListener('DOMContentLoaded', () => {
               </select>
             </div>
             <div class="campo">
+              <label>Regional</label>
+              <select id="stRegional" onchange="filtrarSeguimientoTecnicos()">
+                <option value="">Todas</option>
+              </select>
+            </div>
+            <div class="campo">
               <label>Distrito</label>
               <select id="stDistrito" onchange="filtrarSeguimientoTecnicos()">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label>Acompañado</label>
+              <select id="stAcompanado" onchange="filtrarSeguimientoTecnicos()">
                 <option value="">Todos</option>
               </select>
             </div>
@@ -4807,6 +4819,59 @@ function coincidePlanEjecutado(p, e) {
   return !!p.codigo_centro && e.codigo_centro === p.codigo_centro;
 }
 
+// ── ALCANCE DE LA PLANIFICACIÓN SEGÚN EL ROL ──────────────────────────────────
+// La tabla de planificaciones no guarda regional ni distrito, así que el
+// alcance se resuelve por el perfil de quien planificó.
+//   Nacional y administrador : todas
+//   Regional                 : las de su regional
+//   Distrital                : las de coordinadores y directores de su distrito
+//   Coordinador distrital    : lo anterior, más las de sus pares técnicos
+//   Coordinador y director   : solo las suyas
+// Devuelve null cuando no hay límite, o la lista de usuarios visibles.
+let _perfilesCache = null;
+
+async function usuariosVisiblesPlanificacion() {
+  const p = perfilActual;
+  if (!p || !usuarioActual) return [];
+  const norm = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+  const rol = norm(p.rol);
+  if (p.nivel === 'admin' || rol === 'tecnico/a nacional') return null;   // sin límite
+
+  if (!_perfilesCache) {
+    const { data } = await traerTodo(sb.from('perfiles').select('id,rol,regional,distrito'));
+    _perfilesCache = data || [];
+  }
+  const cod = (v, n) => {
+    const m = String(v || '').trim().match(/^(\d+)/);
+    return m ? m[1].slice(0, n).padStart(n, '0') : '';
+  };
+  const miReg = cod(p.regional, 2), miDis = cod(p.distrito, 4);
+
+  const esRegional  = rol === 'tecnico/a regional'  || rol === 'tecnico/a coordinador/a regional';
+  const esDistrital = rol === 'tecnico/a distrital' || rol === 'tecnico/a coordinador/a distrital';
+  const esCoordinadorTec = rol.includes('coordinador/a regional') || rol.includes('coordinador/a distrital');
+
+  let ids;
+  if (esRegional) {
+    if (!miReg) return [usuarioActual.id];
+    ids = _perfilesCache.filter(x => cod(x.regional, 2) === miReg).map(x => x.id);
+  } else if (esDistrital) {
+    if (!miDis) return [usuarioActual.id];
+    const deCentro = ['coordinador/a pedagogico/a', 'director/a de centro'];
+    ids = _perfilesCache.filter(x => {
+      if (cod(x.distrito, 4) !== miDis) return false;
+      const r = norm(x.rol);
+      if (deCentro.includes(r)) return true;
+      // Los coordinadores técnicos ven además a sus pares del distrito
+      return esCoordinadorTec && (r === 'tecnico/a distrital' || r === 'tecnico/a coordinador/a distrital');
+    }).map(x => x.id);
+  } else {
+    ids = [usuarioActual.id];
+  }
+  if (!ids.includes(usuarioActual.id)) ids.push(usuarioActual.id);
+  return ids;
+}
+
 async function cargarSeguimiento() {
   const desde = document.getElementById('segDesde').value;
   const hasta = document.getElementById('segHasta').value;
@@ -4819,8 +4884,10 @@ async function cargarSeguimiento() {
   let qPlan = sb.from('planificaciones').select('*')
     .gte('fecha_prevista', desde).lte('fecha_prevista', hasta)
     .order('fecha_prevista');
-  if (!esAdmin && rol !== 'Técnico/a Nacional') {
-    qPlan = qPlan.eq('usuario_id', usuarioActual.id);
+  const visibles = await usuariosVisiblesPlanificacion();
+  if (visibles) {
+    if (!visibles.length) { mostrarNotif('No tiene planificaciones a su alcance.', true); return; }
+    qPlan = qPlan.in('usuario_id', visibles);
   }
 
   // Cargar acompañamientos ejecutados del período
@@ -4967,6 +5034,14 @@ const _stRol      = r => _stVista === 'planificaciones'
   ? (_stPerf[r.usuario_id]?.rol || '') : (r.rol_acompanante || '');
 const _stDistrito = r => _stVista === 'planificaciones'
   ? (_stPerf[r.usuario_id]?.distrito || '') : (r.distrito || '');
+const _stRegional = r => _stVista === 'planificaciones'
+  ? (_stPerf[r.usuario_id]?.regional || '') : (r.regional || '');
+// Persona acompañada, según el instrumento
+const _stAcompanado = r => r.tipo_instrumento === 'coordinador'
+  ? (r.nombre_coordinador || r.nombre_docente || '')
+  : r.tipo_instrumento === 'tecnico_distrital'
+    ? (r.nombre_tecnico || r.nombre_docente || '')
+    : (r.nombre_docente || '');
 
 function _poblarFiltrosTecnicos() {
   const selT = document.getElementById('stTecnico');
@@ -4985,10 +5060,26 @@ function _poblarFiltrosTecnicos() {
       dis.map(d => `<option value="${d}">${d}</option>`).join('');
     if (dis.includes(previo)) selD.value = previo;
   }
+  const selR = document.getElementById('stRegional');
+  if (selR) {
+    const previo = selR.value;
+    const regs = [...new Set(_stDatos.map(_stRegional).map(x => x.trim()).filter(Boolean))].sort();
+    selR.innerHTML = '<option value="">Todas</option>' +
+      regs.map(r => `<option value="${r}">${r}</option>`).join('');
+    if (regs.includes(previo)) selR.value = previo;
+  }
+  const selA = document.getElementById('stAcompanado');
+  if (selA) {
+    const previo = selA.value;
+    const acs = [...new Set(_stDatos.map(_stAcompanado).map(x => x.trim()).filter(Boolean))].sort();
+    selA.innerHTML = '<option value="">Todos</option>' +
+      acs.map(a => `<option value="${a}">${a}</option>`).join('');
+    if (acs.includes(previo)) selA.value = previo;
+  }
 }
 
 function limpiarFiltrosTecnicos() {
-  ['stTecnico','stRol','stDistrito','stBuscar'].forEach(id => {
+  ['stTecnico','stRol','stDistrito','stRegional','stAcompanado','stBuscar'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   filtrarSeguimientoTecnicos();
@@ -5000,12 +5091,16 @@ function filtrarSeguimientoTecnicos() {
   const tec   = document.getElementById('stTecnico')?.value || '';
   const rolF  = document.getElementById('stRol')?.value || '';
   const disF  = document.getElementById('stDistrito')?.value || '';
+  const regF  = document.getElementById('stRegional')?.value || '';
+  const acoF  = document.getElementById('stAcompanado')?.value || '';
   const texto = _norm(document.getElementById('stBuscar')?.value);
   const palabras = texto ? texto.split(/\s+/) : [];
 
   const filtrados = _stDatos.filter(r => {
     if (tec  && _stNombre(r).trim()   !== tec)  return false;
     if (disF && _stDistrito(r).trim() !== disF) return false;
+    if (regF && _stRegional(r).trim() !== regF) return false;
+    if (acoF && _stAcompanado(r).trim() !== acoF) return false;
     if (rolF && !_norm(_stRol(r)).includes(_norm(rolF))) return false;
     if (!palabras.length) return true;
     const heno = _norm([r.centro_educativo, r.nombre_docente, r.nombre_coordinador,
@@ -5023,7 +5118,7 @@ function filtrarSeguimientoTecnicos() {
   document.getElementById('stCards').style.display = 'grid';
 
   const cont = document.getElementById('stContador');
-  if (cont) cont.textContent = (tec || rolF || disF || palabras.length)
+  if (cont) cont.textContent = (tec || rolF || disF || regF || acoF || palabras.length)
     ? `${filtrados.length} de ${_stDatos.length} registros`
     : `${_stDatos.length} registros`;
 
