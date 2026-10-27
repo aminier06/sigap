@@ -2893,6 +2893,18 @@ function mostrarPanel(id, el) {
   if (id === 'adminUsuarios')  cargarUsuarios();
   if (id === 'adminRegistros') cargarTodosRegistros();
   if (id === 'mapaCoberta')    cargarMapaCobertura();
+  if (id === 'seguimientoTecnicos') {
+    // Sin rango no hay consulta, y un rango estrecho hace parecer que no hay
+    // datos. Se abre con el año escolar en curso y se consulta de inmediato.
+    const d = document.getElementById('stDesde'), h = document.getElementById('stHasta');
+    if (d && h && !d.value && !h.value) {
+      const hoy = new Date();
+      const anioInicio = hoy.getMonth() >= 7 ? hoy.getFullYear() : hoy.getFullYear() - 1;
+      d.value = anioInicio + '-08-01';
+      h.value = hoy.toISOString().slice(0, 10);
+    }
+    if (d?.value && h?.value) cargarSeguimientoTecnicos();
+  }
   // Autoguardado: activar solo en el formulario
   if (id === 'formDocente') iniciarAutoguardado();
   else detenerAutoguardado();
@@ -5214,9 +5226,9 @@ let _stDatos = [], _stPerf = {}, _stVista = 'acompanamientos';
 
 // Nombre y distrito de cada fila, según la vista
 const _stNombre   = r => _stVista === 'planificaciones'
-  ? (_stPerf[r.usuario_id]?.nombre || '') : (r.nombre_acompanante || '');
+  ? (_stPerf[r.usuario_id]?.nombre || r.nombre_acompanante || '') : (r.nombre_acompanante || '');
 const _stRol      = r => _stVista === 'planificaciones'
-  ? (_stPerf[r.usuario_id]?.rol || '') : (r.rol_acompanante || '');
+  ? (_stPerf[r.usuario_id]?.rol || r.rol_acompanante || '') : (r.rol_acompanante || '');
 const _stDistrito = r => _stVista === 'planificaciones'
   ? (_stPerf[r.usuario_id]?.distrito || '') : (r.distrito || '');
 const _stRegional = r => _stVista === 'planificaciones'
@@ -5252,6 +5264,14 @@ function _poblarFiltrosTecnicos() {
     selR.innerHTML = '<option value="">Todas</option>' +
       regs.map(r => `<option value="${r}">${r}</option>`).join('');
     if (regs.includes(previo)) selR.value = previo;
+  }
+  const selRol = document.getElementById('stRol');
+  if (selRol) {
+    const previo = selRol.value;
+    const roles = [...new Set(_stDatos.map(_stRol).map(x => x.trim()).filter(Boolean))].sort();
+    selRol.innerHTML = '<option value="">Todos</option>' +
+      roles.map(r => `<option value="${r}">${r}</option>`).join('');
+    if (roles.includes(previo)) selRol.value = previo;
   }
   const selA = document.getElementById('stAcompanado');
   if (selA) {
@@ -5320,7 +5340,7 @@ function filtrarSeguimientoTecnicos() {
         ? `<tr>
             <td>${esc(r.fecha_prevista) || '—'}</td>
             <td style="font-size:12px;">${esc(_stNombre(r)) || '—'}</td>
-            <td style="font-size:12px;">${esc(_stPerf[r.usuario_id]?.regional) || '—'}</td>
+            <td style="font-size:12px;">${esc(_stRegional(r)) || '—'}</td>
             <td style="font-size:12px;">${esc(_stDistrito(r)) || '—'}</td>
             <td style="font-size:12px;">${esc(r.centro_educativo) || '—'}</td>
             <td style="font-size:12px;">${esc(r.nombre_docente) || '—'}</td>
@@ -5409,42 +5429,47 @@ async function cargarSeguimientoTecnicos() {
     // Planificaciones
     cabecera.innerHTML = '<tr><th>Fecha prevista</th><th>Técnico</th><th>Regional</th><th>Distrito</th><th>Centro</th><th>Docente</th><th>Foco</th><th>Estado</th></tr>';
 
-    // Para planificaciones necesitamos cruzar con perfiles para filtrar por jurisdicción
-    // Primero obtenemos IDs de técnicos en la jurisdicción
-    let queryPerf = sb.from('perfiles').select('id,nombre,rol,regional,distrito')
-      .in('rol', ['Técnico/a Regional', 'Técnico/a Distrital']);
+    // Se consultan primero las planificaciones del rango y después los perfiles
+    // de quienes las registraron. El orden inverso dejaba fuera a los técnicos
+    // coordinadores y a cualquier perfil cuyo rol estuviera escrito distinto,
+    // y el panel mostraba ceros aunque hubiera datos guardados.
+    const { data: planes, error: errPlan } = await traerTodo(
+      sb.from('planificaciones').select('*')
+        .gte('fecha_prevista', desde).lte('fecha_prevista', hasta)
+        .order('fecha_prevista'));
+    if (errPlan) { mostrarNotif('Error: ' + errPlan.message, true); return; }
+    let todas = planes || [];
 
+    // Perfiles de los autores, para mostrar y filtrar por demarcación
+    const autores = [...new Set(todas.map(r => r.usuario_id).filter(Boolean))];
+    let mapaPerf = {};
+    if (autores.length) {
+      const { data: perfilesTec } = await traerTodo(
+        sb.from('perfiles').select('id,nombre,rol,regional,distrito').in('id', autores));
+      mapaPerf = Object.fromEntries((perfilesTec || []).map(x => [x.id, x]));
+    }
+
+    // Jurisdicción: el coordinador ve su demarcación; nacional y admin, todo
     if (rol === 'tecnico/a coordinador/a distrital') {
       const cod = prefijo(p.distrito, 4);
       if (!cod) { cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:red;padding:24px;">Tu perfil no tiene distrito configurado.</td></tr>'; return; }
-      queryPerf = queryPerf.or('distrito.eq.' + cod + ',distrito.like.' + cod + ' %,distrito.like.' + cod + '-%,distrito.like.' + cod + '–%');
+      todas = todas.filter(r => prefijo(mapaPerf[r.usuario_id]?.distrito, 4) === cod);
     } else if (rol === 'tecnico/a coordinador/a regional') {
       const cod = prefijo(p.regional, 2);
       if (!cod) { cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:red;padding:24px;">Tu perfil no tiene regional configurada.</td></tr>'; return; }
-      queryPerf = queryPerf.or('regional.eq.' + cod + ',regional.like.' + cod + ' %,regional.like.' + cod + '-%,regional.like.' + cod + '–%');
+      todas = todas.filter(r => prefijo(mapaPerf[r.usuario_id]?.regional, 2) === cod);
     }
 
-    const { data: perfilesTec, error: errPerf } = await queryPerf;
-    if (errPerf) { mostrarNotif('Error al obtener técnicos: ' + errPerf.message, true); return; }
-    const ids = (perfilesTec || []).map(x => x.id);
-    const mapaPerf = Object.fromEntries((perfilesTec || []).map(x => [x.id, x]));
+    datos = todas;
 
-    if (!ids.length) {
-      cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">No se encontraron técnicos en tu jurisdicción.</td></tr>';
+    if (!datos.length) {
+      document.getElementById('stCards').style.display = 'none';
+      cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">No hay planificaciones registradas en este rango de fechas.</td></tr>';
+      _stDatos = []; _stPerf = mapaPerf; _stVista = 'planificaciones';
+      _poblarFiltrosTecnicos();
       return;
     }
 
-    const { data: planes, error: errPlan } = await sb.from('planificaciones').select('*')
-      .in('usuario_id', ids)
-      .gte('fecha_prevista', desde).lte('fecha_prevista', hasta)
-      .order('fecha_prevista');
-    if (errPlan) { mostrarNotif('Error: ' + errPlan.message, true); return; }
-    datos = planes || [];
-
-    document.getElementById('stTotalTec').textContent = ids.length;
-    document.getElementById('stTotalReg').textContent = datos.length;
-    document.getElementById('stEnviados').textContent = datos.filter(r => r.estado === 'Ejecutado').length;
-    document.getElementById('stBorradores').textContent = datos.filter(r => r.estado !== 'Ejecutado').length;
     document.getElementById('stCards').style.display = 'grid';
 
     _stDatos = datos; _stPerf = mapaPerf; _stVista = 'planificaciones';
