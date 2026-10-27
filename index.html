@@ -3820,7 +3820,11 @@ async function cargarMapaCobertura() {
 
   const rolAcomp = document.getElementById('mapaFiltroRolAcomp')?.value;
 
-  let queryAcomp = filtrarDemarcacion(sb.from('acompañamientos').select('codigo_centro,tipo_acompanamiento,fecha,estado,rol_acompanante'));
+  // Solo acompañamientos enviados: un borrador a medio llenar no es una visita
+  // realizada, y contarlo haría que el mapa reportara cobertura inexistente.
+  let queryAcomp = filtrarDemarcacion(sb.from('acompañamientos')
+    .select('codigo_centro,tipo_acompanamiento,fecha,estado,rol_acompanante'))
+    .eq('estado', 'Enviado');
   if (desde) queryAcomp = queryAcomp.gte('fecha', desde);
   if (hasta) queryAcomp = queryAcomp.lte('fecha', hasta);
   if (tipo)  queryAcomp = queryAcomp.eq('tipo_acompanamiento', tipo);
@@ -3855,7 +3859,8 @@ async function cargarMapaCobertura() {
       div.innerHTML = `
         <strong>Cobertura</strong><br>
         <span style="background:#16a34a;"></span> Con acompañamiento<br>
-        <span style="background:#dc2626;"></span> Sin acompañamiento`;
+        <span style="background:#dc2626;"></span> Sin acompañamiento<br>
+        <span style="font-size:10px;color:#6b7280;">Solo acompañamientos enviados</span>`;
       return div;
     };
     leyenda.addTo(_mapaLeaflet);
@@ -4290,6 +4295,12 @@ async function enviarFormulario(e) {
 }
 
 async function guardarBorrador() {
+  // Sin fecha ni nombre no hay nada que guardar: evita los borradores en
+  // blanco que se creaban al pulsar el botón con el formulario vacío.
+  if (!_tieneDatosMinimos('docente')) {
+    mostrarNotif('Complete al menos la fecha o el nombre del docente para guardar un borrador.', true);
+    return;
+  }
   const btn = document.getElementById('btnBorrador');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Guardando…';
   await guardarRegistro('Borrador');
