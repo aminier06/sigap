@@ -4613,11 +4613,35 @@ async function guardarObservacionPlan() {
   const valor = document.getElementById('obsPlanTexto').value.trim() || null;
   const btn = document.getElementById('btnGuardarObsPlan');
   btn.disabled = true; btn.textContent = 'Guardando…';
-  const { error } = await sb.from('planificaciones')
-    .update({ observacion: valor }).eq('id', id);
+  // Se pide de vuelta la fila escrita: si las reglas de acceso no permiten la
+  // modificación, la base no devuelve error, simplemente no cambia nada, y
+  // antes eso se anunciaba como guardado.
+  const { data, error } = await sb.from('planificaciones')
+    .update({ observacion: valor }).eq('id', id).select('id,observacion');
   btn.disabled = false; btn.textContent = '💾 Guardar observación';
-  if (error) { mostrarNotif('Error al guardar la observación: ' + error.message, true); return; }
-  if (p) p.observacion = valor;
+
+  if (error) {
+    const m = String(error.message || '').toLowerCase();
+    if (m.includes('observacion') || error.code === '42703' || error.code === 'PGRST204') {
+      mostrarNotif('La columna de observación aún no existe en la base de datos. ' +
+                   'Un administrador debe ejecutar el script ' +
+                   'arreglar_observacion_planificacion.sql en Supabase.', true);
+    } else if (error.code === '42501' || m.includes('policy') || m.includes('permission')) {
+      mostrarNotif('Tu usuario no tiene permiso para modificar esta planificación.', true);
+    } else {
+      mostrarNotif('Error al guardar la observación: ' + error.message, true);
+    }
+    return;
+  }
+
+  if (!data || !data.length) {
+    mostrarNotif('La base de datos no aplicó el cambio. Falta el permiso de ' +
+                 'modificación sobre la planificación: un administrador debe ejecutar ' +
+                 'arreglar_observacion_planificacion.sql en Supabase.', true);
+    return;
+  }
+
+  if (p) p.observacion = data[0].observacion;
   cerrarModalObsPlan();
   renderizarPlanificacion();
   mostrarNotif(valor ? 'Observación guardada.' : 'Observación eliminada.');
