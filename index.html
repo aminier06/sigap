@@ -1708,34 +1708,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
         <!-- Selector de semana -->
         <div class="filtros-bar" style="margin-bottom:20px;">
-          <div class="filtros-grid" style="grid-template-columns:auto auto auto 1fr;align-items:end;">
-            <div class="campo">
-              <label>Semana del</label>
-              <input type="date" id="planSemanaInicio" onchange="calcularFinSemana()" />
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <button class="btn-primario" id="btnSemanaActual" onclick="planificarSemana(0)">
+              📅 Esta semana
+            </button>
+            <button class="btn-primario" id="btnSemanaProxima" onclick="planificarSemana(1)">
+              📅 Próxima semana
+            </button>
+            <button class="btn-secundario" onclick="alternarOtraSemana()">Otra semana…</button>
+            <div id="rotuloSemana" style="margin-left:auto;font-size:13px;color:#617384;"></div>
+          </div>
+
+          <div id="otraSemanaWrap" style="display:none;margin-top:14px;">
+            <div class="filtros-grid" style="grid-template-columns:auto auto auto 1fr;align-items:end;">
+              <div class="campo">
+                <label>Semana del</label>
+                <input type="date" id="planSemanaInicio" onchange="calcularFinSemana(); cargarPlanificacion();" />
+              </div>
+              <div class="campo">
+                <label>Al</label>
+                <input type="date" id="planSemanaFin" disabled style="background:#f0f7ff;" />
+              </div>
+              <div class="campo">
+                <label>Año escolar</label>
+                <select id="planAnioEscolar">
+                  <option>2024-2025</option>
+                  <option selected>2025-2026</option>
+                  <option>2026-2027</option>
+                </select>
+              </div>
             </div>
-            <div class="campo">
-              <label>Al</label>
-              <input type="date" id="planSemanaFin" disabled style="background:#f0f7ff;" />
-            </div>
-            <div class="campo">
-              <label>Año escolar</label>
-              <select id="planAnioEscolar">
-                <option>2024-2025</option>
-                <option selected>2025-2026</option>
-                <option>2026-2027</option>
-              </select>
-            </div>
-            <div style="display:flex;gap:8px;align-items:flex-end;">
-              <button class="btn-secundario" onclick="cargarPlanificacion()">🔍 Cargar semana</button>
-              <button class="btn-primario" onclick="nuevaPlanificacion()">+ Nueva planificación</button>
-            </div>
-            <div class="campo" style="grid-column:1 / -1;">
-              <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;">
-                <input type="checkbox" id="planIncluirVencidos" checked
-                       onchange="cargarPlanificacion()" style="width:auto;margin:0;" />
-                Incluir acompañamientos pendientes de semanas anteriores, para registrar su observación
-              </label>
-            </div>
+          </div>
+
+          <div class="campo" style="margin-top:12px;">
+            <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;">
+              <input type="checkbox" id="planIncluirVencidos" checked
+                     onchange="cargarPlanificacion()" style="width:auto;margin:0;" />
+              Incluir acompañamientos pendientes de semanas anteriores, para registrar su observación
+            </label>
           </div>
         </div>
 
@@ -2924,6 +2934,9 @@ function mostrarPanel(id, el) {
   if (id === 'adminUsuarios')  cargarUsuarios();
   if (id === 'adminRegistros') cargarTodosRegistros();
   if (id === 'mapaCoberta')    cargarMapaCobertura();
+  if (id === 'planificacion' && !document.getElementById('planSemanaInicio')?.value) {
+    planificarSemana(0);
+  }
   if (id === 'seguimientoTecnicos') {
     // Sin rango no hay consulta, y un rango estrecho hace parecer que no hay
     // datos. Se abre con el año escolar en curso y se consulta de inmediato.
@@ -4625,10 +4638,105 @@ async function buscarCentroPlan(codigo) {
   }, 400);
 }
 
+const _DIAS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const _MESES = ['enero','febrero','marzo','abril','mayo','junio','julio',
+                'agosto','septiembre','octubre','noviembre','diciembre'];
+
+function _aIso(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') +
+         '-' + String(d.getDate()).padStart(2,'0');
+}
+function _deIso(iso) { return new Date(iso + 'T00:00:00'); }
+
+// Lunes de la semana indicada: 0 es la de hoy, 1 la próxima
+function _lunesDeSemana(desplazamiento) {
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  const dia = d.getDay();                       // 0 domingo … 6 sábado
+  d.setDate(d.getDate() - (dia === 0 ? 6 : dia - 1) + desplazamiento * 7);
+  return d;
+}
+
+// Arranca la planificación de esta semana o de la próxima
+function planificarSemana(desplazamiento) {
+  const lunes = _lunesDeSemana(desplazamiento);
+  const viernes = new Date(lunes); viernes.setDate(viernes.getDate() + 4);
+  document.getElementById('planSemanaInicio').value = _aIso(lunes);
+  document.getElementById('planSemanaFin').value    = _aIso(viernes);
+  document.getElementById('btnSemanaActual').classList.toggle('btn-secundario', desplazamiento !== 0);
+  document.getElementById('btnSemanaProxima').classList.toggle('btn-secundario', desplazamiento !== 1);
+  cargarPlanificacion();
+}
+
+function alternarOtraSemana() {
+  const w = document.getElementById('otraSemanaWrap');
+  w.style.display = w.style.display === 'none' ? 'block' : 'none';
+}
+
+function _rotularSemana() {
+  const r = document.getElementById('rotuloSemana');
+  const d = document.getElementById('planSemanaInicio')?.value;
+  const h = document.getElementById('planSemanaFin')?.value;
+  if (!r) return;
+  if (!d || !h) { r.textContent = ''; return; }
+  const a = _deIso(d), b = _deIso(h);
+  r.textContent = 'Semana del ' + a.getDate() + ' al ' + b.getDate() +
+                  ' de ' + _MESES[b.getMonth()] + ' de ' + b.getFullYear();
+}
+
+// Datos que se arrastran al agregar otro acompañamiento: así no hay que
+// volver a escribir el centro ni el foco cuando se planifican varios el
+// mismo día o en el mismo centro.
+let _contextoPlan = null;
+
+// Abre el formulario con el día ya fijado y el contexto del último registro
+function agregarEnDia(iso, contexto) {
+  if (!contexto && iso) {
+    const delDia = planActual.filter(p => p.fecha_prevista === iso);
+    if (delDia.length) contexto = delDia[delDia.length - 1];
+  }
+  _contextoPlan = contexto || _contextoPlan;
+  nuevaPlanificacion();
+  const f = document.getElementById('planFecha');
+  if (f && iso) f.value = iso;
+  if (_contextoPlan) {
+    const poner = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+    poner('planCodigoCentro', _contextoPlan.codigo_centro);
+    poner('planCentro',       _contextoPlan.centro_educativo);
+    poner('planFoco',         _contextoPlan.foco);
+    poner('planInsumos',      _contextoPlan.insumos);
+    const sel = document.getElementById('planCentroSel');
+    if (sel && _contextoPlan.codigo_centro) {
+      // La lista puede no estar cargada todavía; el código y el nombre bastan
+      if ([...sel.options].some(o => o.value === _contextoPlan.codigo_centro))
+        sel.value = _contextoPlan.codigo_centro;
+    }
+    const estado = document.getElementById('estadoCentroPlan');
+    if (estado && _contextoPlan.centro_educativo) {
+      estado.textContent = '✅ Centro heredado del acompañamiento anterior.';
+      estado.style.color = '#2a6b1a';
+    }
+  }
+  document.getElementById('planDocente')?.focus();
+}
+
+// Copia un acompañamiento planificado como punto de partida de otro
+function duplicarItemPlan(id) {
+  const p = planActual.find(x => String(x.id) === String(id));
+  if (!p) return;
+  const radio = document.querySelector('input[name="planTipoInstr"][value="' +
+                 (p.tipo_instrumento || 'docente') + '"]');
+  if (radio) { radio.checked = true; }
+  agregarEnDia(p.fecha_prevista, {
+    codigo_centro: p.codigo_centro, centro_educativo: p.centro_educativo,
+    foco: p.foco, insumos: p.insumos });
+  if (radio) adaptarFormPlan(radio.value);
+}
+
 async function cargarPlanificacion() {
   const desde = document.getElementById('planSemanaInicio').value;
   const hasta = document.getElementById('planSemanaFin').value;
-  if (!desde || !hasta) { mostrarNotif('Seleccione una semana primero.', true); return; }
+  if (!desde || !hasta) { renderizarPlanificacion(); return; }
 
   const esAdmin = perfilActual?.nivel === 'admin';
   const rol     = perfilActual?.rol || '';
@@ -4796,39 +4904,34 @@ async function cerrarPlanEnCurso(tipo) {
   } catch (e) {}
 }
 
-function renderizarPlanificacion() {
-  const cuerpo = document.getElementById('cuerpoPlanificacion');
-  if (!planActual.length) {
-    cuerpo.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#8fa5bb;padding:32px;">No hay acompañamientos planificados para esta semana.<br><button class="btn-primario" onclick="nuevaPlanificacion()" style="margin-top:12px;">+ Agregar</button></td></tr>';
-    return;
-  }
-  cuerpo.innerHTML = planActual.map((p, i) => {
-    const tInstr = p.tipo_instrumento || 'docente';
-    const badgePlan = tInstr === 'coordinador'
-      ? '<span style="font-size:10px;background:#e8f0fa;color:#1a3a52;border-radius:4px;padding:1px 5px;margin-right:4px;">Coord.</span>'
-      : tInstr === 'tecnico_distrital'
-        ? '<span style="font-size:10px;background:#fef3e2;color:#7a4f00;border-radius:4px;padding:1px 5px;margin-right:4px;">Téc.Dist.</span>'
-        : '';
-    const nombrePlan = tInstr === 'coordinador'
-      ? (p.nombre_coordinador || p.nombre_docente || '—')
-      : tInstr === 'tecnico_distrital'
-        ? (p.nombre_tecnico || p.nombre_docente || '—')
-        : (p.nombre_docente || '—');
-    const vencido = _planVencido(p);
-    return `<tr${vencido ? ' style="background:#fffaf0;"' : ''}>
-      <td style="text-align:center;font-weight:700;color:#8fa5bb;">${i+1}</td>
+function _celdasPlan(p, i) {
+  const tInstr = p.tipo_instrumento || 'docente';
+  const badgePlan = tInstr === 'coordinador'
+    ? '<span style="font-size:10px;background:#e8f0fa;color:#1a3a52;border-radius:4px;padding:1px 5px;margin-right:4px;">Coord.</span>'
+    : tInstr === 'tecnico_distrital'
+      ? '<span style="font-size:10px;background:#fef3e2;color:#7a4f00;border-radius:4px;padding:1px 5px;margin-right:4px;">Téc.Dist.</span>'
+      : '';
+  const nombrePlan = tInstr === 'coordinador'
+    ? (p.nombre_coordinador || p.nombre_docente || '—')
+    : tInstr === 'tecnico_distrital'
+      ? (p.nombre_tecnico || p.nombre_docente || '—')
+      : (p.nombre_docente || '—');
+  const vencido = _planVencido(p);
+
+  return `<tr${vencido ? ' style="background:#fffaf0;"' : ''}>
+      <td style="text-align:center;font-weight:700;color:#8fa5bb;">${i}</td>
       <td>${p.fecha_prevista || '—'}${vencido
         ? '<div style="font-size:10px;color:#b45309;font-weight:700;margin-top:2px;">VENCIDO</div>' : ''}</td>
-      <td>${p.centro_educativo || '—'}</td>
+      <td>${_esc(p.centro_educativo) || '—'}</td>
       <td>${p.hora_prevista || '—'}</td>
-      <td>${badgePlan}${nombrePlan}</td>
-      <td style="font-size:12px;">${p.foco || '—'}</td>
-      <td style="font-size:12px;">${p.insumos || '—'}</td>
+      <td>${badgePlan}${_esc(nombrePlan)}</td>
+      <td style="font-size:12px;">${_esc(p.foco) || '—'}</td>
+      <td style="font-size:12px;">${_esc(p.insumos) || '—'}</td>
       <td>
         <span class="badge ${
           p.estado === 'Ejecutado' ? 'badge-verde' :
           p.estado === 'Pendiente' ? 'badge-amarillo' : 'badge-rojo'
-        }">${p.estado || 'Pendiente'}</span>
+        }">${_esc(p.estado) || 'Pendiente'}</span>
       </td>
       <td style="font-size:12px;max-width:220px;">
         ${p.observacion
@@ -4845,12 +4948,81 @@ function renderizarPlanificacion() {
         ${p.estado !== 'Ejecutado'
           ? `<button class="btn-primario btn-sm" onclick="iniciarAcompanamientoDesdePlan('${p.id}')"
                      title="Abre el instrumento con los datos de esta planificación">▶️ Iniciar</button>
+             <button class="btn-secundario btn-sm" onclick="duplicarItemPlan('${p.id}')"
+                     title="Agregar otro acompañamiento partiendo de estos datos">⧉ Otro igual</button>
              <button class="btn-secundario btn-sm" onclick="marcarEjecutado('${p.id}')">✅ Ejecutado</button>
              <button class="btn-peligro btn-sm" onclick="eliminarItemPlan('${p.id}')">🗑️</button>`
-          : '<span style="font-size:12px;color:#2a6b1a;">Realizado</span>'}
+          : `<span style="font-size:12px;color:#2a6b1a;">Realizado</span>
+             <button class="btn-secundario btn-sm" onclick="duplicarItemPlan('${p.id}')"
+                     title="Agregar otro acompañamiento partiendo de estos datos">⧉ Otro igual</button>`}
       </td>
     </tr>`;
-  }).join('');
+}
+
+// La tabla se arma por días: una franja por cada día de la semana, con sus
+// acompañamientos debajo y un botón para agregar otro en ese mismo día que
+// hereda el centro y el foco del anterior, para no reescribirlos.
+function renderizarPlanificacion() {
+  const cuerpo = document.getElementById('cuerpoPlanificacion');
+  if (!cuerpo) return;
+  _rotularSemana();
+
+  const desde = document.getElementById('planSemanaInicio')?.value;
+  const hasta = document.getElementById('planSemanaFin')?.value;
+  if (!desde || !hasta) {
+    cuerpo.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#8fa5bb;padding:32px;">' +
+      'Elija <strong>Esta semana</strong> o <strong>Próxima semana</strong> para comenzar a planificar.</td></tr>';
+    return;
+  }
+
+  let n = 0;
+  const partes = [];
+  const usados = new Set();
+
+  // Rezago de semanas anteriores, si se pidió incluirlo
+  const atrasados = planActual.filter(p => p.fecha_prevista && p.fecha_prevista < desde);
+  if (atrasados.length) {
+    partes.push(`<tr style="background:#fff3dc;">
+      <td colspan="10" style="font-weight:800;color:#8a5d00;padding:10px 14px;">
+        Pendientes de semanas anteriores (${atrasados.length})
+        <span style="font-weight:400;font-size:12px;">— registre la observación de los que no se ejecutaron</span>
+      </td></tr>`);
+    atrasados.forEach(p => { usados.add(p.id); partes.push(_celdasPlan(p, ++n)); });
+  }
+
+  // Un bloque por día laborable de la semana elegida
+  const lunes = _deIso(desde);
+  for (let k = 0; k < 5; k++) {
+    const d = new Date(lunes); d.setDate(d.getDate() + k);
+    const iso = _aIso(d);
+    const delDia = planActual.filter(p => p.fecha_prevista === iso);
+    delDia.forEach(p => usados.add(p.id));
+    partes.push(`<tr style="background:#eef4fb;">
+      <td colspan="10" style="padding:9px 14px;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <strong style="color:#1a3a52;">${_DIAS[d.getDay()]} ${d.getDate()} de ${_MESES[d.getMonth()]}</strong>
+          <span style="font-size:12px;color:#617384;">${
+            delDia.length ? delDia.length + (delDia.length === 1 ? ' acompañamiento' : ' acompañamientos')
+                          : 'sin acompañamientos'}</span>
+          <button class="btn-secundario btn-sm" style="margin-left:auto;"
+                  onclick="agregarEnDia('${iso}')">
+            + Agregar en este día</button>
+        </div>
+      </td></tr>`);
+
+    if (delDia.length) delDia.forEach(p => partes.push(_celdasPlan(p, ++n)));
+  }
+
+  // Cualquier acompañamiento fuera de la semana y del rezago
+  const sueltos = planActual.filter(p => !usados.has(p.id));
+  if (sueltos.length) {
+    partes.push(`<tr style="background:#f4f7fa;">
+      <td colspan="10" style="font-weight:700;color:#617384;padding:9px 14px;">
+        Otras fechas (${sueltos.length})</td></tr>`);
+    sueltos.forEach(p => partes.push(_celdasPlan(p, ++n)));
+  }
+
+  cuerpo.innerHTML = partes.join('');
 }
 
 function nuevaPlanificacion() {
@@ -4859,6 +5031,7 @@ function nuevaPlanificacion() {
   const desde = document.getElementById('planSemanaInicio').value;
   if (desde) document.getElementById('planFecha').value = desde;
   prepararDemarcacionPlan();
+  adaptarInstrumentosPlan();
   document.getElementById('formNuevaPlan').scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -4985,6 +5158,40 @@ function prepararDemarcacionPlan() {
   }
 }
 
+// Los instrumentos que cada rol puede planificar. Un coordinador pedagógico
+// no planifica acompañamientos a técnicos distritales, y ofrecerlos solo
+// invita a registrar algo que después no cuadra.
+const _INSTRUMENTOS_POR_ROL = {
+  'tecnico/a nacional':              ['docente','coordinador','tecnico_distrital'],
+  'tecnico/a regional':              ['docente','coordinador','tecnico_distrital'],
+  'tecnico/a coordinador/a regional':['docente','coordinador','tecnico_distrital'],
+  'tecnico/a distrital':             ['docente','coordinador'],
+  'tecnico/a coordinador/a distrital':['docente','coordinador'],
+  'coordinador/a pedagogico/a':      ['docente'],
+  'director/a de centro':            ['docente','coordinador'],
+};
+
+function adaptarInstrumentosPlan() {
+  const p = perfilActual;
+  const rol = String(p?.rol || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+  const permitidos = (p?.nivel === 'admin')
+    ? ['docente','coordinador','tecnico_distrital']
+    : (_INSTRUMENTOS_POR_ROL[rol] || ['docente','coordinador','tecnico_distrital']);
+
+  let primero = null;
+  document.querySelectorAll('input[name="planTipoInstr"]').forEach(radio => {
+    const ok = permitidos.includes(radio.value);
+    const etiqueta = radio.closest('label');
+    if (etiqueta) etiqueta.style.display = ok ? 'flex' : 'none';
+    if (ok && !primero) primero = radio;
+    if (!ok && radio.checked) radio.checked = false;
+  });
+  if (primero && !document.querySelector('input[name="planTipoInstr"]:checked')) {
+    primero.checked = true;
+    adaptarFormPlan(primero.value);
+  }
+}
+
 function cargarDistritosPlan(seleccionado) {
   const reg = document.getElementById('planRegional')?.value || '';
   const sel = document.getElementById('planDistrito');
@@ -5084,6 +5291,10 @@ async function guardarItemPlan() {
   };
 
   payload.cedula_acompanado = cedulaNormalizada(cedulaPlan);
+  // Se recuerda para que el próximo acompañamiento del día no exija
+  // reescribir el centro ni el foco
+  _contextoPlan = { codigo_centro: codCentro, centro_educativo: centro,
+                    foco, insumos };
 
   if (tipoInstr === 'docente') {
     payload.nombre_docente  = nombre;
