@@ -4789,6 +4789,7 @@ let _obsPlanId = null;
 async function editarObservacionPlan(id) {
   const p = planActual.find(x => String(x.id) === String(id));
   if (!p) return;
+  if (!_planEsMio(p)) { mostrarNotif('Solo quien hizo la planificación puede modificarla.', true); return; }
   _obsPlanId = id;
   const ctx = [p.centro_educativo, p.fecha_prevista].filter(Boolean).join(', ');
   document.getElementById('obsPlanContexto').textContent = ctx || 'Acompañamiento planificado';
@@ -4816,7 +4817,8 @@ async function guardarObservacionPlan() {
   // modificación, la base no devuelve error, simplemente no cambia nada, y
   // antes eso se anunciaba como guardado.
   const { data, error } = await sb.from('planificaciones')
-    .update({ observacion: valor }).eq('id', id).select('id,observacion');
+    .update({ observacion: valor }).eq('id', id)
+    .eq('usuario_id', usuarioActual.id).select('id,observacion');
   btn.disabled = false; btn.textContent = '💾 Guardar observación';
 
   if (error) {
@@ -4854,6 +4856,7 @@ let _planEnCurso = null;
 async function iniciarAcompanamientoDesdePlan(id) {
   const p = planActual.find(x => String(x.id) === String(id));
   if (!p) { mostrarNotif('No se encontró la planificación.', true); return; }
+  if (!_planEsMio(p)) { mostrarNotif('Solo quien hizo la planificación puede iniciarla.', true); return; }
 
   const tipo = p.tipo_instrumento || 'docente';
   const panel = tipo === 'coordinador' ? 'formCoord'
@@ -4904,6 +4907,13 @@ async function cerrarPlanEnCurso(tipo) {
   } catch (e) {}
 }
 
+// Cada quien edita lo suyo: iniciar, marcar ejecutado, eliminar y escribir la
+// observación son acciones sobre la fila de quien la planificó. Los demás la
+// ven, pero sin botones que la modifiquen.
+function _planEsMio(p) {
+  return !!usuarioActual && String(p.usuario_id) === String(usuarioActual.id);
+}
+
 function _celdasPlan(p, i) {
   const tInstr = p.tipo_instrumento || 'docente';
   const badgePlan = tInstr === 'coordinador'
@@ -4917,6 +4927,7 @@ function _celdasPlan(p, i) {
       ? (p.nombre_tecnico || p.nombre_docente || '—')
       : (p.nombre_docente || '—');
   const vencido = _planVencido(p);
+  const mio = _planEsMio(p);
 
   return `<tr${vencido ? ' style="background:#fffaf0;"' : ''}>
       <td style="text-align:center;font-weight:700;color:#8fa5bb;">${i}</td>
@@ -4935,26 +4946,33 @@ function _celdasPlan(p, i) {
       </td>
       <td style="font-size:12px;max-width:220px;">
         ${p.observacion
-          ? `<div style="color:#8a5d00;white-space:pre-wrap;">${_esc(p.observacion)}</div>
-             <button class="btn-secundario btn-sm" style="margin-top:4px;" onclick="editarObservacionPlan('${p.id}')">✏️ Editar</button>`
-          : vencido
-            ? `<button class="btn-secundario btn-sm" onclick="editarObservacionPlan('${p.id}')"
-                       style="border-color:#e0a106;color:#8a5d00;background:#fff7e6;"
-                       title="Esta fecha ya pasó: explique la razón o circunstancia">⚠️ Explicar</button>`
-            : `<button class="btn-secundario btn-sm" onclick="editarObservacionPlan('${p.id}')"
-                       title="Razón o circunstancia por la que no se ha ejecutado">+ Observación</button>`}
+          ? `<div style="color:#8a5d00;white-space:pre-wrap;">${_esc(p.observacion)}</div>` : ''}
+        ${!mio ? (p.observacion ? '' : '<span style="color:#8fa5bb;">—</span>')
+          : p.observacion
+            ? `<button class="btn-secundario btn-sm" style="margin-top:4px;" onclick="editarObservacionPlan('${p.id}')">✏️ Editar</button>`
+            : vencido
+              ? `<button class="btn-secundario btn-sm" onclick="editarObservacionPlan('${p.id}')"
+                         style="border-color:#e0a106;color:#8a5d00;background:#fff7e6;"
+                         title="Esta fecha ya pasó: explique la razón o circunstancia">⚠️ Explicar</button>`
+              : `<button class="btn-secundario btn-sm" onclick="editarObservacionPlan('${p.id}')"
+                         title="Razón o circunstancia por la que no se ha ejecutado">+ Observación</button>`}
       </td>
-      <td style="display:flex;gap:6px;flex-wrap:wrap;">
-        ${p.estado !== 'Ejecutado'
-          ? `<button class="btn-primario btn-sm" onclick="iniciarAcompanamientoDesdePlan('${p.id}')"
-                     title="Abre el instrumento con los datos de esta planificación">▶️ Iniciar</button>
+      <td style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        ${!mio
+          ? `<span style="font-size:11px;color:#8fa5bb;" title="Solo quien planificó puede modificarla">
+               🔒 Planificado por ${_esc(p.nombre_acompanante) || 'otro usuario'}</span>
              <button class="btn-secundario btn-sm" onclick="duplicarItemPlan('${p.id}')"
-                     title="Agregar otro acompañamiento partiendo de estos datos">⧉ Otro igual</button>
-             <button class="btn-secundario btn-sm" onclick="marcarEjecutado('${p.id}')">✅ Ejecutado</button>
-             <button class="btn-peligro btn-sm" onclick="eliminarItemPlan('${p.id}')">🗑️</button>`
-          : `<span style="font-size:12px;color:#2a6b1a;">Realizado</span>
-             <button class="btn-secundario btn-sm" onclick="duplicarItemPlan('${p.id}')"
-                     title="Agregar otro acompañamiento partiendo de estos datos">⧉ Otro igual</button>`}
+                     title="Crear un acompañamiento propio partiendo de estos datos">⧉ Otro igual</button>`
+          : p.estado !== 'Ejecutado'
+            ? `<button class="btn-primario btn-sm" onclick="iniciarAcompanamientoDesdePlan('${p.id}')"
+                       title="Abre el instrumento con los datos de esta planificación">▶️ Iniciar</button>
+               <button class="btn-secundario btn-sm" onclick="duplicarItemPlan('${p.id}')"
+                       title="Agregar otro acompañamiento partiendo de estos datos">⧉ Otro igual</button>
+               <button class="btn-secundario btn-sm" onclick="marcarEjecutado('${p.id}')">✅ Ejecutado</button>
+               <button class="btn-peligro btn-sm" onclick="eliminarItemPlan('${p.id}')">🗑️</button>`
+            : `<span style="font-size:12px;color:#2a6b1a;">Realizado</span>
+               <button class="btn-secundario btn-sm" onclick="duplicarItemPlan('${p.id}')"
+                       title="Agregar otro acompañamiento partiendo de estos datos">⧉ Otro igual</button>`}
       </td>
     </tr>`;
 }
@@ -5316,15 +5334,20 @@ async function guardarItemPlan() {
 }
 
 async function marcarEjecutado(id) {
-  const { error } = await sb.from('planificaciones').update({ estado: 'Ejecutado' }).eq('id', id);
+  const p = planActual.find(x => String(x.id) === String(id));
+  if (p && !_planEsMio(p)) { mostrarNotif('Solo quien hizo la planificación puede modificarla.', true); return; }
+  const { error } = await sb.from('planificaciones').update({ estado: 'Ejecutado' })
+    .eq('id', id).eq('usuario_id', usuarioActual.id);
   if (error) { mostrarNotif('Error: ' + error.message, true); return; }
   mostrarNotif('Marcado como ejecutado.');
   cargarPlanificacion();
 }
 
 async function eliminarItemPlan(id) {
+  const p = planActual.find(x => String(x.id) === String(id));
+  if (p && !_planEsMio(p)) { mostrarNotif('Solo quien hizo la planificación puede eliminarla.', true); return; }
   if (!confirm('¿Eliminar este acompañamiento de la planificación?')) return;
-  await sb.from('planificaciones').delete().eq('id', id);
+  await sb.from('planificaciones').delete().eq('id', id).eq('usuario_id', usuarioActual.id);
   mostrarNotif('Eliminado de la planificación.');
   cargarPlanificacion();
 }
