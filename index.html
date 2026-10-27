@@ -1769,15 +1769,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 <label>Fecha prevista</label>
                 <input type="date" id="planFecha" />
               </div>
+              <div class="campo" id="planRegionalWrap">
+                <label>Regional</label>
+                <select id="planRegional" onchange="cargarDistritosPlan()">
+                  <option value="">Seleccione regional</option>
+                  <option>01 - Barahona</option>
+                  <option>02 - San Juan de la Maguana</option>
+                  <option>03 - Azua</option>
+                  <option>04 - San Cristobal</option>
+                  <option>05 - San Pedro de Macoris</option>
+                  <option>06 - La Vega</option>
+                  <option>07 - San Francisco de Macoris</option>
+                  <option>08 - Santiago</option>
+                  <option>09 - Mao</option>
+                  <option>10 - Santo Domingo</option>
+                  <option>11 - Puerto Plata</option>
+                  <option>12 - Higuey</option>
+                  <option>13 - Monte Cristi</option>
+                  <option>14 - Nagua</option>
+                  <option>15 - Santo Domingo</option>
+                  <option>16 - Cotui</option>
+                  <option>17 - Monte Plata</option>
+                  <option>18 - Baoruco</option>
+                </select>
+              </div>
+              <div class="campo" id="planDistritoWrap">
+                <label>Distrito</label>
+                <select id="planDistrito" onchange="cargarCentrosPlan()">
+                  <option value="">Seleccione primero la regional</option>
+                </select>
+              </div>
+              <div class="campo" style="grid-column:span 2;">
+                <label>Centro educativo</label>
+                <select id="planCentroSel" onchange="elegirCentroPlan()">
+                  <option value="">Seleccione primero el distrito</option>
+                </select>
+                <div id="estadoCentroPlan" style="font-size:12px;min-height:16px;margin-top:3px;color:#617384;"></div>
+              </div>
               <div class="campo">
                 <label>Código del centro</label>
                 <input type="text" id="planCodigoCentro" placeholder="Ej. 02334"
                   oninput="buscarCentroPlan(this.value)" />
-                <div id="estadoCentroPlan" style="font-size:12px;min-height:16px;margin-top:3px;color:#617384;"></div>
               </div>
               <div class="campo">
-                <label>Centro educativo</label>
-                <input type="text" id="planCentro" placeholder="Autocompletado" style="background:#f0f7ff;" />
+                <label>Nombre del centro</label>
+                <input type="text" id="planCentro" placeholder="Autocompletado" readonly style="background:#f0f7ff;" />
               </div>
             </div>
             <div class="grid g-3 fila-linea">
@@ -4637,6 +4673,7 @@ function nuevaPlanificacion() {
   // Pre-fill dates from selected week
   const desde = document.getElementById('planSemanaInicio').value;
   if (desde) document.getElementById('planFecha').value = desde;
+  prepararDemarcacionPlan();
   document.getElementById('formNuevaPlan').scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -4707,7 +4744,7 @@ function buscarNombrePorCedulaPlan(cedula) {
 
 function cancelarItemPlan() {
   document.getElementById('formNuevaPlan').style.display = 'none';
-  ['planFecha','planCodigoCentro','planCentro','planHora','planDocente','planFoco','planInsumos','planCargo','planCedula'].forEach(id => {
+  ['planFecha','planCodigoCentro','planCentro','planHora','planDocente','planFoco','planInsumos','planCargo','planCedula','planCentroSel'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -4718,6 +4755,93 @@ function cancelarItemPlan() {
   // Resetear al tipo docente
   const radioDocente = document.querySelector('input[name="planTipoInstr"][value="docente"]');
   if (radioDocente) { radioDocente.checked = true; adaptarFormPlan('docente'); }
+}
+
+// ── DEMARCACIÓN EN EL FORMULARIO DE PLANIFICACIÓN ─────────────────────────────
+// Lo que el perfil ya determina no se pregunta: un regional no elige su
+// regional, un distrital tampoco su distrito. Quedan fijados y a la vista.
+function prepararDemarcacionPlan() {
+  const p = perfilActual;
+  if (!p) return;
+  const norm = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+  const rol = norm(p.rol);
+  const selR = document.getElementById('planRegional');
+  const selD = document.getElementById('planDistrito');
+  if (!selR || !selD) return;
+
+  const fijarRegional = rol !== 'tecnico/a nacional' && p.nivel !== 'admin' && p.regional;
+  const fijarDistrito = ['tecnico/a distrital','tecnico/a coordinador/a distrital',
+                         'coordinador/a pedagogico/a','director/a de centro'].includes(rol) && p.distrito;
+
+  const codigoDe = v => (String(v || '').trim().match(/^\d+/) || [''])[0];
+
+  if (fijarRegional) {
+    const canon = regionalCanonica(codigoDe(p.regional)) || p.regional;
+    if (![...selR.options].some(o => o.value === canon)) {
+      const o = document.createElement('option'); o.value = canon; o.textContent = canon; selR.appendChild(o);
+    }
+    selR.value = canon;
+    selR.disabled = true;
+    selR.style.background = '#f0f7ff';
+  } else {
+    selR.disabled = false;
+    selR.style.background = '';
+  }
+
+  cargarDistritosPlan(fijarDistrito ? (distritoCanonico(codigoDe(p.distrito)) || p.distrito) : '');
+
+  if (fijarDistrito) {
+    selD.disabled = true;
+    selD.style.background = '#f0f7ff';
+    cargarCentrosPlan();
+  } else {
+    selD.disabled = false;
+    selD.style.background = '';
+  }
+}
+
+function cargarDistritosPlan(seleccionado) {
+  const reg = document.getElementById('planRegional')?.value || '';
+  const sel = document.getElementById('planDistrito');
+  if (!sel) return;
+  const previo = seleccionado !== undefined ? seleccionado : sel.value;
+  sel.innerHTML = '<option value="">Seleccione distrito</option>';
+  (DISTRITOS_POR_REGIONAL[reg] || []).forEach(d => {
+    const o = document.createElement('option'); o.value = d; o.textContent = d; sel.appendChild(o);
+  });
+  if (previo && [...sel.options].some(o => o.value === previo)) sel.value = previo;
+  cargarCentrosPlan();
+}
+
+// Centros del distrito elegido, tomados del padrón
+async function cargarCentrosPlan() {
+  const sel = document.getElementById('planCentroSel');
+  const dis = document.getElementById('planDistrito')?.value || '';
+  if (!sel) return;
+  const cod = (String(dis).match(/^(\d{1,4})/) || [])[1];
+  if (!cod) { sel.innerHTML = '<option value="">Seleccione primero el distrito</option>'; return; }
+
+  sel.innerHTML = '<option value="">Cargando centros…</option>';
+  const { data } = await traerTodo(sb.from('centros')
+    .select('codigo,nombre')
+    .eq('distrito_codigo', cod.padStart(4,'0'))
+    .ilike('niveles','%Primario%')
+    .not('niveles','ilike','%Adultos%')
+    .order('nombre'));
+  const centros = data || [];
+  sel.innerHTML = '<option value="">Seleccione centro (' + centros.length + ')</option>' +
+    centros.map(c => `<option value="${c.codigo}">${c.codigo} — ${c.nombre}</option>`).join('');
+}
+
+// Al elegir el centro de la lista se completan el código y el nombre
+function elegirCentroPlan() {
+  const sel = document.getElementById('planCentroSel');
+  if (!sel || !sel.value) return;
+  const texto = sel.options[sel.selectedIndex].textContent;
+  document.getElementById('planCodigoCentro').value = sel.value;
+  document.getElementById('planCentro').value = texto.split('—').slice(1).join('—').trim();
+  const estado = document.getElementById('estadoCentroPlan');
+  if (estado) { estado.textContent = '✅ Centro seleccionado.'; estado.style.color = '#2a6b1a'; }
 }
 
 async function guardarItemPlan() {
