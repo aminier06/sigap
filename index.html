@@ -1704,7 +1704,8 @@ document.addEventListener('DOMContentLoaded', () => {
       <!-- PLANIFICACIÓN -->
       <div id="panel-planificacion" class="panel">
         <div class="dashboard-titulo">Planificación semanal de acompañamientos</div>
-        <p class="dashboard-sub">Instrumento de Planificación — Dirección General de Educación Primaria</p>
+        <p class="dashboard-sub">Instrumento de Planificación — Dirección General de Educación Primaria.
+          Aquí aparece únicamente su propia planificación; la del equipo se consulta en Seguimiento.</p>
 
         <!-- Selector de semana -->
         <div class="filtros-bar" style="margin-bottom:20px;">
@@ -1917,7 +1918,62 @@ document.addEventListener('DOMContentLoaded', () => {
       <!-- SEGUIMIENTO -->
       <div id="panel-seguimiento" class="panel">
         <div class="dashboard-titulo">Seguimiento: Planificado vs. Ejecutado</div>
-        <p class="dashboard-sub">Compare lo planificado con los acompañamientos realmente realizados.</p>
+        <p class="dashboard-sub">Compare lo planificado con los acompañamientos realmente realizados,
+          o revise la planificación semanal de su equipo.</p>
+
+        <div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">
+          <button id="segTab-comparativo" class="btn-primario" onclick="cambiarVistaSeguimiento('comparativo')">
+            📊 Planificado vs. ejecutado</button>
+          <button id="segTab-semana" class="btn-secundario" onclick="cambiarVistaSeguimiento('semana')">
+            📅 Planificación semanal del equipo</button>
+        </div>
+
+        <!-- VISTA: planificación semanal del equipo -->
+        <div id="segVistaSemana" style="display:none;">
+          <div class="filtros-bar" style="margin-bottom:20px;">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+              <button class="btn-primario" id="btnSegSemanaActual" onclick="planificarSemanaSeg(0)">
+                📅 Esta semana</button>
+              <button class="btn-primario" id="btnSegSemanaProxima" onclick="planificarSemanaSeg(1)">
+                📅 Próxima semana</button>
+              <input type="date" id="segSemanaInicio" onchange="planificarSemanaSeg(null)"
+                     style="max-width:170px;" />
+              <div id="segRotuloSemana" style="margin-left:auto;font-size:13px;color:#617384;"></div>
+            </div>
+            <div class="campo" style="margin-top:12px;max-width:320px;">
+              <label>Acompañante</label>
+              <select id="segSemanaQuien" onchange="renderizarSemanaSeguimiento()">
+                <option value="">Todos los que puedo ver</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="bloque">
+            <div class="bloque-titulo">Planificación de la semana</div>
+            <div class="bloque-cuerpo" style="padding:0;">
+              <div class="tabla-wrap-outer">
+                <table class="tabla-registros" style="box-shadow:none;">
+                  <thead>
+                    <tr>
+                      <th style="width:40px;">#</th>
+                      <th>Fecha</th>
+                      <th>Acompañante</th>
+                      <th>Centro educativo</th>
+                      <th>Hora</th>
+                      <th>Persona a acompañar</th>
+                      <th>Foco</th>
+                      <th>Estado</th>
+                      <th>Observación</th>
+                    </tr>
+                  </thead>
+                  <tbody id="segCuerpoSemana"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="segVistaComparativo">
 
         <!-- Filtros -->
         <div class="filtros-bar" style="margin-bottom:20px;">
@@ -2042,6 +2098,7 @@ document.addEventListener('DOMContentLoaded', () => {
               </table>
             </div>
           </div>
+        </div>
         </div>
       </div>
 
@@ -4738,15 +4795,12 @@ async function cargarPlanificacion() {
   const hasta = document.getElementById('planSemanaFin').value;
   if (!desde || !hasta) { renderizarPlanificacion(); return; }
 
-  const esAdmin = perfilActual?.nivel === 'admin';
-  const rol     = perfilActual?.rol || '';
-  let query = sb.from('planificaciones').select('*')
+  // Esta pantalla es el cuaderno de trabajo de cada quien: solo su propia
+  // planificación. La del equipo se consulta en Seguimiento.
+  const query = sb.from('planificaciones').select('*')
+    .eq('usuario_id', usuarioActual.id)
     .gte('fecha_prevista', desde).lte('fecha_prevista', hasta)
     .order('fecha_prevista');
-
-  if (!esAdmin && rol !== 'Técnico/a Nacional') {
-    query = query.eq('usuario_id', usuarioActual.id);
-  }
 
   const { data, error } = await traerTodo(query);
   if (error) { mostrarNotif('Error: ' + error.message, true); return; }
@@ -4757,11 +4811,11 @@ async function cargarPlanificacion() {
   // el calendario, y con él desaparece la posibilidad de explicar por qué.
   // Por eso el rezago pendiente se arrastra a la semana que se esté viendo.
   if (document.getElementById('planIncluirVencidos')?.checked) {
-    let qv = sb.from('planificaciones').select('*')
+    const qv = sb.from('planificaciones').select('*')
+      .eq('usuario_id', usuarioActual.id)
       .lt('fecha_prevista', desde)
       .neq('estado', 'Ejecutado')
       .order('fecha_prevista');
-    if (!esAdmin && rol !== 'Técnico/a Nacional') qv = qv.eq('usuario_id', usuarioActual.id);
     const { data: vencidos } = await traerTodo(qv);
     const yaEstan = new Set(filas.map(f => String(f.id)));
     filas = (vencidos || []).filter(v => !yaEstan.has(String(v.id))).concat(filas);
@@ -4959,10 +5013,7 @@ function _celdasPlan(p, i) {
       </td>
       <td style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
         ${!mio
-          ? `<span style="font-size:11px;color:#8fa5bb;" title="Solo quien planificó puede modificarla">
-               🔒 Planificado por ${_esc(p.nombre_acompanante) || 'otro usuario'}</span>
-             <button class="btn-secundario btn-sm" onclick="duplicarItemPlan('${p.id}')"
-                     title="Crear un acompañamiento propio partiendo de estos datos">⧉ Otro igual</button>`
+          ? `<span style="font-size:11px;color:#8fa5bb;">🔒 De ${_esc(p.nombre_acompanante) || 'otro usuario'}</span>`
           : p.estado !== 'Ejecutado'
             ? `<button class="btn-primario btn-sm" onclick="iniciarAcompanamientoDesdePlan('${p.id}')"
                        title="Abre el instrumento con los datos de esta planificación">▶️ Iniciar</button>
@@ -5431,6 +5482,149 @@ async function usuariosVisiblesPlanificacion() {
   }
   if (!ids.includes(usuarioActual.id)) ids.push(usuarioActual.id);
   return ids;
+}
+
+// ── PLANIFICACIÓN SEMANAL DEL EQUIPO (dentro de Seguimiento) ────────────────
+// Misma lectura por día que en Planificar semana, pero sobre la planificación
+// de las personas que el rol permite ver, y sin botones que la modifiquen.
+let _segSemanaDatos = [], _segSemanaPerf = {};
+
+function cambiarVistaSeguimiento(vista) {
+  const esSemana = vista === 'semana';
+  document.getElementById('segVistaSemana').style.display = esSemana ? 'block' : 'none';
+  document.getElementById('segVistaComparativo').style.display = esSemana ? 'none' : 'block';
+  document.getElementById('segTab-semana').className = esSemana ? 'btn-primario' : 'btn-secundario';
+  document.getElementById('segTab-comparativo').className = esSemana ? 'btn-secundario' : 'btn-primario';
+  if (esSemana && !document.getElementById('segSemanaInicio').value) planificarSemanaSeg(0);
+}
+
+function planificarSemanaSeg(desplazamiento) {
+  const campo = document.getElementById('segSemanaInicio');
+  if (desplazamiento !== null) campo.value = _aIso(_lunesDeSemana(desplazamiento));
+  document.getElementById('btnSegSemanaActual').className =
+    desplazamiento === 0 ? 'btn-primario' : 'btn-secundario';
+  document.getElementById('btnSegSemanaProxima').className =
+    desplazamiento === 1 ? 'btn-primario' : 'btn-secundario';
+  cargarSemanaSeguimiento();
+}
+
+async function cargarSemanaSeguimiento() {
+  const cuerpo = document.getElementById('segCuerpoSemana');
+  const inicio = document.getElementById('segSemanaInicio').value;
+  if (!cuerpo || !inicio) return;
+
+  const lunes = _deIso(inicio);
+  // Si eligen un día cualquiera, la semana arranca igual en su lunes
+  const corregido = _lunesDeSemana(0);
+  corregido.setTime(lunes.getTime());
+  const dia = corregido.getDay();
+  corregido.setDate(corregido.getDate() - (dia === 0 ? 6 : dia - 1));
+  const desde = _aIso(corregido);
+  const viernes = new Date(corregido); viernes.setDate(viernes.getDate() + 4);
+  const hasta = _aIso(viernes);
+  document.getElementById('segSemanaInicio').value = desde;
+
+  cuerpo.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#8fa5bb;padding:24px;">Cargando…</td></tr>';
+
+  const permitidos = await usuariosVisiblesPlanificacion();
+  let q = sb.from('planificaciones').select('*')
+    .gte('fecha_prevista', desde).lte('fecha_prevista', hasta)
+    .order('fecha_prevista');
+  if (permitidos) {
+    if (!permitidos.length) { cuerpo.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#8fa5bb;padding:24px;">No hay usuarios en su ámbito.</td></tr>'; return; }
+    q = q.in('usuario_id', permitidos);
+  }
+  const { data, error } = await traerTodo(q);
+  if (error) { mostrarNotif('Error al consultar: ' + error.message, true); return; }
+  _segSemanaDatos = data || [];
+
+  // Nombres de quienes planificaron
+  const autores = [...new Set(_segSemanaDatos.map(r => r.usuario_id).filter(Boolean))];
+  _segSemanaPerf = {};
+  if (autores.length) {
+    const { data: perfs } = await traerTodo(
+      sb.from('perfiles').select('id,nombre,rol').in('id', autores));
+    _segSemanaPerf = Object.fromEntries((perfs || []).map(x => [x.id, x]));
+  }
+
+  const sel = document.getElementById('segSemanaQuien');
+  const previo = sel.value;
+  const nombres = [...new Set(_segSemanaDatos.map(_segQuien).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todos los que puedo ver (' + nombres.length + ')</option>' +
+    nombres.map(n => `<option value="${n}">${n}</option>`).join('');
+  if (nombres.includes(previo)) sel.value = previo;
+
+  renderizarSemanaSeguimiento();
+}
+
+const _segQuien = r =>
+  (_segSemanaPerf[r.usuario_id]?.nombre || r.nombre_acompanante || '').trim();
+
+function renderizarSemanaSeguimiento() {
+  const cuerpo = document.getElementById('segCuerpoSemana');
+  const inicio = document.getElementById('segSemanaInicio').value;
+  if (!cuerpo || !inicio) return;
+
+  const quien = document.getElementById('segSemanaQuien')?.value || '';
+  const filas = quien ? _segSemanaDatos.filter(r => _segQuien(r) === quien) : _segSemanaDatos;
+
+  const rot = document.getElementById('segRotuloSemana');
+  const lunes = _deIso(inicio);
+  const viernes = new Date(lunes); viernes.setDate(viernes.getDate() + 4);
+  if (rot) rot.textContent = 'Semana del ' + lunes.getDate() + ' al ' + viernes.getDate() +
+    ' de ' + _MESES[viernes.getMonth()] + ' de ' + viernes.getFullYear() +
+    ' · ' + filas.length + (filas.length === 1 ? ' acompañamiento' : ' acompañamientos');
+
+  let n = 0;
+  const partes = [];
+  for (let k = 0; k < 5; k++) {
+    const d = new Date(lunes); d.setDate(d.getDate() + k);
+    const iso = _aIso(d);
+    const delDia = filas.filter(p => p.fecha_prevista === iso);
+    const hechos = delDia.filter(p => p.estado === 'Ejecutado').length;
+
+    partes.push(`<tr style="background:#eef4fb;">
+      <td colspan="9" style="padding:9px 14px;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <strong style="color:#1a3a52;">${_DIAS[d.getDay()]} ${d.getDate()} de ${_MESES[d.getMonth()]}</strong>
+          <span style="font-size:12px;color:#617384;">${
+            delDia.length ? delDia.length + (delDia.length === 1 ? ' acompañamiento' : ' acompañamientos') +
+                            ' · ' + hechos + ' ejecutado' + (hechos === 1 ? '' : 's')
+                          : 'sin acompañamientos'}</span>
+        </div>
+      </td></tr>`);
+
+    delDia.forEach(p => {
+      const t = p.tipo_instrumento || 'docente';
+      const nombre = t === 'coordinador' ? (p.nombre_coordinador || p.nombre_docente || '—')
+                   : t === 'tecnico_distrital' ? (p.nombre_tecnico || p.nombre_docente || '—')
+                   : (p.nombre_docente || '—');
+      const badge = t === 'coordinador'
+        ? '<span style="font-size:10px;background:#e8f0fa;color:#1a3a52;border-radius:4px;padding:1px 5px;margin-right:4px;">Coord.</span>'
+        : t === 'tecnico_distrital'
+          ? '<span style="font-size:10px;background:#fef3e2;color:#7a4f00;border-radius:4px;padding:1px 5px;margin-right:4px;">Téc.Dist.</span>'
+          : '';
+      const vencido = _planVencido(p);
+      partes.push(`<tr${vencido ? ' style="background:#fffaf0;"' : ''}>
+        <td style="text-align:center;font-weight:700;color:#8fa5bb;">${++n}</td>
+        <td>${p.fecha_prevista || '—'}${vencido
+          ? '<div style="font-size:10px;color:#b45309;font-weight:700;margin-top:2px;">VENCIDO</div>' : ''}</td>
+        <td style="font-size:12px;">${_esc(_segQuien(p)) || '—'}
+          <div style="font-size:10px;color:#8fa5bb;">${_esc(_segSemanaPerf[p.usuario_id]?.rol) || ''}</div></td>
+        <td style="font-size:12px;">${_esc(p.centro_educativo) || '—'}</td>
+        <td>${p.hora_prevista || '—'}</td>
+        <td style="font-size:12px;">${badge}${_esc(nombre)}</td>
+        <td style="font-size:12px;">${_esc(p.foco) || '—'}</td>
+        <td><span class="badge ${
+          p.estado === 'Ejecutado' ? 'badge-verde' :
+          p.estado === 'Pendiente' ? 'badge-amarillo' : 'badge-rojo'
+        }">${_esc(p.estado) || 'Pendiente'}</span></td>
+        <td style="font-size:12px;max-width:220px;color:#8a5d00;white-space:pre-wrap;">${
+          _esc(p.observacion) || '<span style="color:#8fa5bb;">—</span>'}</td>
+      </tr>`);
+    });
+  }
+  cuerpo.innerHTML = partes.join('');
 }
 
 async function cargarSeguimiento() {
