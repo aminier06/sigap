@@ -3315,8 +3315,17 @@ async function _resolverBorrador(tipo) {
   return _borradorId[tipo];
 }
 
+// Si el aviso de apertura y un autoguardado piden resolver a la vez, los dos
+// deben esperar la MISMA consulta. Sin esto, el segundo veía el indicador aún
+// vacío y abría una fila nueva.
+const _resolviendo = { docente:null, coordinador:null, tecnico_distrital:null };
+
 async function _asegurarBorradorResuelto(tipo) {
-  if (!_borradorResuelto[tipo]) await _resolverBorrador(tipo);
+  if (_borradorResuelto[tipo]) return;
+  if (!_resolviendo[tipo]) {
+    _resolviendo[tipo] = _resolverBorrador(tipo).finally(() => { _resolviendo[tipo] = null; });
+  }
+  await _resolviendo[tipo];
 }
 
 
@@ -3415,7 +3424,9 @@ function idBorradorEnCurso(tipo) { return _borradorId[tipo]; }
 // en realidad continuará sobre una fila ya existente.
 async function avisarBorradorEnCurso(tipo) {
   if (!usuarioActual) return;
-  const id = await _resolverBorrador(tipo);
+  cerrarBorrador(tipo);              // al abrir se vuelve a resolver
+  await _asegurarBorradorResuelto(tipo);
+  const id = _borradorId[tipo];
   const aviso = document.getElementById('avisoBorrador_' + tipo);
   const texto = document.getElementById('textoBorrador_' + tipo);
   if (aviso) aviso.style.display = id ? 'flex' : 'none';
@@ -9164,9 +9175,41 @@ document.addEventListener('click', e => {
 })();
 
 // Registrar Service Worker
+//
+// Además de registrarlo, hay que vigilar que no se quede una versión vieja
+// sirviendo la aplicación. Con el service worker anterior eso fue justo lo
+// que pasó: quien había abierto el SIGAP una vez seguía ejecutando la primera
+// versión descargada, y ninguna corrección posterior le llegaba.
 if ('serviceWorker' in navigator) {
+  let _recargando = false;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    // Un service worker nuevo tomó el control: hay versión nueva en el aire
+    if (_recargando) return;
+    _recargando = true;
+    location.reload();
+  });
+
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // Si ya hay uno esperando, que entre de una vez
+      if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
+
+      reg.addEventListener('updatefound', () => {
+        const nuevo = reg.installing;
+        if (!nuevo) return;
+        nuevo.addEventListener('statechange', () => {
+          if (nuevo.state === 'installed' && navigator.serviceWorker.controller) {
+            nuevo.postMessage('SKIP_WAITING');
+          }
+        });
+      });
+
+      // Buscar versión nueva al abrir y cada media hora, por si la sesión
+      // queda abierta todo el día
+      reg.update().catch(() => {});
+      setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
+    }).catch(() => {});
   });
 }
 
@@ -9410,6 +9453,7 @@ if ('serviceWorker' in navigator) {
     MINERD · Dirección de Educación Primaria &nbsp;·&nbsp;
     Desarrollado por <strong style="color:#617384;">Aneudy Minier</strong>
     &nbsp;·&nbsp; © <span id="anioFooter"></span>
+    &nbsp;·&nbsp; <span id="versionApp" title="Versión que está corriendo este navegador">v2026-10-28</span>
   </div>
 
 <!-- MODAL VISOR DE REGISTRO ─────────────────────────────────────────────── -->
