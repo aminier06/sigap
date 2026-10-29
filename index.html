@@ -11,416 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="logominerd.jpeg" />
   <title>SIGAP — Acompañamiento Pedagógico</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-
-// ── GENERADOR DE CONTRASEÑA ───────────────────────────────────────────────────
-function generarClave() {
-  const num = Math.floor(100 + Math.random() * 900);
-  const especiales = ['*', '#', '@', '!'];
-  const esp = especiales[Math.floor(Math.random() * especiales.length)];
-  const clave = 'Sigap' + num + esp;
-  document.getElementById('nuClave').value = clave;
-  document.getElementById('avisoClave').innerHTML =
-    '⚠️ <strong>Anote esta contraseña</strong> antes de crear el usuario. Se la deberá entregar al docente o técnico.';
-  document.getElementById('avisoClave').style.color = '#8a5d00';
-}
-
-function copiarClave() {
-  const clave = document.getElementById('nuClave').value;
-  if (!clave) { mostrarNotif('Primero genere una contraseña.', true); return; }
-  navigator.clipboard.writeText(clave).then(() => {
-    mostrarNotif('Contraseña copiada al portapapeles.');
-    document.getElementById('btnCopiarClave').textContent = '✅ Copiada';
-    setTimeout(() => document.getElementById('btnCopiarClave').textContent = '📋 Copiar', 2000);
-  });
-}
-
-
-// ── CARGA MASIVA DE USUARIOS ──────────────────────────────────────────────────
-let usuariosPendientes = [];
-
-async function previsualizarCarga(input) {
-  if (!requiereAdministrador()) return;
-  const file = input.files[0];
-  if (!file) return;
-
-  // Dynamically load SheetJS
-  if (!window.XLSX) {
-    await new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      s.onload = res; s.onerror = rej;
-      document.head.appendChild(s);
-    });
-  }
-
-  const data = await file.arrayBuffer();
-  const wb   = XLSX.read(data, { type: 'array' });
-
-  // Find the "Usuarios" sheet
-  const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('usuario')) || wb.SheetNames[0];
-  const ws   = wb.Sheets[sheetName];
-  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-
-  // Header row is row index 2 (row 3 in Excel), data starts at index 9 (row 10)
-  const dataRows = rows.slice(9).filter(r => r[0] || r[1]); // skip empty rows
-
-  const rolesValidos = [
-    'Técnico/a Nacional','Técnico/a Regional','Técnico/a Distrital',
-    'Técnico/a Coordinador/a Regional','Técnico/a Coordinador/a Distrital',
-    'Coordinador/a Pedagógico/a','Director/a de Centro','Administrador/a'
-  ];
-
-  usuariosPendientes = [];
-  const errores = [];
-
-  dataRows.forEach((row, i) => {
-    const u = {
-      nombre:        String(row[0] || '').trim(),
-      email:         String(row[1] || '').trim().toLowerCase(),
-      rol:           String(row[2] || '').trim(),
-      nivel:         String(row[3] || '').trim().toLowerCase() === 'admin' ? 'admin' : 'usuario',
-      regional:      String(row[4] || '').trim(),
-      distrito:      String(row[5] || '').trim(),
-      codigoCentro:  String(row[6] || '').trim(),
-      nombreCentro:  String(row[7] || '').trim(),
-      activo:        String(row[8] || '').trim().toUpperCase() !== 'NO',
-      fila: i + 10,
-      errores: [],
-      valido: true,
-    };
-
-    if (!u.nombre)  u.errores.push('Nombre vacío');
-    if (!u.email || !u.email.includes('@')) u.errores.push('Correo inválido');
-    if (!rolesValidos.includes(u.rol)) u.errores.push('Rol inválido');
-    if (u.errores.length) u.valido = false;
-
-    usuariosPendientes.push(u);
-  });
-
-  // Render preview
-  const validos   = usuariosPendientes.filter(u => u.valido).length;
-  const invalidos = usuariosPendientes.filter(u => !u.valido).length;
-
-  document.getElementById('previewConteo').textContent =
-    `${usuariosPendientes.length} usuarios encontrados — ${validos} válidos, ${invalidos} con errores`;
-
-  const cuerpo = document.getElementById('cuerpoPreviewCarga');
-  cuerpo.innerHTML = usuariosPendientes.map((u, i) => `
-    <tr>
-      <td style="text-align:center;color:#8fa5bb;font-size:12px;">${u.fila}</td>
-      <td>${u.nombre || '<em style="color:#b42318">Vacío</em>'}</td>
-      <td style="font-size:12px;">${u.email || '<em style="color:#b42318">Vacío</em>'}</td>
-      <td style="font-size:12px;">${u.rol || '<em style="color:#b42318">Inválido</em>'}</td>
-      <td><span class="badge ${u.nivel==='admin'?'badge-azul':'badge-amarillo'}">${u.nivel}</span></td>
-      <td style="font-size:11px;">${u.regional||'—'}</td>
-      <td style="font-size:11px;">${u.distrito||'—'}</td>
-      <td>
-        ${u.valido
-          ? '<span class="badge badge-verde">✓ Válido</span>'
-          : `<span class="badge badge-rojo" title="${u.errores.join(', ')}">⚠ ${u.errores.join(', ')}</span>`}
-      </td>
-    </tr>`).join('');
-
-  document.getElementById('resumenCarga').innerHTML = validos > 0
-    ? `<span style="color:#2a6b1a;font-weight:700;">✅ ${validos} usuarios listos para crear.</span>`
-    + (invalidos > 0 ? ` <span style="color:#b45309;"> ⚠️ ${invalidos} filas con errores serán omitidas.</span>` : '')
-    : `<span style="color:#b42318;font-weight:700;">⚠️ No hay usuarios válidos para importar. Revise el archivo.</span>`;
-
-  document.getElementById('btnEjecutarCarga').disabled = validos === 0;
-  document.getElementById('previewCarga').style.display = 'block';
-  document.getElementById('progresoCarga').style.display = 'none';
-  document.getElementById('resultadoCarga').style.display = 'none';
-}
-
-async function ejecutarCargaMasiva() {
-  if (!requiereAdministrador()) return;
-  const validos = usuariosPendientes.filter(u => u.valido);
-  if (!validos.length) return;
-
-  document.getElementById('previewCarga').style.display = 'none';
-  document.getElementById('progresoCarga').style.display = 'block';
-  document.getElementById('resultadoCarga').style.display = 'none';
-
-  const log     = document.getElementById('logCarga');
-  const barra   = document.getElementById('barraProgreso');
-  const texto   = document.getElementById('textoProgreso');
-  log.innerHTML = '';
-
-  let creados = 0, fallidos = 0;
-  const usuariosCreados = []; // track for credentials document
-
-  for (let i = 0; i < validos.length; i++) {
-    const u = validos[i];
-    const pct = Math.round(((i) / validos.length) * 100);
-    barra.style.width = pct + '%';
-    texto.textContent = `Creando usuario ${i + 1} de ${validos.length}: ${u.nombre}…`;
-
-    // Generate password
-    const num = Math.floor(100 + Math.random() * 900);
-    const esp = ['*','#','@','!'][Math.floor(Math.random() * 4)];
-    const clave = 'Sigap' + num + esp;
-
-    try {
-      const { data: { session } } = await sb.auth.getSession();
-      const resp = await fetch(SUPA_URL + '/functions/v1/crear-usuario', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + session.access_token,
-          'apikey': SUPA_KEY
-        },
-        body: JSON.stringify({
-          email: u.email, password: clave,
-          nombre: u.nombre, rol: u.rol, nivel: u.nivel,
-          regional: u.regional, distrito: u.distrito,
-          codigo_centro: u.codigoCentro, nombre_centro: u.nombreCentro,
-          activo: u.activo
-        })
-      });
-      const result = await resp.json();
-      if (!resp.ok || result.error) throw new Error(result.error || 'Error desconocido');
-
-      creados++;
-      usuariosCreados.push({ nombre: u.nombre, regional: u.regional, distrito: u.distrito, email: u.email, clave, rol: u.rol });
-      log.innerHTML += `<span style="color:#2a6b1a;">✓ ${u.nombre} (${u.email}) — Clave: <strong>${clave}</strong></span>\n`;
-    } catch(e) {
-      fallidos++;
-      log.innerHTML += `<span style="color:#b42318;">✗ ${u.nombre} (${u.email}) — ${e.message}</span>\n`;
-    }
-
-    log.scrollTop = log.scrollHeight;
-    await new Promise(r => setTimeout(r, 300)); // small delay to avoid rate limits
-  }
-
-  barra.style.width = '100%';
-  texto.textContent = `Proceso completado.`;
-
-  // Store for download
-  window._usuariosCreados = usuariosCreados;
-
-  document.getElementById('resultadoCarga').style.display = 'block';
-  document.getElementById('resultadoCarga').innerHTML = `
-    <div style="background:${creados>0?'#d8ead0':'#fee2e2'};border:1px solid ${creados>0?'#a3c99a':'#f4c2bd'};border-radius:12px;padding:18px;">
-      <div style="font-size:16px;font-weight:800;color:${creados>0?'#17324d':'#b42318'};margin-bottom:8px;">
-        ${creados>0?'✅':'⚠️'} Carga completada
-      </div>
-      <div style="font-size:14px;color:#2d4a63;">
-        <strong>${creados}</strong> usuarios creados correctamente.<br>
-        ${fallidos>0?`<strong style="color:#b42318;">${fallidos}</strong> usuarios fallaron (ver log arriba).`:''}
-      </div>
-      <div style="margin-top:12px;font-size:12px;color:#617384;">
-        ⚠️ <strong>Importante:</strong> Descargue el documento de credenciales antes de cerrar esta página. Las contraseñas no se pueden recuperar posteriormente.
-      </div>
-      <div class="acciones" style="margin-top:14px;">
-        ${creados>0?`<button class="btn-primario" onclick="descargarCredenciales()">📄 Descargar credenciales</button>`:''}
-        <button class="btn-secundario" onclick="copiarLog()">📋 Copiar log</button>
-        <button class="btn-secundario" onclick="cancelarCarga(); cargarUsuarios();">Ver usuarios registrados</button>
-      </div>
-    </div>`;
-
-  cargarUsuarios();
-}
-
-function copiarLog() {
-  if (!requiereAdministrador()) return;
-  const log = document.getElementById('logCarga').innerText;
-  navigator.clipboard.writeText(log).then(() => mostrarNotif('Log copiado al portapapeles.'));
-}
-
-function descargarPlantillaCarga() {
-  const bom = '﻿';
-  const lineas = [
-    '=== PLANTILLA CARGA MASIVA DE USUARIOS SIGAP ===',
-    '=== Instrucciones: Complete los datos a partir de la fila 10. No modifique las filas 1-9. ===',
-    '=== Columnas: Nombre | Correo | Rol | Nivel | Regional | Distrito | Código Centro | Nombre Centro | Activo ===',
-    '=== Roles válidos: Técnico/a Nacional | Técnico/a Regional | Técnico/a Distrital | Técnico/a Coordinador/a Regional | Técnico/a Coordinador/a Distrital | Coordinador/a Pedagógico/a | Director/a de Centro | Administrador/a ===',
-    '=== Nivel: dejar vacío para usuario normal; escribir "admin" para administrador ===',
-    '=== Regional: código de 2 dígitos (ej: 01) ===',
-    '=== Distrito: código de 4 dígitos (ej: 0101) ===',
-    '=== Activo: dejar vacío o escribir SI para activo; NO para inactivo ===',
-    '',
-    'Nombre,Correo,Rol,Nivel,Regional,Distrito,Código Centro,Nombre Centro,Activo',
-    'Juan Pérez,jperez@ejemplo.com,Técnico/a Distrital,,01,0101,,Centro Modelo,SI',
-    'María López,mlopez@ejemplo.com,Técnico/a Coordinador/a Distrital,,01,0101,,,SI',
-    'Carlos Ruiz,cruiz@ejemplo.com,Técnico/a Coordinador/a Regional,,01,,,,SI',
-    'Ana Martínez,amartinez@ejemplo.com,Coordinador/a Pedagógico/a,,01,0101,C001,Centro Esperanza,SI',
-    'Pedro Gómez,pgomez@ejemplo.com,Director/a de Centro,,01,0101,C002,Centro Nuevo,SI',
-  ];
-  const csv = bom + lineas.join('\r\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'plantilla_usuarios_sigap.csv';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function descargarCredenciales() {
-  const lista = window._usuariosCreados || [];
-  if (!lista.length) { mostrarNotif('No hay credenciales para descargar.', true); return; }
-  const fecha = new Date().toLocaleDateString('es-DO', { year:'numeric', month:'2-digit', day:'2-digit' });
-  const filas = lista.map(u => `
-    <tr>
-      <td>${u.nombre}</td>
-      <td style="text-align:center;">${u.regional||'—'}</td>
-      <td style="text-align:center;">${u.distrito||'—'}</td>
-      <td>${u.email}</td>
-      <td style="font-family:monospace;font-weight:700;color:#0d4a7a;">${u.clave}</td>
-      <td>${u.rol}</td>
-    </tr>`).join('');
-  const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Credenciales de usuarios — SIGAP ${fecha}</title>
-<style>
-  body{font-family:Arial,sans-serif;font-size:13px;color:#1a3a52;padding:24px;}
-  h1{font-size:18px;color:#0d4a7a;margin-bottom:4px;}
-  p.sub{font-size:12px;color:#617384;margin-bottom:20px;}
-  table{width:100%;border-collapse:collapse;}
-  th{background:#0d4a7a;color:#fff;padding:9px 12px;font-size:12px;text-align:left;}
-  td{padding:8px 12px;border-bottom:1px solid #dce9f5;vertical-align:top;}
-  tr:nth-child(even) td{background:#f4f9ff;}
-  .aviso{margin-top:20px;padding:12px 16px;background:#fff8e1;border:1px solid #f9c74f;border-radius:8px;font-size:12px;color:#7a5500;}
-</style>
-</head>
-<body>
-<h1>📋 Credenciales de acceso — SIGAP</h1>
-<p class="sub">Generado el ${fecha} · ${lista.length} usuario${lista.length!==1?'s':''} creado${lista.length!==1?'s':''}</p>
-<table>
-  <thead><tr><th>Nombre</th><th>Regional</th><th>Distrito</th><th>Usuario (correo)</th><th>Contraseña</th><th>Rol</th></tr></thead>
-  <tbody>${filas}</tbody>
-</table>
-<div class="aviso">⚠️ <strong>Confidencial.</strong> Este documento contiene contraseñas en texto plano. Distribúyalo de forma segura y solicite a cada usuario que cambie su contraseña en el primer acceso. Una vez entregadas las credenciales, destruya este documento.</div>
-</body>
-</html>`;
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `credenciales_sigap_${fecha.replace(/\//g,'-')}.html`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function cancelarCarga() {
-  usuariosPendientes = [];
-  document.getElementById('archivoCarga').value = '';
-  document.getElementById('previewCarga').style.display    = 'none';
-  document.getElementById('progresoCarga').style.display   = 'none';
-  document.getElementById('resultadoCarga').style.display  = 'none';
-}
-
-
-// ── ELIMINAR USUARIO ──────────────────────────────────────────────────────────
-function confirmarEliminarUsuario(id, nombre) {
-  if (!requiereAdministrador()) return;
-  document.getElementById('eliminarUsuarioId').value = id;
-  document.getElementById('textoEliminarUsuario').innerHTML =
-    `¿Está seguro de que desea eliminar a <strong>${nombre}</strong>? `+
-    `Esta acción es <strong>permanente e irreversible</strong>. Se eliminarán también todos sus datos de perfil.`;
-  document.getElementById('modalEliminarUsuario').style.display = 'flex';
-}
-
-function cerrarModalEliminar() {
-  document.getElementById('modalEliminarUsuario').style.display = 'none';
-  document.getElementById('eliminarUsuarioId').value = '';
-}
-
-async function ejecutarEliminarUsuario() {
-  if (!requiereAdministrador()) return;
-  const id  = document.getElementById('eliminarUsuarioId').value;
-  if (!id) return;
-
-  const btn = document.getElementById('btnConfirmarEliminar');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Eliminando…';
-
-  try {
-    // Usar Edge Function para eliminar usuario completamente
-    const { data: { session } } = await sb.auth.getSession();
-    const resp = await fetch(SUPA_URL + '/functions/v1/eliminar-usuario', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + session.access_token,
-        'apikey': SUPA_KEY
-      },
-      body: JSON.stringify({ usuario_id: id })
-    });
-    const result = await resp.json();
-    if (!resp.ok || result.error) throw new Error(result.error || 'Error desconocido');
-
-    cerrarModalEliminar();
-    mostrarNotif('Usuario eliminado correctamente.');
-    cargarUsuarios();
-  } catch(e) {
-    mostrarNotif('Error al eliminar: ' + e.message, true);
-  }
-
-  btn.disabled = false;
-  btn.innerHTML = '🗑️ Sí, eliminar usuario';
-}
-
-// Close modal on outside click
-document.addEventListener('DOMContentLoaded', () => {
-  const _mEli = document.getElementById('modalEliminarUsuario');
-  if (_mEli) _mEli.addEventListener('click', function(e) {
-    if (e.target === this) cerrarModalEliminar();
-  });
-});
-
-// ── EDITAR USUARIO ────────────────────────────────────────────────────────────
-function abrirModalEditar(u) {
-  if (!requiereAdministrador()) return;
-  document.getElementById('editUserId').value = u.id;
-  document.getElementById('editEmail').value = u.email || '';
-  document.getElementById('btnResetUsuario').disabled = !u.email;
-  document.getElementById('mensajeResetUsuario').textContent = '';
-
-  document.getElementById('editNombre').value = u.nombre || '';
-  document.getElementById('editRol').value = u.rol || '';
-  document.getElementById('editNivel').value = u.nivel || 'usuario';
-  document.getElementById('modalEditarUsuario').style.display = 'flex';
-}
-
-function cerrarModalEditar() {
-  document.getElementById('modalEditarUsuario').style.display = 'none';
-}
-
-async function guardarEdicionUsuario() {
-  if (!requiereAdministrador()) return;
-  const id     = document.getElementById('editUserId').value;
-  const nombre = document.getElementById('editNombre').value.trim();
-  const rol    = document.getElementById('editRol').value;
-  const nivel  = document.getElementById('editNivel').value;
-  if (!nombre) { mostrarNotif('El nombre no puede estar vacío.', true); return; }
-
-  const btn = document.getElementById('btnGuardarEdicion');
-  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Guardando…';
-
-  const { error } = await sb.from('perfiles').update({ nombre, rol, nivel }).eq('id', id);
-  if (error) {
-    mostrarNotif('Error al guardar: ' + error.message, true);
-  } else {
-    mostrarNotif('Usuario actualizado correctamente.');
-    cerrarModalEditar();
-    cargarUsuarios();
-  }
-  btn.disabled = false; btn.textContent = 'Guardar cambios';
-}
-
-// Cerrar modal al hacer clic fuera
-document.addEventListener('DOMContentLoaded', () => {
-  const _mEdi = document.getElementById('modalEditarUsuario');
-  if (_mEdi) _mEdi.addEventListener('click', function(e) {
-    if (e.target === this) cerrarModalEditar();
-  });
-});
-
-</script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --azul:#1a6fb5; --azul-osc:#0d4a7a; --azul-claro:#e8f3fb;
@@ -4694,6 +4285,7 @@ function filtrarDashboardPorStat(tipo) {
 
 // ── MIS REGISTROS ─────────────────────────────────────────────────────────────
 async function cargarMisRegistros() {
+  if (!usuarioActual) return;
   // Registros visibles según la demarcación del perfil
   const { data } = await traerTodo(filtrarDemarcacion(sb.from('acompañamientos').select('*')).order('created_at', { ascending: false }));
   const registros = data || [];
@@ -4880,13 +4472,22 @@ async function buscarCentroPlan(codigo) {
   if (codigo.length < 4) { estado.textContent=''; document.getElementById('planCentro').value=''; return; }
   clearTimeout(buscarCentroPlanTimeout);
   buscarCentroPlanTimeout = setTimeout(async () => {
-    const { data } = await sb.from('centros').select('nombre').eq('codigo', codigo).maybeSingle();
+    // Se piden las columnas de demarcación: sin ellas no se puede comprobar
+    // si el centro cae dentro de la jurisdicción de quien planifica.
+    const { data } = await sb.from('centros')
+      .select('codigo,nombre,distrito_codigo,regional_codigo').eq('codigo', codigo).maybeSingle();
+    const borrar = () => {
+      document.getElementById('planCentro').value = '';
+      const sel = document.getElementById('planCentroSel'); if (sel) sel.value = '';
+    };
     if (!data) {
       estado.textContent='⚠️ Código no encontrado.'; estado.style.color='#b45309';
-      document.getElementById('planCentro').value='';
+      borrar();
     } else {
+      const fuera = avisoCentroFueraDeDemarcacion(data);
+      if (fuera) { borrar(); estado.textContent = fuera; estado.style.color = '#b42318'; return; }
       document.getElementById('planCentro').value = data.nombre;
-      estado.textContent='✅ Centro encontrado.'; estado.style.color='#2a6b1a';
+      estado.textContent = '✅ Centro encontrado.'; estado.style.color = '#2a6b1a';
     }
   }, 400);
 }
@@ -4987,6 +4588,10 @@ function duplicarItemPlan(id) {
 }
 
 async function cargarPlanificacion() {
+  // Sin sesión resuelta no hay a quién consultarle la planificación. Esta
+  // pantalla se carga sola al abrir el panel, así que puede llegar antes de
+  // que la sesión esté lista y reventar la carga del resto.
+  if (!usuarioActual) return;
   const desde = document.getElementById('planSemanaInicio').value;
   const hasta = document.getElementById('planSemanaFin').value;
   if (!desde || !hasta) { renderizarPlanificacion(); return; }
@@ -5153,7 +4758,8 @@ async function cerrarPlanEnCurso(tipo) {
   const id = _planEnCurso.id;
   _planEnCurso = null;
   try {
-    await sb.from('planificaciones').update({ estado: 'Ejecutado' }).eq('id', id);
+    await sb.from('planificaciones').update({ estado: 'Ejecutado' })
+      .eq('id', id).eq('usuario_id', usuarioActual.id);
   } catch (e) {}
 }
 
@@ -6277,6 +5883,39 @@ async function cargarSeguimientoTecnicos() {
 
 // ── AUTOCOMPLETAR CENTRO ──────────────────────────────────────────────────────
 let buscarTimeout = null;
+// ¿El centro que se acaba de escribir cae fuera de la jurisdicción del
+// usuario? Devuelve el motivo, o cadena vacía si está dentro. Quien lo llama
+// rechaza el centro: nadie registra fuera de su demarcación.
+function avisoCentroFueraDeDemarcacion(centro) {
+  const p = perfilActual;
+  if (!p || !centro) return '';
+  const rol = String(p.rol || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  if (p.nivel === 'admin' || rol === 'tecnico/a nacional') return '';
+  const cod = (v, n) => (String(v || '').trim().match(/^(\d+)/) || [''])[0].slice(0, n).padStart(n, '0');
+
+  if (rol === 'coordinador/a pedagogico/a' || rol === 'director/a de centro') {
+    // padStart sobre una cadena vacía devuelve '00000', que es un valor
+    // verdadero: sin este corte, un perfil sin centro recibía el aviso siempre.
+    const digitos = String(p.codigo_centro || '').replace(/\D/g, '');
+    const propio = digitos ? digitos.padStart(5, '0') : '';
+    if (propio && propio !== String(centro.codigo || '').padStart(5, '0'))
+      return '🚫 Este centro no es el suyo. Solo puede registrar acompañamientos en su centro.';
+    return '';
+  }
+  if (rol.includes('distrital')) {
+    const mio = cod(p.distrito, 4);
+    if (mio && cod(centro.distrito_codigo, 4) !== mio)
+      return '🚫 Este centro está fuera de su distrito. No puede registrar acompañamientos aquí.';
+    return '';
+  }
+  if (rol.includes('regional')) {
+    const mio = cod(p.regional, 2);
+    if (mio && cod(centro.regional_codigo, 2) !== mio)
+      return '🚫 Este centro está fuera de su regional. No puede registrar acompañamientos aquí.';
+  }
+  return '';
+}
+
 async function buscarCentro(codigo) {
   const estado = document.getElementById('estadoBusquedaCentro');
   const limpiar = () => {
@@ -6321,8 +5960,9 @@ async function buscarCentro(codigo) {
       const zonaRadio = document.querySelector('input[name="zona"][value="'+data.zona+'"]');
       if (zonaRadio) zonaRadio.checked = true;
     }
-    estado.textContent = '✅ Centro encontrado.';
-    estado.style.color = '#2a6b1a';
+    const fuera = avisoCentroFueraDeDemarcacion(data);
+    if (fuera) { if (typeof limpiar === 'function') limpiar(); estado.textContent = fuera; estado.style.color = '#b42318'; return; }
+    estado.textContent = '✅ Centro encontrado.'; estado.style.color = '#2a6b1a';
   }, 400);
 }
 
@@ -7018,6 +6658,8 @@ async function buscarCentroDist(codigo) {
     if (regMatch) selReg.value = regMatch.value;
     cargarDistritosDist(distCodigo);
     document.getElementById('dSectorDist').value = data.sector || 'Urbano';
+    const fuera = avisoCentroFueraDeDemarcacion(data);
+    if (fuera) { if (typeof limpiar === 'function') limpiar(); estado.textContent = fuera; estado.style.color = '#b42318'; return; }
     estado.textContent = '✅ Centro encontrado.'; estado.style.color = '#2a6b1a';
   }, 400);
 }
@@ -7174,6 +6816,8 @@ async function buscarCentroCoord(codigo) {
     if (regMatch) selReg.value = regMatch.value;
     cargarDistritosCoord(distCodigo);
     document.getElementById('cSectorCentro').value = data.sector || '';
+    const fuera = avisoCentroFueraDeDemarcacion(data);
+    if (fuera) { if (typeof limpiar === 'function') limpiar(); estado.textContent = fuera; estado.style.color = '#b42318'; return; }
     estado.textContent = '✅ Centro encontrado.'; estado.style.color = '#2a6b1a';
   }, 400);
 }
