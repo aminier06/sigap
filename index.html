@@ -6141,64 +6141,99 @@ async function buscarCentro(codigo) {
   }, 400);
 }
 
+// Validación de los instrumentos, en un solo lugar.
+//
+// Antes cada formulario validaba dentro de su propia función de envío, y las
+// versiones sin conexión de esas funciones sustituían la función entera: al
+// enviar sin señal no se validaba nada y se encolaban registros marcados como
+// Enviados sin centro, sin nombre y sin indicadores. Ahora los dos caminos,
+// con y sin conexión, preguntan a la misma función.
+function faltantesInstrumento(tipo) {
+  const v = id => (document.getElementById(id) || {}).value || '';
+  const r = n => { const e = document.querySelector('input[name="' + n + '"]:checked'); return e ? e.value : ''; };
+  const sinCalificar = lista => lista.filter(i => i.codigo &&
+    !document.querySelector('input[name="val_' + i.codigo + '"]:checked')).length;
+  const faltan = [];
+
+  if (tipo === 'coordinador') {
+    [ { id:'cCentroEducativo', label:'Centro educativo' },
+      { id:'cCodigoCentro',    label:'Código del centro' },
+      { id:'cNombreCoord',     label:'Nombre del coordinador' },
+      { id:'cCedulaCoord',     label:'Cédula del coordinador' },
+      { id:'cFechaCoord',      label:'Fecha' },
+      { id:'cFocoCoord',       label:'Foco del acompañamiento' },
+    ].forEach(({id,label}) => { if (!v(id)) faltan.push(label); });
+    if (!r('cTipoAcomp')) faltan.push('Tipo de acompañamiento');
+    const n = sinCalificar(INDICADORES_COORD);
+    if (n) faltan.push('Indicadores sin calificar (' + n + ')');
+    return faltan;
+  }
+
+  if (tipo === 'tecnico_distrital') {
+    [ { id:'dCentroEducativo', label:'Centro educativo' },
+      { id:'dCodigoCentro',    label:'Código del centro' },
+      { id:'dNombreTecnico',   label:'Nombre del técnico acompañado' },
+      { id:'dCedulaTecnico',   label:'Cédula del técnico' },
+      { id:'dFechaDist',       label:'Fecha' },
+      { id:'dFocoDist',        label:'Foco del acompañamiento' },
+    ].forEach(({id,label}) => { if (!v(id)) faltan.push(label); });
+    if (!r('dTipoAcomp')) faltan.push('Tipo de acompañamiento');
+    const n = sinCalificar(INDICADORES_DIST);
+    if (n) faltan.push('Indicadores sin calificar (' + n + ')');
+    return faltan;
+  }
+
+  // Docente
+  [ { id:'centroEducativo',     label:'Centro educativo' },
+    { id:'codigoCentro',        label:'Código del centro' },
+    { id:'nombreDocente',       label:'Nombre del docente' },
+    { id:'cedulaDocente',       label:'Cédula del docente' },
+    { id:'areaAcompanada',      label:'Área acompañada' },
+    { id:'fecha',               label:'Fecha' },
+    { id:'horaInicio',          label:'Hora de inicio' },
+    { id:'horaTermino',         label:'Hora de término' },
+    { id:'foco',                label:'Foco del acompañamiento' },
+    { id:'intencionDocente',    label:'Intención pedagógica' },
+    { id:'contenidoConceptual', label:'Contenido conceptual' },
+  ].forEach(({id,label}) => { if (!v(id)) faltan.push(label); });
+  [ { name:'modalidad',          label:'Modalidad' },
+    { name:'zona',               label:'Zona' },
+    { name:'tipoAcompanamiento', label:'Tipo de acompañamiento' },
+  ].forEach(({name,label}) => { if (!r(name)) faltan.push(label); });
+
+  const multi = document.querySelector('input[name="modalidad"][value="Multigrado"]')?.checked;
+  if (!multi) {
+    if (!r('ciclo')) faltan.push('Ciclo');
+    if (!r('gradoUnico')) faltan.push('Grado acompañado');
+  } else {
+    if (!document.querySelectorAll('input[name="ciclosMultigrado"]:checked').length)
+      faltan.push('Ciclos (multigrado)');
+    if (!document.querySelectorAll('input[name="gradosMultigrado"]:checked').length)
+      faltan.push('Grados acompañados (multigrado)');
+  }
+  const n = sinCalificar(INDICADORES);
+  if (n) faltan.push('Indicadores sin calificar (' + n + ')');
+  return faltan;
+}
+
+// Avisa y devuelve true cuando falta algo, para cortar el envío
+function bloqueaPorFaltantes(tipo) {
+  const faltan = faltantesInstrumento(tipo);
+  if (!faltan.length) return false;
+  const lista = faltan.map(f => '<li>' + f + '</li>').join('');
+  mostrarNotif('<strong>⚠️ Complete los siguientes campos antes de enviar:</strong>' +
+               '<ul style="margin:4px 0 0 16px;padding:0">' + lista + '</ul>', true, true);
+  return true;
+}
+
 async function guardarRegistro(estado) {
   const v = id => (document.getElementById(id)||{}).value || '';
   const r = name => { const el = document.querySelector('input[name="'+name+'"]:checked'); return el?el.value:''; };
   const multi = document.querySelector('input[name="modalidad"][value="Multigrado"]')?.checked;
   const grado = r('gradoUnico') || Array.from(document.querySelectorAll('input[name="gradosMultigrado"]:checked')).map(c=>c.value).join(', ');
 
-  // ── VALIDACIÓN (solo al enviar, no al guardar borrador) ──────────────────────
-  if (estado === 'Enviado') {
-    const faltantes = [];
-    // Campos de texto/select requeridos
-    const camposReq = [
-      { id: 'centroEducativo',       label: 'Centro educativo' },
-      { id: 'codigoCentro',          label: 'Código del centro' },
-      { id: 'nombreDocente',         label: 'Nombre del docente' },
-      { id: 'cedulaDocente',         label: 'Cédula del docente' },
-      { id: 'areaAcompanada',        label: 'Área acompañada' },
-      { id: 'fecha',                 label: 'Fecha' },
-      { id: 'horaInicio',            label: 'Hora de inicio' },
-      { id: 'horaTermino',           label: 'Hora de término' },
-      { id: 'foco',                  label: 'Foco del acompañamiento' },
-      { id: 'intencionDocente',      label: 'Intención pedagógica' },
-      { id: 'contenidoConceptual',   label: 'Contenido conceptual' },
-    ];
-    camposReq.forEach(({ id, label }) => { if (!v(id)) faltantes.push(label); });
+  if (estado === 'Enviado' && bloqueaPorFaltantes('docente')) return;
 
-    // Grupos de radio requeridos
-    const radiosReq = [
-      { name: 'modalidad',           label: 'Modalidad' },
-      { name: 'zona',                label: 'Zona' },
-      { name: 'tipoAcompanamiento',  label: 'Tipo de acompañamiento' },
-    ];
-    radiosReq.forEach(({ name, label }) => { if (!r(name)) faltantes.push(label); });
-
-    // Ciclo (solo en modo regular) / Grados
-    if (!multi) {
-      if (!r('ciclo')) faltantes.push('Ciclo');
-      if (!r('gradoUnico')) faltantes.push('Grado acompañado');
-    } else {
-      const ciclosMarc = document.querySelectorAll('input[name="ciclosMultigrado"]:checked').length;
-      const gradosMarc = document.querySelectorAll('input[name="gradosMultigrado"]:checked').length;
-      if (!ciclosMarc) faltantes.push('Ciclos (multigrado)');
-      if (!gradosMarc) faltantes.push('Grados acompañados (multigrado)');
-    }
-
-    // Todos los indicadores deben tener valor seleccionado
-    const indSinValor = INDICADORES.filter(item => {
-      if (!item.codigo) return false;
-      return !document.querySelector('input[name="val_'+item.codigo+'"]:checked');
-    });
-    if (indSinValor.length) faltantes.push('Indicadores sin calificar (' + indSinValor.length + ')');
-
-    if (faltantes.length) {
-      const lista = faltantes.map(f => '<li>'+f+'</li>').join('');
-      mostrarNotif('<strong>⚠️ Complete los siguientes campos antes de enviar:</strong><ul style="margin:4px 0 0 16px;padding:0">'+lista+'</ul>', true, true);
-      return;
-    }
-  }
-  // ────────────────────────────────────────────────────────────────────────────
 
   // Recoger indicadores como JSON
   const indicadoresData = {};
@@ -6828,30 +6863,8 @@ async function guardarBorradorDist() {
 async function enviarFormularioDist(event) {
   event.preventDefault();
 
-  // ── VALIDACIÓN ───────────────────────────────────────────────────────────────
-  const vd = id => (document.getElementById(id)||{}).value || '';
-  const rd = name => { const el = document.querySelector('input[name="'+name+'"]:checked'); return el?el.value:''; };
-  const faltantesDist = [];
-  [
-    { id: 'dCentroEducativo',  label: 'Centro educativo' },
-    { id: 'dCodigoCentro',     label: 'Código del centro' },
-    { id: 'dNombreTecnico',    label: 'Nombre del técnico acompañado' },
-    { id: 'dCedulaTecnico',    label: 'Cédula del técnico' },
-    { id: 'dFechaDist',        label: 'Fecha' },
-    { id: 'dFocoDist',         label: 'Foco del acompañamiento' },
-  ].forEach(({ id, label }) => { if (!vd(id)) faltantesDist.push(label); });
-  if (!rd('dTipoAcomp')) faltantesDist.push('Tipo de acompañamiento');
-  const indDistSinValor = INDICADORES_DIST.filter(item => {
-    if (!item.codigo) return false;
-    return !document.querySelector('input[name="val_'+item.codigo+'"]:checked');
-  });
-  if (indDistSinValor.length) faltantesDist.push('Indicadores sin calificar (' + indDistSinValor.length + ')');
-  if (faltantesDist.length) {
-    const lista = faltantesDist.map(f => '<li>'+f+'</li>').join('');
-    mostrarNotif('<strong>⚠️ Complete los siguientes campos antes de enviar:</strong><ul style="margin:4px 0 0 16px;padding:0">'+lista+'</ul>', true, true);
-    return;
-  }
-  // ────────────────────────────────────────────────────────────────────────────
+  if (bloqueaPorFaltantes('tecnico_distrital')) return;
+
 
   const btn = document.getElementById('btnEnviarDist');
   btn.disabled = true; btn.textContent = 'Enviando…';
@@ -7001,28 +7014,8 @@ async function enviarFormularioCoord(event) {
   const v = id => (document.getElementById(id)||{}).value || '';
   const r = name => { const el = document.querySelector('input[name="'+name+'"]:checked'); return el?el.value:''; };
 
-  // ── VALIDACIÓN ───────────────────────────────────────────────────────────────
-  const faltantesCoord = [];
-  [
-    { id: 'cCentroEducativo',  label: 'Centro educativo' },
-    { id: 'cCodigoCentro',     label: 'Código del centro' },
-    { id: 'cNombreCoord',      label: 'Nombre del coordinador' },
-    { id: 'cCedulaCoord',      label: 'Cédula del coordinador' },
-    { id: 'cFechaCoord',       label: 'Fecha' },
-    { id: 'cFocoCoord',        label: 'Foco del acompañamiento' },
-  ].forEach(({ id, label }) => { if (!v(id)) faltantesCoord.push(label); });
-  if (!r('cTipoAcomp')) faltantesCoord.push('Tipo de acompañamiento');
-  const indCoordSinValor = INDICADORES_COORD.filter(item => {
-    if (!item.codigo) return false;
-    return !document.querySelector('input[name="val_'+item.codigo+'"]:checked');
-  });
-  if (indCoordSinValor.length) faltantesCoord.push('Indicadores sin calificar (' + indCoordSinValor.length + ')');
-  if (faltantesCoord.length) {
-    const lista = faltantesCoord.map(f => '<li>'+f+'</li>').join('');
-    mostrarNotif('<strong>⚠️ Complete los siguientes campos antes de enviar:</strong><ul style="margin:4px 0 0 16px;padding:0">'+lista+'</ul>', true, true);
-    return;
-  }
-  // ────────────────────────────────────────────────────────────────────────────
+  if (bloqueaPorFaltantes('coordinador')) return;
+
 
   const indicadoresData = {};
   INDICADORES_COORD.forEach(item => {
@@ -8830,6 +8823,16 @@ async function guardarOffline(tipo, datos, clave, filaId) {
   const pendientes = await obtenerPendientes();
   const previo = clave ? pendientes.find(x => x.clave === clave) : null;
   const esFinal = String(datos?.estado || '').toLowerCase() === 'enviado';
+  // Red de seguridad: nada entra a la cola como enviado sin centro, sin
+  // persona acompañada y sin fecha, venga de donde venga.
+  if (esFinal) {
+    const nombre = datos.nombre_docente || datos.nombre_coordinador || datos.nombre_tecnico || '';
+    if (!String(datos.codigo_centro || '').trim() || !String(nombre).trim() || !datos.fecha) {
+      mostrarNotif('No se puede enviar un acompañamiento sin centro, sin la persona acompañada y sin fecha. ' +
+                   'Complete el instrumento y vuelva a intentarlo.', true);
+      throw new Error('registro incompleto');
+    }
+  }
   // Fila que este acompañamiento ya ocupa en la base, si la tiene
   const fila = filaId || previo?.filaId || null;
   return new Promise((resolve, reject) => {
@@ -8942,6 +8945,9 @@ async function sincronizarPendientes() {
 const _guardarOriginal = guardarRegistro;
 guardarRegistro = async function(estado) {
   if (!estaOffline) return _guardarOriginal(estado);
+  // Sin señal se valida igual: un registro incompleto marcado como enviado
+  // entra a la base en cuanto vuelve la conexión y ya nadie lo completa.
+  if (estado === 'Enviado' && bloqueaPorFaltantes('docente')) return;
 
   const v  = id => (document.getElementById(id)||{}).value || '';
   const r  = name => { const el = document.querySelector('input[name="'+name+'"]:checked'); return el?el.value:''; };
@@ -8985,6 +8991,7 @@ const _enviarFormularioCoordOriginal = enviarFormularioCoord;
 enviarFormularioCoord = async function(event) {
   if (!estaOffline) return _enviarFormularioCoordOriginal(event);
   event.preventDefault();
+  if (bloqueaPorFaltantes('coordinador')) return;
   const v = id => (document.getElementById(id)||{}).value || '';
   const r = name => { const el = document.querySelector('input[name="'+name+'"]:checked'); return el?el.value:''; };
   const indicadoresData = {};
@@ -9061,6 +9068,7 @@ const _enviarFormularioDistOriginal = enviarFormularioDist;
 enviarFormularioDist = async function(event) {
   if (!estaOffline) return _enviarFormularioDistOriginal(event);
   event.preventDefault();
+  if (bloqueaPorFaltantes('tecnico_distrital')) return;
   const fd = new FormData(document.getElementById('formAcompDist'));
   const valores = {};
   INDICADORES_DIST.filter(i => i.codigo).forEach(i => {
