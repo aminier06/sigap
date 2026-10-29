@@ -5027,6 +5027,39 @@ function prepararDemarcacionPlan() {
     selD.disabled = false;
     selD.style.background = '';
   }
+
+  // Un coordinador pedagógico o un director tienen su centro asignado: no es
+  // algo que deban elegir. Se fija y se bloquea, igual que la regional y el
+  // distrito de un distrital.
+  fijarCentroPropioPlan(rol);
+}
+
+async function fijarCentroPropioPlan(rol) {
+  const p = perfilActual;
+  const sel = document.getElementById('planCentroSel');
+  const cod = document.getElementById('planCodigoCentro');
+  const nom = document.getElementById('planCentro');
+  if (!sel || !cod || !nom) return;
+
+  const deCentro = rol === 'coordinador/a pedagogico/a' || rol === 'director/a de centro';
+  const propio = String(p?.codigo_centro || '').replace(/\D/g, '');
+
+  if (!deCentro || !propio) {
+    sel.disabled = false; sel.style.background = '';
+    cod.readOnly = false; cod.style.background = '';
+    return;
+  }
+
+  const codigo = propio.padStart(5, '0');
+  const { data } = await sb.from('centros').select('codigo,nombre').eq('codigo', codigo).maybeSingle();
+  sel.innerHTML = `<option value="${codigo}">${codigo} — ${data?.nombre || 'Su centro'}</option>`;
+  sel.value = codigo;
+  sel.disabled = true; sel.style.background = '#f0f7ff';
+  cod.value = codigo;
+  cod.readOnly = true; cod.style.background = '#f0f7ff';
+  nom.value = data?.nombre || '';
+  const estado = document.getElementById('estadoCentroPlan');
+  if (estado) { estado.textContent = 'Su centro asignado.'; estado.style.color = '#617384'; }
 }
 
 // Los instrumentos que cada rol puede planificar. Un coordinador pedagógico
@@ -5081,6 +5114,7 @@ async function cargarCentrosPlan() {
   const sel = document.getElementById('planCentroSel');
   const dis = document.getElementById('planDistrito')?.value || '';
   if (!sel) return;
+  if (sel.disabled) return;          // centro propio fijado: no se repuebla
   const cod = (String(dis).match(/^(\d{1,4})/) || [])[1];
   if (!cod) { sel.innerHTML = '<option value="">Seleccione primero el distrito</option>'; return; }
 
@@ -5097,9 +5131,22 @@ async function cargarCentrosPlan() {
 }
 
 // Al elegir el centro de la lista se completan el código y el nombre
-function elegirCentroPlan() {
+async function elegirCentroPlan() {
   const sel = document.getElementById('planCentroSel');
   if (!sel || !sel.value) return;
+  // La lista se arma por distrito, pero la jurisdicción se comprueba igual:
+  // así el desplegable no se convierte en una puerta trasera.
+  const { data } = await sb.from('centros')
+    .select('codigo,nombre,distrito_codigo,regional_codigo').eq('codigo', sel.value).maybeSingle();
+  const fuera = data ? avisoCentroFueraDeDemarcacion(data) : '';
+  const estadoSel = document.getElementById('estadoCentroPlan');
+  if (fuera) {
+    sel.value = '';
+    document.getElementById('planCodigoCentro').value = '';
+    document.getElementById('planCentro').value = '';
+    if (estadoSel) { estadoSel.textContent = fuera; estadoSel.style.color = '#b42318'; }
+    return;
+  }
   const texto = sel.options[sel.selectedIndex].textContent;
   document.getElementById('planCodigoCentro').value = sel.value;
   document.getElementById('planCentro').value = texto.split('—').slice(1).join('—').trim();
