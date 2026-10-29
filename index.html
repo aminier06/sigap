@@ -3378,7 +3378,21 @@ async function guardarBorradorInstrumento(tipo, silencioso = false) {
   if (!error && !_borradorId[tipo]) {
     const res = await sb.from('acompañamientos').insert(registro).select('id').single();
     error = res.error;
-    if (!error && res.data) _borradorId[tipo] = res.data.id;
+    if (!error && res.data) {
+      _borradorId[tipo] = res.data.id;
+    } else if (error && (error.code === '23505' ||
+               String(error.message || '').includes('borrador_sin_clones'))) {
+      // La base rechazó un clon de este mismo acompañamiento. Es la regla
+      // que impide justamente lo que veníamos persiguiendo: en vez de
+      // fallar, se adopta el borrador que ya existe y se actualiza.
+      error = null;
+      await _resolverBorrador(tipo);
+      if (_borradorId[tipo]) {
+        const res2 = await sb.from('acompañamientos').update(registro)
+          .eq('id', _borradorId[tipo]).eq('estado', 'Borrador').select('id');
+        error = res2.error;
+      }
+    }
   }
   if (error) {
     if (!silencioso) mostrarNotif('Error al guardar el borrador: ' + error.message, true);
@@ -8928,8 +8942,30 @@ async function sincronizarPendientes() {
           error = ins.error;
         }
       } else {
-        const ins = await sb.from(tabla).insert(p.datos);
-        error = ins.error;
+        let destino = null;
+        if (tabla === 'acompañamientos' &&
+            String(p.clave || '').startsWith('borrador:') &&
+            String(p.datos?.estado || '') === 'Borrador') {
+          const tipo = String(p.clave).split(':')[1];
+          const q = sb.from('acompañamientos').select('id')
+            .eq('usuario_id', usuarioActual.id).eq('estado', 'Borrador')
+            .order('created_at', { ascending: false });
+          const { data: yaHay } = await (tipo === 'docente'
+            ? q.or('tipo_instrumento.is.null,tipo_instrumento.eq.docente')
+            : q.eq('tipo_instrumento', tipo));
+          destino = yaHay && yaHay.length ? yaHay[0].id : null;
+        }
+        if (destino) {
+          const res = await sb.from(tabla).update(p.datos).eq('id', destino).select('id');
+          error = res.error;
+          if (!error && (!res.data || !res.data.length)) {
+            const ins = await sb.from(tabla).insert(p.datos);
+            error = ins.error;
+          }
+        } else {
+          const ins = await sb.from(tabla).insert(p.datos);
+          error = ins.error;
+        }
       }
       if (!error) { await eliminarPendiente(p.id); ok++; }
     } catch(e) {}
