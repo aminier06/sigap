@@ -1678,15 +1678,15 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="filtros-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;">
             <div class="campo">
               <label>Desde</label>
-              <input type="date" id="misRegFiltroDesde">
+              <input type="date" id="misRegFiltroDesde" onchange="aplicarFiltrosMisReg()">
             </div>
             <div class="campo">
               <label>Hasta</label>
-              <input type="date" id="misRegFiltroHasta">
+              <input type="date" id="misRegFiltroHasta" onchange="aplicarFiltrosMisReg()">
             </div>
             <div class="campo">
               <label>Tipo de instrumento</label>
-              <select id="misRegFiltroTipo">
+              <select id="misRegFiltroTipo" onchange="aplicarFiltrosMisReg()">
                 <option value="">Todos</option>
                 <option value="docente">Docente</option>
                 <option value="coordinador">Coordinador/a</option>
@@ -1695,16 +1695,51 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="campo">
               <label>Estado</label>
-              <select id="misRegFiltroEstado">
+              <select id="misRegFiltroEstado" onchange="aplicarFiltrosMisReg()">
                 <option value="">Todos</option>
                 <option value="Enviado">Enviado</option>
                 <option value="Borrador">Borrador</option>
               </select>
             </div>
+            <div class="campo" id="misRegWrapAcompanante">
+              <label>Acompañante</label>
+              <select id="misRegFiltroAcompanante" onchange="aplicarFiltrosMisReg()">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="campo" id="misRegWrapRegional">
+              <label>Regional</label>
+              <select id="misRegFiltroRegional" onchange="aplicarFiltrosMisReg()">
+                <option value="">Todas</option>
+              </select>
+            </div>
+            <div class="campo" id="misRegWrapDistrito">
+              <label>Distrito</label>
+              <select id="misRegFiltroDistrito" onchange="aplicarFiltrosMisReg()">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="campo" id="misRegWrapCentro">
+              <label>Centro educativo</label>
+              <select id="misRegFiltroCentro" onchange="aplicarFiltrosMisReg()">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="campo" id="misRegWrapArea">
+              <label>Área curricular</label>
+              <select id="misRegFiltroArea" onchange="aplicarFiltrosMisReg()">
+                <option value="">Todas</option>
+              </select>
+            </div>
+            <div class="campo" style="grid-column:span 2;">
+              <label>Buscar</label>
+              <input type="text" id="misRegBuscar" placeholder="Nombre, cédula o código de centro…"
+                     oninput="aplicarFiltrosMisReg()">
+            </div>
           </div>
-          <div style="display:flex;gap:10px;margin-top:10px;">
-            <button class="btn-primario btn-sm" onclick="aplicarFiltrosMisReg()">🔍 Filtrar</button>
-            <button class="btn-secundario btn-sm" onclick="limpiarFiltrosMisReg()">✕ Limpiar</button>
+          <div style="display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap;">
+            <button class="btn-secundario btn-sm" onclick="limpiarFiltrosMisReg()">✕ Limpiar filtros</button>
+            <span id="misRegContador" style="font-size:12px;color:#617384;"></span>
           </div>
         </div>
 
@@ -4668,35 +4703,8 @@ async function cargarMisRegistros() {
   }
   // Guardar registros en variable global para acceso desde verRegistro por id
   window._misRegistrosList = registros;
-  cuerpo.innerHTML = registros.map(r => {
-    const tipoInstr = r.tipo_instrumento || 'docente';
-    const badgeTipo = tipoInstr === 'coordinador'
-      ? '<span style="font-size:10px;background:#e8f0fa;color:#1a3a52;border-radius:4px;padding:1px 5px;">Coord.</span>'
-      : tipoInstr === 'tecnico_distrital'
-        ? '<span style="font-size:10px;background:#fef3e2;color:#7a4f00;border-radius:4px;padding:1px 5px;">Téc.Dist.</span>'
-        : '<span style="font-size:10px;background:#e6f4ea;color:#1a6b2a;border-radius:4px;padding:1px 5px;">Docente</span>';
-    const nombreAcomp = tipoInstr === 'coordinador'
-      ? (r.nombre_coordinador || r.nombre_docente || '—')
-      : tipoInstr === 'tecnico_distrital'
-        ? (r.nombre_tecnico || r.nombre_docente || '—')
-        : (r.nombre_docente || '—');
-    const detalle = tipoInstr === 'docente'
-      ? (r.area_acompanada || '—')
-      : (r.cargo_coordinador || r.distrito || '—');
-    const gradoCell = tipoInstr === 'docente' ? (r.grado || '—') : '—';
-    return `<tr onclick="verRegistroById('${r.id}')" style="cursor:pointer;" title="Clic para ver el formulario completo">
-      <td>${r.fecha||'—'}</td>
-      <td>${badgeTipo}<br><span style="font-size:11px;color:#617384;">${r.tipo_acompanamiento||'—'}</span></td>
-      <td>${nombreAcomp}</td>
-      <td>${r.centro_educativo||'—'}</td>
-      <td>${detalle}</td>
-      <td>${gradoCell}</td>
-      <td><span class="badge ${r.estado==='Enviado'?'badge-verde':'badge-amarillo'}">${r.estado}</span></td>
-      <td onclick="event.stopPropagation()">${r.estado==='Borrador' && r.usuario_id === usuarioActual?.id
-        ? `<button class="btn-secundario btn-sm" onclick="eliminarRegistro('${r.id}')">Eliminar</button>`
-        : '<span style="font-size:13px;color:#8fa5bb;">👁 Ver</span>'}</td>
-    </tr>`;
-  }).join('');
+  _poblarFiltrosMisReg(registros);
+  aplicarFiltrosMisReg();
 }
 
 function verRegistroById(id) {
@@ -4741,27 +4749,83 @@ function _renderFilasMisReg(lista) {
   }).join('');
 }
 
+// Los selectores se llenan con lo que de verdad hay en los registros
+// visibles, no con catálogos completos: así un técnico distrital no ve 18
+// regionales de las que solo una le aplica.
+function _poblarFiltrosMisReg(lista) {
+  const _reg = r => regionalCanonica((String(r.regional || '').trim().match(/^\d+/) || [''])[0]) || r.regional || '';
+  const _dis = r => distritoCanonico((String(r.distrito || '').trim().match(/^\d+/) || [''])[0]) || r.distrito || '';
+  const _cen = r => r.centro_educativo || '';
+  const campos = [
+    ['misRegFiltroAcompanante', 'misRegWrapAcompanante', r => r.nombre_acompanante || '', 'Todos'],
+    ['misRegFiltroRegional',    'misRegWrapRegional',    _reg, 'Todas'],
+    ['misRegFiltroDistrito',    'misRegWrapDistrito',    _dis, 'Todos'],
+    ['misRegFiltroCentro',      'misRegWrapCentro',      _cen, 'Todos'],
+    ['misRegFiltroArea',        'misRegWrapArea',        r => r.area_acompanada || '', 'Todas'],
+  ];
+  campos.forEach(([selId, wrapId, valor, rotulo]) => {
+    const sel = document.getElementById(selId);
+    const wrap = document.getElementById(wrapId);
+    if (!sel) return;
+    const previo = sel.value;
+    const valores = [...new Set(lista.map(valor).map(x => String(x).trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'es'));
+    sel.innerHTML = `<option value="">${rotulo} (${valores.length})</option>` +
+      valores.map(v => `<option value="${v}">${v}</option>`).join('');
+    if (valores.includes(previo)) sel.value = previo;
+    // Un filtro con una sola opción no filtra nada: se oculta
+    if (wrap) wrap.style.display = valores.length > 1 ? '' : 'none';
+  });
+}
+
 function aplicarFiltrosMisReg() {
   const lista = window._misRegistrosList || [];
-  const desde  = document.getElementById('misRegFiltroDesde')?.value || '';
-  const hasta  = document.getElementById('misRegFiltroHasta')?.value || '';
-  const tipo   = document.getElementById('misRegFiltroTipo')?.value || '';
-  const estado = document.getElementById('misRegFiltroEstado')?.value || '';
+  const val = id => document.getElementById(id)?.value || '';
+  const desde  = val('misRegFiltroDesde');
+  const hasta  = val('misRegFiltroHasta');
+  const tipo   = val('misRegFiltroTipo');
+  const estado = val('misRegFiltroEstado');
+  const acomp  = val('misRegFiltroAcompanante');
+  const reg    = val('misRegFiltroRegional');
+  const dis    = val('misRegFiltroDistrito');
+  const cen    = val('misRegFiltroCentro');
+  const area   = val('misRegFiltroArea');
+  const texto  = _norm(val('misRegBuscar'));
+  const palabras = texto ? texto.split(/\s+/) : [];
+
+  const codigo = (v, n) => (String(v || '').trim().match(/^(\d+)/) || [''])[0].slice(0, n).padStart(n, '0');
+
   const filtrados = lista.filter(r => {
-    if (desde && r.fecha < desde) return false;
-    if (hasta && r.fecha > hasta) return false;
-    const tipoR = r.tipo_instrumento || 'docente';
-    if (tipo && tipoR !== tipo) return false;
+    if (desde && (!r.fecha || r.fecha < desde)) return false;
+    if (hasta && (!r.fecha || r.fecha > hasta)) return false;
+    if (tipo && (r.tipo_instrumento || 'docente') !== tipo) return false;
     if (estado && r.estado !== estado) return false;
-    return true;
+    if (acomp && String(r.nombre_acompanante || '').trim() !== acomp) return false;
+    if (reg && codigo(r.regional, 2) !== codigo(reg, 2)) return false;
+    if (dis && codigo(r.distrito, 4) !== codigo(dis, 4)) return false;
+    if (cen && String(r.centro_educativo || '').trim() !== cen) return false;
+    if (area && String(r.area_acompanada || '').trim() !== area) return false;
+    if (!palabras.length) return true;
+    const heno = _norm([r.nombre_docente, r.nombre_coordinador, r.nombre_tecnico,
+                        r.cedula_docente, r.cedula, r.centro_educativo,
+                        r.codigo_centro, r.foco, r.nombre_acompanante].join(' '));
+    return palabras.every(w => heno.includes(w));
   });
+
+  const cont = document.getElementById('misRegContador');
+  if (cont) cont.textContent = filtrados.length === lista.length
+    ? `${lista.length} registro${lista.length === 1 ? '' : 's'}`
+    : `${filtrados.length} de ${lista.length} registros`;
+
   _renderFilasMisReg(filtrados);
 }
 
 function limpiarFiltrosMisReg() {
-  ['misRegFiltroDesde','misRegFiltroHasta'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
-  ['misRegFiltroTipo','misRegFiltroEstado'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
-  _renderFilasMisReg(window._misRegistrosList || []);
+  ['misRegFiltroDesde','misRegFiltroHasta','misRegFiltroTipo','misRegFiltroEstado',
+   'misRegFiltroAcompanante','misRegFiltroRegional','misRegFiltroDistrito',
+   'misRegFiltroCentro','misRegFiltroArea','misRegBuscar']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  aplicarFiltrosMisReg();
 }
 
 async function eliminarRegistro(id) {
