@@ -2704,7 +2704,8 @@ async function resetearClaveUsuario() {
   } catch (error) {
     if (document.getElementById('editUserId').value !== id) return;
     msg.style.color = 'var(--rojo)';
-    msg.textContent = 'No se pudo enviar el enlace: ' + (error.message || 'Intente nuevamente.');
+    msg.textContent = _mensajeCorreo(error) +
+      ' Desde este mismo cuadro puede generar una contraseña nueva y copiarla.';
   } finally {
     if (document.getElementById('editUserId').value === id) btn.disabled = false;
     btn.textContent = 'Resetear contraseña';
@@ -2727,11 +2728,31 @@ async function enviarReset() {
 
   if (error) {
     msg.style.color = 'var(--rojo)';
-    msg.textContent = 'Error: ' + error.message;
+    msg.textContent = _mensajeCorreo(error);
   } else {
     msg.style.color = '#2a6b1a';
-    msg.textContent = '✅ Enlace enviado. Revise su correo electrónico.';
+    msg.textContent = '✅ Enlace enviado. Revise su correo electrónico, ' +
+                      'incluida la carpeta de no deseados.';
   }
+}
+
+// Traduce los errores del servicio de correo a algo que el usuario pueda
+// accionar. Supabase deshabilita el envío cuando acumula rebotes, y el
+// mensaje crudo no le dice a nadie qué hacer.
+function _mensajeCorreo(error) {
+  const m = String(error?.message || '').toLowerCase();
+  if (m.includes('sending') || m.includes('smtp') || m.includes('disabled') ||
+      m.includes('rate') || error?.status === 429 || error?.status === 500) {
+    return 'El envío de correos está fuera de servicio en este momento. ' +
+           'Solicite una contraseña nueva a su administrador: puede generarla ' +
+           'y entregársela sin necesidad de correo.';
+  }
+  if (m.includes('not found') || m.includes('invalid')) {
+    return 'No se encontró una cuenta con ese correo. Verifique que esté bien ' +
+           'escrito, o consulte a su administrador cuál quedó registrado.';
+  }
+  return 'No se pudo enviar el enlace: ' + (error?.message || 'error desconocido') +
+         '. Si persiste, solicite una contraseña nueva a su administrador.';
 }
 
 // Detectar si el usuario viene de un enlace de restablecimiento
