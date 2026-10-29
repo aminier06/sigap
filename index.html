@@ -642,6 +642,17 @@ document.addEventListener('DOMContentLoaded', () => {
     #notificacion.error{background:var(--rojo);pointer-events:auto;max-width:380px;}
 
     /* MODAL */
+    .interruptor{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;padding:6px 0;}
+    .interruptor input{position:absolute;opacity:0;width:0;height:0;}
+    .interruptor-pista{width:38px;height:21px;border-radius:999px;background:#cfdced;
+      position:relative;transition:background .18s ease;flex:none;}
+    .interruptor-bola{position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;
+      background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s ease;}
+    .interruptor input:checked + .interruptor-pista{background:var(--azul);}
+    .interruptor input:checked + .interruptor-pista .interruptor-bola{transform:translateX(17px);}
+    .interruptor input:focus-visible + .interruptor-pista{outline:2px solid var(--azul);outline-offset:2px;}
+    .interruptor-texto{font-size:13px;font-weight:600;color:#2d4a63;white-space:nowrap;}
+    .grafica-pie{font-size:11px;color:#8fa5bb;margin-top:8px;line-height:1.45;}
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:800;display:flex;align-items:center;justify-content:center;}
     .modal{background:#fff;border-radius:16px;padding:32px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.25);}
     .modal h3{font-size:18px;font-weight:800;color:var(--azul-osc);margin-bottom:12px;}
@@ -1088,21 +1099,25 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="grafica-card">
             <div class="grafica-titulo">Acompañamientos por área curricular</div>
             <div class="barras-wrap" id="graficaAreas"></div>
+            <div class="grafica-pie" id="pieAreas"></div>
           </div>
 
           <div class="grafica-card">
             <div class="grafica-titulo">Acompañamientos por tipo</div>
             <div class="barras-wrap" id="graficaTipos"></div>
+            <div class="grafica-pie" id="pieTipos"></div>
           </div>
 
           <div class="grafica-card">
             <div class="grafica-titulo">Acompañamientos por grado</div>
             <div class="barras-wrap" id="graficaGrados"></div>
+            <div class="grafica-pie" id="pieGrados"></div>
           </div>
 
           <div class="grafica-card">
             <div class="grafica-titulo">Acompañamientos por modalidad</div>
             <div class="barras-wrap" id="graficaModalidad"></div>
+            <div class="grafica-pie" id="pieModalidad"></div>
           </div>
 
         </div>
@@ -2620,6 +2635,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 onkeydown="if(event.key==='Enter') cargarMapaCobertura()"
                 style="padding:7px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;width:110px;">
             </div>
+            <div class="campo">
+              <label style="font-size:12px;font-weight:600;color:#617384;">Alcance</label>
+              <label class="interruptor" title="Las 9 regionales donde se está pilotando el SIGAP: 01 Barahona, 03 Azua, 08 Santiago, 09 Mao, 10 Santo Domingo, 11 Puerto Plata, 12 Higüey, 14 Nagua y 16 Cotuí">
+                <input type="checkbox" id="mapaSoloPiloto" onchange="alternarAlcancePiloto()">
+                <span class="interruptor-pista"><span class="interruptor-bola"></span></span>
+                <span class="interruptor-texto">Ver solo piloto</span>
+              </label>
+            </div>
             <button onclick="cargarMapaCobertura()" style="padding:7px 18px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;">🗺️ Actualizar mapa</button>
             <button onclick="limpiarFiltrosMapa()" style="padding:7px 14px;background:#edf3f8;color:#2d4a63;border:1px solid #cce0f0;border-radius:6px;font-weight:600;font-size:13px;cursor:pointer;">✕ Limpiar</button>
           </div>
@@ -3568,7 +3591,14 @@ async function cargarDashboard() {
   const filtroInstrumento = document.getElementById('filtroInstrumento')?.value;
 
   if (filtroEstado)      query = query.eq('estado', filtroEstado);
-  if (filtroInstrumento) query = query.eq('tipo_instrumento', filtroInstrumento);
+  // Las filas más antiguas del instrumento de docente tienen tipo_instrumento
+  // nulo. Filtrar por igualdad las dejaba fuera, y el total con filtro no
+  // cuadraba con el desglose sin filtro.
+  if (filtroInstrumento === 'docente') {
+    query = query.or('tipo_instrumento.is.null,tipo_instrumento.eq.docente');
+  } else if (filtroInstrumento) {
+    query = query.eq('tipo_instrumento', filtroInstrumento);
+  }
   // Filtro de área solo aplica a docentes
   if (filtroArea && (!filtroInstrumento || filtroInstrumento === 'docente'))
     query = query.eq('area_acompanada', filtroArea);
@@ -3600,12 +3630,23 @@ async function cargarDashboard() {
   document.getElementById('statBorradores').textContent= todosRegistros.filter(r => r.estado === 'Borrador').length;
   document.getElementById('statCentros').textContent   = new Set(todosRegistros.map(r => r.centro_educativo).filter(Boolean)).size;
   // "Acompañados" = docentes + coordinadores + técnicos (nombre del campo varía según tipo)
-  const nombresAcompañados = new Set([
-    ...todosRegistros.map(r => r.nombre_docente).filter(Boolean),
-    ...todosRegistros.map(r => r.nombre_coordinador).filter(Boolean),
-    ...todosRegistros.map(r => r.nombre_tecnico).filter(Boolean),
-  ]);
-  document.getElementById('statDocentes').textContent  = nombresAcompañados.size;
+  // Se identifica por cédula cuando la hay: contar por nombre fundía en una
+  // sola persona a dos homónimas, y separaba a la misma escrita de dos formas.
+  const nombreDe = r => (r.nombre_docente || r.nombre_coordinador || r.nombre_tecnico || '')
+    .trim().toLowerCase();
+  const cedulaDe = r => String(r.cedula_docente || r.cedula || '').replace(/\D/g, '');
+  const porCedula = new Set(), nombresConCedula = new Set();
+  todosRegistros.forEach(r => {
+    const c = cedulaDe(r);
+    if (c.length === 11) { porCedula.add(c); const n = nombreDe(r); if (n) nombresConCedula.add(n); }
+  });
+  const soloNombre = new Set();
+  todosRegistros.forEach(r => {
+    if (cedulaDe(r).length === 11) return;
+    const n = nombreDe(r);
+    if (n && !nombresConCedula.has(n)) soloNombre.add(n);
+  });
+  document.getElementById('statDocentes').textContent = porCedula.size + soloNombre.size;
   document.getElementById('statMes').textContent       = todosRegistros.filter(r => r.fecha && r.fecha.startsWith(mesActual)).length;
   // Actualizar label del stat "Este mes" con el nombre real del mes
   const nombreMes = new Date().toLocaleDateString('es-DO', { month:'long' });
@@ -3615,14 +3656,31 @@ async function cargarDashboard() {
   // Poblar filtros dinámicos
   poblarDistritosDashboard(todosRegistros);
 
-  // Gráficas (basadas en acompañamientos a docentes donde aplica el área/grado)
-  renderBarras('graficaAreas',    contarPor(regDocentes, 'area_acompanada'));
-  renderBarras('graficaTipos',    contarPor(todosRegistros, 'tipo_acompanamiento'));
-  renderBarras('graficaGrados',   contarPor(regDocentes, 'grado'), true);
-  renderBarras('graficaModalidad',contarPor(regDocentes, 'modalidad'));
+  // Gráficas. El área, el grado y la modalidad solo existen en el instrumento
+  // de docente, así que esas tres se calculan sobre ese subconjunto y lo dicen
+  // en su pie. El tipo y la regional aplican a los tres instrumentos.
+  const dAreas = contarPor(regDocentes, 'area_acompanada');
+  const dTipos = contarPor(todosRegistros, 'tipo_acompanamiento');
+  const dGrados = contarPor(regDocentes, 'grado');
+  const dModal = contarPor(regDocentes, 'modalidad');
 
-  // Tabla de regionales
-  renderRegionales(contarPor(todosRegistros, 'regional'));
+  renderBarras('graficaAreas',     dAreas);
+  renderBarras('graficaTipos',     dTipos);
+  renderBarras('graficaGrados',    dGrados, true);
+  renderBarras('graficaModalidad', dModal);
+
+  const nDoc = regDocentes.length, nTodos = todosRegistros.length;
+  const bDoc   = regDocentes.filter(r => r.estado !== 'Enviado').length;
+  const bTodos = todosRegistros.filter(r => r.estado !== 'Enviado').length;
+  pieGrafica('pieAreas',     dAreas, nDoc,   'acompañamientos a docentes', bDoc);
+  pieGrafica('pieTipos',     dTipos, nTodos, 'acompañamientos',            bTodos);
+  pieGrafica('pieGrados',    dGrados, nDoc,  'acompañamientos a docentes', bDoc);
+  pieGrafica('pieModalidad', dModal, nDoc,   'acompañamientos a docentes', bDoc);
+
+  // Tabla de regionales. Se agrupa por el nombre del catálogo para que
+  // "01 – BARAHONA" y "01 - Barahona" no salgan como dos regionales.
+  renderRegionales(contarPor(todosRegistros, null,
+    r => regionalCanonica((String(r.regional || '').trim().match(/^\d+/) || [''])[0]) || r.regional));
 
   // Últimos registros (todos los tipos, mostrando nombre según instrumento)
   // Restablecer la vista por defecto: el usuario pudo dejarla en un desglose
@@ -3667,13 +3725,31 @@ async function cargarDashboard() {
   renderResumenFortalezasMejoras();
 }
 
-function contarPor(registros, campo) {
+// Cuenta por un campo SIN descartar los registros que lo tienen vacío: antes
+// esas filas no aparecían en ninguna barra y las gráficas sumaban menos que
+// las tarjetas, sin que nada lo explicara.
+function contarPor(registros, campo, agrupador) {
   const mapa = {};
   registros.forEach(r => {
-    const val = r[campo];
-    if (val) mapa[val] = (mapa[val] || 0) + 1;
+    const bruto = agrupador ? agrupador(r) : r[campo];
+    const val = (bruto === null || bruto === undefined || String(bruto).trim() === '')
+      ? 'Sin especificar' : String(bruto).trim();
+    mapa[val] = (mapa[val] || 0) + 1;
   });
   return Object.entries(mapa).sort((a,b) => b[1]-a[1]);
+}
+
+// Pie de la gráfica: sobre cuántos registros se calculó y de qué conjunto
+function pieGrafica(id, datos, base, aclaracion, borradores) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const suma = datos.reduce((t, d) => t + d[1], 0);
+  const sinDato = (datos.find(d => d[0] === 'Sin especificar') || [,0])[1];
+  el.innerHTML = 'Calculado sobre ' + suma + ' de ' + base +
+    (aclaracion ? ' ' + aclaracion : ' registros') +
+    (sinDato ? '. ' + sinDato + ' sin el dato' : '') +
+    (borradores ? '. Incluye ' + borradores + ' borrador' + (borradores === 1 ? '' : 'es') +
+                  ', que el mapa no cuenta' : '') + '.';
 }
 
 function renderBarras(contenedorId, datos, ordenarEtiqueta=false) {
@@ -3870,10 +3946,35 @@ async function poblarRegionalesMapa() {
     vistas.add(r.regional_codigo); return true;
   });
 
-  sel.innerHTML = '<option value="">Todas</option>';
-  _mapaRegionalesCache.forEach(r => {
+  const soloPiloto = document.getElementById('mapaSoloPiloto')?.checked;
+  const lista = soloPiloto
+    ? _mapaRegionalesCache.filter(r => REGIONALES_PILOTO.includes(String(r.regional_codigo)))
+    : _mapaRegionalesCache;
+  sel.innerHTML = '<option value="">' +
+    (soloPiloto ? 'Todas las del piloto (9)' : 'Todas (18)') + '</option>';
+  lista.forEach(r => {
     sel.appendChild(new Option(`${r.regional_codigo} - ${r.regional_nombre}`, r.regional_codigo));
   });
+}
+
+// El interruptor del piloto también acota el selector de regional: si no,
+// elegir una regional fuera del piloto anulaba el alcance sin avisar y el
+// interruptor parecía no hacer nada.
+function alternarAlcancePiloto() {
+  const soloPiloto = document.getElementById('mapaSoloPiloto')?.checked;
+  const sel = document.getElementById('mapaFiltroRegional');
+  if (sel && _mapaRegionalesCache) {
+    const previo = sel.value;
+    const lista = soloPiloto
+      ? _mapaRegionalesCache.filter(r => REGIONALES_PILOTO.includes(String(r.regional_codigo)))
+      : _mapaRegionalesCache;
+    sel.innerHTML = '<option value="">' +
+      (soloPiloto ? 'Todas las del piloto (9)' : 'Todas (18)') + '</option>';
+    lista.forEach(r => sel.appendChild(
+      new Option(`${r.regional_codigo} - ${r.regional_nombre}`, r.regional_codigo)));
+    sel.value = [...sel.options].some(o => o.value === previo) ? previo : '';
+  }
+  poblarDistritosMapa().then(() => cargarMapaCobertura());
 }
 
 // Cuando cambia la regional, carga los distritos correspondientes
@@ -4167,7 +4268,13 @@ async function cargarMapaCobertura() {
   const filtCentro   = document.getElementById('mapaFiltroCentro')?.value.trim();
   const filtSector   = document.getElementById('mapaFiltroSector')?.value;
 
+  // Alcance del piloto: las 9 regionales donde el SIGAP está en marcha. Sin
+  // esto, el porcentaje de cobertura se calcula sobre las 18 y sale a la
+  // mitad de lo que realmente se ha logrado.
+  const soloPiloto = document.getElementById('mapaSoloPiloto')?.checked;
+
   if (filtRegional) queryCentros = queryCentros.eq('regional_codigo', filtRegional);
+  else if (soloPiloto) queryCentros = queryCentros.in('regional_codigo', REGIONALES_PILOTO);
   if (filtDistrito) queryCentros = queryCentros.eq('distrito_codigo', filtDistrito);
   if (filtCentro)   queryCentros = queryCentros.eq('codigo', filtCentro.padStart(5,'0'));
   if (filtSector)   queryCentros = queryCentros.eq('sector', filtSector);
@@ -7075,6 +7182,11 @@ async function enviarFormularioCoord(event) {
 
 // ── DATOS DE REGIONALES Y DISTRITOS ──────────────────────────────────────────
 const DISTRITOS_POR_REGIONAL = {"01 - Barahona": ["0101 - Pedernales", "0102 - Enriquillo", "0103 - Barahona", "0104 - Cabral", "0105 - Vicente Noble"], "02 - San Juan de la Maguana": ["0201 - Comendador", "0202 - Pedro Santana", "0203 - Las Matas de Farfan", "0204 - El Cercado", "0205 - San Juan Este", "0206 - San Juan Oeste", "0207 - Hondo Valle"], "03 - Azua": ["0301 - Azua", "0302 - Padre de las Casas", "0303 - San Jose de Ocoa", "0304 - Bani", "0305 - Nizao"], "04 - San Cristobal": ["0401 - Cambita Garabitos", "0402 - San Cristobal Norte", "0403 - San Cristobal Sur", "0404 - Villa Altagracia", "0405 - Yaguate", "0406 - Haina", "0407 - San Gregorio de Nigua"], "05 - San Pedro de Macoris": ["0501 - San Pedro de Macoris Este", "0502 - San Pedro de Macoris Oeste", "0503 - La Romana", "0504 - Hato Mayor", "0505 - Sabana de la Mar", "0506 - Consuelo", "0507 - San Jose de los Llanos", "0508 - Quisqueya", "0509 - El Valle", "0510 - Guaymate", "0511 - Villa Hermosa"], "06 - La Vega": ["0601 - Jose Contreras", "0602 - Constanza", "0603 - Jarabacoa", "0604 - La Vega Oeste", "0605 - La Vega Este", "0606 - Moca", "0607 - Gaspar Hernandez", "0608 - Jamao al Norte", "0609 - San Victor", "0610 - Jima Abajo"], "07 - San Francisco de Macoris": ["0701 - Tenares", "0702 - Salcedo", "0703 - Castillo", "0704 - Villa Riva", "0705 - San Francisco de Macoris Sur-e", "0706 - San Francisco de Macoris Nor-o", "0707 - Villa Tapia"], "08 - Santiago": ["0801 - San Jose de las Matas", "0802 - Janico", "0803 - Santiago Sur-este", "0804 - Santiago Noroeste", "0805 - Santiago Centro-oeste", "0806 - Santiago Noreste", "0807 - Villa Bisono (navarrete)", "0808 - Licey al Medio", "0809 - Tamboril", "0810 - Villa Gonzalez"], "09 - Mao": ["0901 - Mao", "0902 - Esperanza", "0903 - San Ignacio de Sabaneta", "0904 - Moncion", "0905 - Laguna Salada", "0906 - Villa los Almacigos"], "10 - Santo Domingo": ["1001 - Villa Mella", "1002 - Sabana Perdida", "1003 - Santo Domingo Noreste", "1004 - Santo Domingo Oriental", "1005 - Boca Chica", "1006 - Mendoza", "1007 - San Antonio de Guerra"], "11 - Puerto Plata": ["1101 - Sosua", "1102 - Puerto Plata", "1103 - Imbert", "1104 - Luperon", "1105 - Altamira", "1106 - El Mamey", "1107 - Villa Isabela"], "12 - Higuey": ["1201 - Higuey", "1202 - San Rafael del Yuma", "1203 - El Seibo", "1204 - Miches"], "13 - Monte Cristi": ["1301 - Monte Cristi", "1302 - Guayubin", "1303 - Villa Vasquez", "1304 - Dajabon", "1305 - Loma de Cabrera", "1306 - Restauracion"], "14 - Nagua": ["1401 - Nagua", "1402 - Cabrera", "1403 - Rio San Juan", "1404 - Samana", "1405 - Sanchez", "1406 - El Factor", "1407 - Las Terrenas"], "15 - Santo Domingo": ["1501 - Los Alcarrizos", "1502 - Santo Domingo Centro", "1503 - Santo Domingo Surcentral", "1504 - Santo Domingo Noroeste", "1505 - Herrera", "1506 - Pedro Brand"], "16 - Cotui": ["1601 - Cotui", "1602 - Fantino", "1603 - Cevicos", "1604 - Bonao Suroeste", "1605 - Piedra Blanca", "1606 - Bonao Nordeste", "1607 - Villa la Mata"], "17 - Monte Plata": ["1701 - Yamasa", "1702 - Monte Plata", "1703 - Bayaguana", "1704 - Sabana Grande de Boya", "1705 - Peralvillo"], "18 - Baoruco": ["1801 - Neiba", "1802 - Tamayo", "1803 - Villa Jaragua", "1804 - Jimani", "1805 - Duverge"]};
+
+// Regionales donde el SIGAP está siendo pilotado. El mapa puede acotarse a
+// ellas con el interruptor "Ver solo piloto", para que la cobertura se mida
+// sobre el universo real del piloto y no sobre las 18 regionales del país.
+const REGIONALES_PILOTO = ['01','03','08','09','10','11','12','14','16'];
 
 // Devuelve el nombre canónico de una demarcación a partir de su código.
 // Evita que se guarden variantes con guion largo, mayúsculas o nombres
