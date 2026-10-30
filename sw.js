@@ -11,7 +11,7 @@
 // respaldo cuando no hay conexión, y el nombre de la caché lleva versión para
 // que cada despliegue limpie la anterior.
 
-const VERSION       = 'v2-2026-10-28';
+const VERSION = 'v3-2026-10-30';
 const CACHE_NAME    = 'sigap-' + VERSION;
 const CACHE_OFFLINE = 'sigap-offline-v1';   // cola de pendientes: no se borra
 
