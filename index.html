@@ -868,7 +868,7 @@
               </div>
               <div class="grid g-2 fila-linea">
                 <div class="campo"><label for="especialidadDocente">Especialidad</label><input type="text" id="especialidadDocente" name="especialidadDocente" /></div>
-                <div class="campo"><label for="aniosExp">Años de experiencia</label><input type="number" id="aniosExp" name="aniosExp" min="0" /></div>
+                <div class="campo"><label for="aniosExp">Años de experiencia</label><input type="number" id="aniosExp" name="aniosExp" min="0" title="Se calcula desde la fecha de ingreso del padrón docente. Puede corregirlo si hace falta." /></div>
               </div>
 
               <div class="subtitulo fila-linea">Datos de la clase acompañada</div>
@@ -1336,8 +1336,8 @@
 
         <div class="tabla-wrap-outer">
           <table class="tabla-registros">
-            <thead><tr><th>Fecha</th><th>Tipo</th><th>Acompañado</th><th>Centro</th><th>Área / Detalle</th><th>Grado</th><th>Estado</th><th>Acción</th></tr></thead>
-            <tbody id="cuerpoMisRegistros"><tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Cargando…</td></tr></tbody>
+            <thead><tr><th>Fecha</th><th>Tipo</th><th>Acompañante</th><th>Acompañado</th><th>Centro</th><th>Área / Detalle</th><th>Grado</th><th>Estado</th><th>Acción</th></tr></thead>
+            <tbody id="cuerpoMisRegistros"><tr><td colspan="9" style="text-align:center;color:#8fa5bb;padding:24px;">Cargando…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1393,7 +1393,7 @@
 
         <!-- Tabla de planificación -->
         <div class="bloque">
-          <div class="bloque-titulo">Planificación de los acompañamientos semanales</div>
+          <div class="bloque-titulo">Planificación de los acompañamientos semanales<span id="planQuien" style="font-weight:500;color:#617384;font-size:13px;"></span></div>
           <div class="bloque-cuerpo" style="padding:0;">
             <div class="tabla-wrap-outer">
               <table class="tabla-registros" id="tablaPlanificacion" style="box-shadow:none;">
@@ -1726,6 +1726,7 @@
                 <thead>
                   <tr>
                     <th>Fecha planificada</th>
+                    <th>Acompañante</th>
                     <th>Centro</th>
                     <th>Docente planificado</th>
                     <th>Foco</th>
@@ -4312,7 +4313,7 @@ async function cargarMisRegistros() {
   const registros = data || [];
   const cuerpo = document.getElementById('cuerpoMisRegistros');
   if (registros.length === 0) {
-    cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">No hay registros guardados.</td></tr>'; return;
+    cuerpo.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#8fa5bb;padding:24px;">No hay registros guardados.</td></tr>'; return;
   }
   // Guardar registros en variable global para acceso desde verRegistro por id
   window._misRegistrosList = registros;
@@ -4328,7 +4329,7 @@ function verRegistroById(id) {
 function _renderFilasMisReg(lista) {
   const cuerpo = document.getElementById('cuerpoMisRegistros');
   if (!lista.length) {
-    cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Sin registros con esos filtros.</td></tr>';
+    cuerpo.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#8fa5bb;padding:24px;">Sin registros con esos filtros.</td></tr>';
     return;
   }
   cuerpo.innerHTML = lista.map(r => {
@@ -4350,6 +4351,8 @@ function _renderFilasMisReg(lista) {
     return `<tr onclick="verRegistroById('${r.id}')" style="cursor:pointer;" title="Clic para ver el formulario completo">
       <td>${r.fecha||'—'}</td>
       <td>${badgeTipo}<br><span style="font-size:11px;color:#617384;">${r.tipo_acompanamiento||'—'}</span></td>
+      <td style="font-size:12px;">${r.nombre_acompanante||'—'}
+        ${r.rol_acompanante ? `<div style="font-size:10px;color:#8fa5bb;">${r.rol_acompanante}</div>` : ''}</td>
       <td>${nombreAcomp}</td>
       <td>${r.centro_educativo||'—'}</td>
       <td>${detalle}</td>
@@ -4855,6 +4858,14 @@ function _celdasPlan(p, i) {
 // acompañamientos debajo y un botón para agregar otro en ese mismo día que
 // hereda el centro y el foco del anterior, para no reescribirlos.
 function renderizarPlanificacion() {
+  // El acompañante de esta pantalla es siempre quien la tiene abierta, porque
+  // aquí solo se ve la planificación propia. Va en el encabezado una vez.
+  const quien = document.getElementById('planQuien');
+  if (quien) {
+    const n = (perfilActual?.nombre || '').trim();
+    const r = (perfilActual?.rol || '').trim();
+    quien.textContent = n ? ` — Acompañante: ${n}${r ? ' (' + r + ')' : ''}` : '';
+  }
   const cuerpo = document.getElementById('cuerpoPlanificacion');
   if (!cuerpo) return;
   _rotularSemana();
@@ -4981,13 +4992,19 @@ function buscarNombrePorCedulaPlan(cedula) {
     if (error) { console.error('buscarNombrePorCedulaPlan:', error); estado.textContent = ''; return; }
 
     const nomInput = document.getElementById('planDocente');
-    if (data?.nombre_docente) {
+    // El padrón manda sobre el historial: es la fuente oficial del nombre
+    const fila = await buscarEnPadron(cedula);
+    if (fila) {
+      if (nomInput) nomInput.value = _tituloNombre(fila.nombre);
+      estado.textContent = '✅ ' + _tituloNombre(fila.nombre) + ' (padrón docente)';
+      estado.style.color = '#2a6b1a';
+    } else if (data?.nombre_docente) {
       if (nomInput && !nomInput.value.trim()) nomInput.value = data.nombre_docente;
-      estado.textContent = '✅ ' + data.nombre_docente;
+      estado.textContent = '✅ ' + data.nombre_docente + ' (acompañamiento anterior)';
       estado.style.color = '#2a6b1a';
     } else {
-      estado.textContent = 'Sin acompañamientos previos. Escriba el nombre.';
-      estado.style.color = '#8fa5bb';
+      estado.textContent = 'No está en el padrón docente. Escriba el nombre.';
+      estado.style.color = '#8a5d00';
     }
   }, 400);
 }
@@ -5645,6 +5662,7 @@ function filtrarSeguimiento() {
     const [clase, texto2] = etiquetas[estado];
     return `<tr>
       <td>${p.fecha_prevista||'—'}</td>
+      <td style="font-size:12px;">${p.nombre_acompanante||'—'}</td>
       <td style="font-size:12px;">${p.centro_educativo||'—'}</td>
       <td style="font-size:12px;">${_nombrePlanificado(p)||'—'}${
         p.cedula_acompanado
@@ -5667,6 +5685,7 @@ function filtrarSeguimiento() {
     noPlaneados.forEach(e => {
       filas.push(`<tr style="background:#f0fdf4;">
         <td>—</td>
+        <td style="font-size:12px;">${e.nombre_acompanante||'—'}</td>
         <td style="font-size:12px;">${e.centro_educativo||'—'}</td>
         <td style="font-size:12px;">${e.nombre_docente||'—'}</td>
         <td style="font-size:12px;">—</td>
@@ -5687,7 +5706,7 @@ function filtrarSeguimiento() {
   }
 
   document.getElementById('cuerpSeguimiento').innerHTML =
-    filas.length ? filas.join('') : '<tr><td colspan="8" style="text-align:center;color:#8fa5bb;padding:24px;">Ningún registro coincide con los filtros.</td></tr>';
+    filas.length ? filas.join('') : '<tr><td colspan="9" style="text-align:center;color:#8fa5bb;padding:24px;">Ningún registro coincide con los filtros.</td></tr>';
   document.getElementById('tablaSeguimientoWrap').style.display = 'block';
 }
 
@@ -6258,6 +6277,76 @@ function formatearCedula(input) {
 
 // ── LOOKUP POR CÉDULA ─────────────────────────────────────────────────────────
 let buscarCedulaDocTimeout = null;
+// ── PADRÓN DEL PERSONAL DOCENTE ─────────────────────────────────────────────
+// El padrón trae cédula, nombre y fecha de ingreso de 135 mil docentes del
+// MINERD. Con él, escribir la cédula basta: el nombre y el tiempo en servicio
+// se completan solos. Si la persona no está en el padrón, se escribe a mano
+// como siempre, porque hay personal de reciente ingreso y de otras nóminas.
+const _padronCache = new Map();
+
+function _tituloNombre(t) {
+  const menores = ['de','del','la','las','los','y','e','da','do'];
+  return String(t || '').toLowerCase().split(/\s+/).filter(Boolean)
+    .map((p, i) => (i > 0 && menores.includes(p)) ? p : p.charAt(0).toUpperCase() + p.slice(1))
+    .join(' ');
+}
+
+// Años cumplidos entre el ingreso y la fecha de referencia
+function _aniosDeServicio(desde, hasta) {
+  if (!desde) return null;
+  const a = new Date(desde + 'T00:00:00');
+  const b = hasta ? new Date(hasta + 'T00:00:00') : new Date();
+  if (isNaN(a) || isNaN(b) || b < a) return null;
+  let n = b.getFullYear() - a.getFullYear();
+  const m = b.getMonth() - a.getMonth();
+  if (m < 0 || (m === 0 && b.getDate() < a.getDate())) n--;
+  return n >= 0 ? n : null;
+}
+
+// Consulta el padrón por cédula. Devuelve null si no está.
+async function buscarEnPadron(cedula) {
+  const ced = cedulaNormalizada(cedula);
+  if (!ced) return null;
+  if (_padronCache.has(ced)) return _padronCache.get(ced);
+  let fila = null;
+  try {
+    const { data, error } = await sb.from('docentes')
+      .select('cedula,nombre,fecha_ingreso').eq('cedula', ced).maybeSingle();
+    // Si la tabla aún no existe, el instrumento sigue funcionando a mano
+    if (!error) fila = data || null;
+  } catch (e) {}
+  _padronCache.set(ced, fila);
+  return fila;
+}
+
+// Completa nombre y años de servicio desde el padrón.
+//   idNombre  campo del nombre de la persona acompañada
+//   idAnios   campo de años de experiencia, o null si el instrumento no lo tiene
+//   idFecha   campo de la fecha del acompañamiento, para calcular los años
+// Devuelve el texto de estado que corresponde mostrar.
+async function completarDesdePadron(cedula, idNombre, idAnios, idFecha) {
+  const fila = await buscarEnPadron(cedula);
+  if (!fila) return '';
+  const elNombre = document.getElementById(idNombre);
+  if (elNombre) {
+    elNombre.value = _tituloNombre(fila.nombre);
+    elNombre.dataset.delPadron = '1';
+  }
+  let msg = 'Tomado del padrón docente.';
+  if (idAnios && fila.fecha_ingreso) {
+    const ref = idFecha ? (document.getElementById(idFecha)?.value || '') : '';
+    const n = _aniosDeServicio(fila.fecha_ingreso, ref);
+    const elAnios = document.getElementById(idAnios);
+    if (elAnios && n != null) {
+      elAnios.value = n;
+      elAnios.dataset.delPadron = '1';
+      const ingreso = fila.fecha_ingreso.split('-').reverse().join('/');
+      msg += ' Ingresó el ' + ingreso + ', ' + n + ' año' + (n === 1 ? '' : 's') + ' en servicio.';
+    }
+  }
+  return msg;
+}
+
 async function buscarPorCedulaDocente(cedula) {
   const estado = document.getElementById('estadoBusquedaCedulaDocente');
   const cedLimpia = cedula.replace(/\D/g, '');
@@ -6265,6 +6354,7 @@ async function buscarPorCedulaDocente(cedula) {
   clearTimeout(buscarCedulaDocTimeout);
   buscarCedulaDocTimeout = setTimeout(async () => {
     estado.textContent = 'Buscando…'; estado.style.color = '#617384';
+    const delPadron = await completarDesdePadron(cedula, 'nombreDocente', 'aniosExp', 'fecha');
     // Buscar por cédula con o sin guiones — probamos ambos formatos
     const cedulaFormateada = cedula.trim();
     const cedulaSola = cedLimpia; // solo dígitos, sin guiones
@@ -6279,17 +6369,27 @@ async function buscarPorCedulaDocente(cedula) {
       console.error('buscarPorCedulaDocente error:', error);
       estado.textContent = ''; return;
     }
-    if (!data) { estado.textContent = ''; return; }
-    // Solo prellenar campos vacíos
+    // Lo que no trae el padrón (grado académico, especialidad) sí puede venir
+    // de un acompañamiento anterior, así que se usan las dos fuentes.
     const setIfEmpty = (id, val) => {
       const el = document.getElementById(id);
       if (el && !el.value && val != null) el.value = val;
     };
-    setIfEmpty('nombreDocente', data.nombre_docente);
-    setIfEmpty('gradoAcademicoDocente', data.grado_academico);
-    setIfEmpty('especialidadDocente', data.especialidad);
-    setIfEmpty('aniosExp', data.anios_experiencia);
-    estado.textContent = '✅ Datos cargados del registro anterior.';
+    if (data) {
+      setIfEmpty('nombreDocente', data.nombre_docente);
+      setIfEmpty('gradoAcademicoDocente', data.grado_academico);
+      setIfEmpty('especialidadDocente', data.especialidad);
+      setIfEmpty('aniosExp', data.anios_experiencia);
+    }
+    if (delPadron) {
+      estado.textContent = '✅ ' + delPadron;
+    } else if (data) {
+      estado.textContent = '✅ Datos cargados del registro anterior.';
+    } else {
+      estado.textContent = 'No está en el padrón docente. Escriba el nombre.';
+      estado.style.color = '#8a5d00';
+      return;
+    }
     estado.style.color = '#2a6b1a';
   }, 500);
 }
@@ -6302,6 +6402,7 @@ async function buscarPorCedulaCoord(cedula) {
   clearTimeout(buscarCedulaCoordTimeout);
   buscarCedulaCoordTimeout = setTimeout(async () => {
     estado.textContent = 'Buscando…'; estado.style.color = '#617384';
+    const delPadron = await completarDesdePadron(cedula, 'cNombreCoord', 'cAniosExpCoord', 'cFechaCoord');
     const cedulaFormateada = cedula.trim();
     const cedulaSola = cedLimpia;
     const { data, error } = await sb.from('acompañamientos')
@@ -6313,7 +6414,11 @@ async function buscarPorCedulaCoord(cedula) {
       .limit(1)
       .maybeSingle();
     if (error) { console.error('buscarPorCedulaCoord error:', error); estado.textContent = ''; return; }
-    if (!data) { estado.textContent = ''; return; }
+    if (!data && !delPadron) {
+      estado.textContent = 'No está en el padrón docente. Escriba el nombre.';
+      estado.style.color = '#8a5d00'; return;
+    }
+    if (!data) { estado.textContent = '✅ ' + delPadron; estado.style.color = '#2a6b1a'; return; }
     const setIfEmpty = (id, val) => {
       const el = document.getElementById(id);
       if (el && !el.value && val != null) el.value = val;
@@ -6321,7 +6426,7 @@ async function buscarPorCedulaCoord(cedula) {
     setIfEmpty('cNombreCoord', data.nombre_docente);
     setIfEmpty('cGradoAcademicoCoord', data.grado_academico);
     setIfEmpty('cAniosExpCoord', data.anios_experiencia);
-    estado.textContent = '✅ Datos cargados del registro anterior.';
+    estado.textContent = '✅ ' + (delPadron || 'Datos cargados del registro anterior.');
     estado.style.color = '#2a6b1a';
   }, 500);
 }
@@ -6334,6 +6439,7 @@ async function buscarPorCedulaDist(cedula) {
   clearTimeout(buscarCedulaDistTimeout);
   buscarCedulaDistTimeout = setTimeout(async () => {
     estado.textContent = 'Buscando…'; estado.style.color = '#617384';
+    const delPadron = await completarDesdePadron(cedula, 'dNombreTecnico', 'dAniosExpDist', 'dFechaDist');
     const cedulaFormateada = cedula.trim();
     const cedulaSola = cedLimpia;
     const { data, error } = await sb.from('acompañamientos')
@@ -6345,7 +6451,11 @@ async function buscarPorCedulaDist(cedula) {
       .limit(1)
       .maybeSingle();
     if (error) { console.error('buscarPorCedulaDist error:', error); estado.textContent = ''; return; }
-    if (!data) { estado.textContent = ''; return; }
+    if (!data && !delPadron) {
+      estado.textContent = 'No está en el padrón docente. Escriba el nombre.';
+      estado.style.color = '#8a5d00'; return;
+    }
+    if (!data) { estado.textContent = '✅ ' + delPadron; estado.style.color = '#2a6b1a'; return; }
     const setIfEmpty = (id, val) => {
       const el = document.getElementById(id);
       if (el && !el.value && val != null) el.value = val;
@@ -6353,7 +6463,7 @@ async function buscarPorCedulaDist(cedula) {
     setIfEmpty('dNombreTecnico', data.nombre_docente);
     setIfEmpty('dGradoAcadDist', data.grado_academico);
     setIfEmpty('dAniosExpDist', data.anios_experiencia);
-    estado.textContent = '✅ Datos cargados del registro anterior.';
+    estado.textContent = '✅ ' + (delPadron || 'Datos cargados del registro anterior.');
     estado.style.color = '#2a6b1a';
   }, 500);
 }
@@ -9385,7 +9495,7 @@ if ('serviceWorker' in navigator) {
     MINERD · Dirección de Educación Primaria &nbsp;·&nbsp;
     Desarrollado por <strong style="color:#617384;">Aneudy Minier</strong>
     &nbsp;·&nbsp; © <span id="anioFooter"></span>
-    &nbsp;·&nbsp; <span id="versionApp" title="Versión que está corriendo este navegador">v2026-10-28</span>
+    &nbsp;·&nbsp; <span id="versionApp" title="Versión que está corriendo este navegador">v2026-10-30</span>
   </div>
 
 <!-- MODAL VISOR DE REGISTRO ─────────────────────────────────────────────── -->
