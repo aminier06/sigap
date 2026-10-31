@@ -572,26 +572,8 @@
             </div>
             <div class="campo">
               <label>Regional</label>
-              <select id="filtroRegional" onchange="cargarDashboard()">
+              <select id="filtroRegional" onchange="poblarDistritosDe('filtroRegional','filtroDistrito');cargarDashboard()">
                 <option value="">Todas las regionales</option>
-                    <option>01 - Barahona</option>
-                    <option>02 - San Juan de la Maguana</option>
-                    <option>03 - Azua</option>
-                    <option>04 - San Cristobal</option>
-                    <option>05 - San Pedro de Macoris</option>
-                    <option>06 - La Vega</option>
-                    <option>07 - San Francisco de Macoris</option>
-                    <option>08 - Santiago</option>
-                    <option>09 - Mao</option>
-                    <option>10 - Santo Domingo</option>
-                    <option>11 - Puerto Plata</option>
-                    <option>12 - Higuey</option>
-                    <option>13 - Monte Cristi</option>
-                    <option>14 - Nagua</option>
-                    <option>15 - Santo Domingo</option>
-                    <option>16 - Cotui</option>
-                    <option>17 - Monte Plata</option>
-                    <option>18 - Baoruco</option>
               </select>
             </div>
             <div class="campo">
@@ -1300,7 +1282,7 @@
             </div>
             <div class="campo" id="misRegWrapRegional">
               <label>Regional</label>
-              <select id="misRegFiltroRegional" onchange="aplicarFiltrosMisReg()">
+              <select id="misRegFiltroRegional" onchange="poblarDistritosDe('misRegFiltroRegional','misRegFiltroDistrito');aplicarFiltrosMisReg()">
                 <option value="">Todas</option>
               </select>
             </div>
@@ -1635,7 +1617,7 @@
             </div>
             <div class="campo">
               <label>Regional</label>
-              <select id="segRegional" onchange="filtrarSeguimiento()">
+              <select id="segRegional" onchange="poblarDistritosDe('segRegional','segDistrito');filtrarSeguimiento()">
                 <option value="">Todas</option>
               </select>
             </div>
@@ -2164,7 +2146,7 @@
             </div>
             <div class="campo">
               <label style="font-size:12px;font-weight:600;color:#617384;">Regional</label>
-              <select id="filtroUsuRegional" onchange="filtrarUsuarios()"
+              <select id="filtroUsuRegional" onchange="poblarDistritosDe('filtroUsuRegional','filtroUsuDistrito');filtrarUsuarios()"
                       style="padding:8px 10px;border:1px solid #cce0f0;border-radius:6px;font-size:13px;min-width:160px;">
                 <option value="">Todas</option>
               </select>
@@ -2322,11 +2304,16 @@
             </div>
             <div class="campo" id="adminFiltroRegionalWrap">
               <label>Regional</label>
-              <input type="text" id="adminFiltroRegional" placeholder="Ej: 07">
+              <select id="adminFiltroRegional"
+                      onchange="poblarDistritosDe('adminFiltroRegional','adminFiltroDistrito');aplicarFiltrosAdmin()">
+                <option value="">Todas las regionales</option>
+              </select>
             </div>
             <div class="campo" id="adminFiltroDistritoWrap">
               <label>Distrito</label>
-              <input type="text" id="adminFiltroDistrito" placeholder="Ej: 07-04">
+              <select id="adminFiltroDistrito" onchange="aplicarFiltrosAdmin()">
+                <option value="">Todos los distritos</option>
+              </select>
             </div>
           </div>
           <div style="display:flex;gap:10px;margin-top:10px;">
@@ -2381,7 +2368,7 @@
             </div>
             <div class="campo">
               <label>Regional</label>
-              <select id="stRegional" onchange="filtrarSeguimientoTecnicos()">
+              <select id="stRegional" onchange="poblarDistritosDe('stRegional','stDistrito');filtrarSeguimientoTecnicos()">
                 <option value="">Todas</option>
               </select>
             </div>
@@ -3179,6 +3166,9 @@ function detenerAutoguardado() {
 // ── DASHBOARD AVANZADO ────────────────────────────────────────────────────────
 let todosRegistros = [];
 let todosRegistrosCoord = [];
+// Subconjunto de docentes con el que se dibujan los gráficos del panel
+// principal: solo lo enviado, salvo que se filtre por estado a propósito.
+let _grafDocentesActual = [];
 
 // Extrae el código numérico inicial de un valor "01 - Barahona" o "01 – BARAHONA"
 // (funciona sin importar el tipo de guion o si el nombre está en mayúsculas).
@@ -3270,7 +3260,20 @@ async function cargarDashboard() {
   const regDocentes = todosRegistros.filter(r => !r.tipo_instrumento || r.tipo_instrumento === 'docente');
   const regCoord    = todosRegistros.filter(r => r.tipo_instrumento === 'coordinador');
   const regDist     = todosRegistros.filter(r => r.tipo_instrumento === 'tecnico_distrital');
-  todosRegistrosCoord = regCoord; // mantener compatibilidad con renderResumenFortalezasMejoras
+
+  // Los gráficos miden lo que se hizo, no lo que está a medio llenar. Un
+  // borrador todavía puede cambiar de área, de grado y de centro antes de
+  // enviarse, así que contarlo deforma la distribución y además no cuadra con
+  // el mapa de cobertura, que solo cuenta lo enviado. Las tarjetas de arriba
+  // siguen mostrando el total, los enviados y los borradores por separado.
+  // Si la persona eligió un estado en el filtro, manda su filtro.
+  const soloEnviados = !filtroEstado;
+  const regGraf     = soloEnviados ? todosRegistros.filter(r => r.estado === 'Enviado') : todosRegistros;
+  const grafDocentes = regGraf.filter(r => !r.tipo_instrumento || r.tipo_instrumento === 'docente');
+  const grafCoord    = regGraf.filter(r => r.tipo_instrumento === 'coordinador');
+  const fueraDeGrafico = todosRegistros.length - regGraf.length;
+  todosRegistrosCoord = grafCoord; // base de Fortalezas y aspectos de mejora
+  _grafDocentesActual = grafDocentes;
 
   // Tarjetas resumen (todos los tipos)
   document.getElementById('statTotal').textContent     = todosRegistros.length;
@@ -3302,32 +3305,32 @@ async function cargarDashboard() {
   if (labelMes) labelMes.textContent = nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1);
 
   // Poblar filtros dinámicos
-  poblarDistritosDashboard(todosRegistros);
+  poblarDistritosDashboard();
 
   // Gráficas. El área, el grado y la modalidad solo existen en el instrumento
   // de docente, así que esas tres se calculan sobre ese subconjunto y lo dicen
   // en su pie. El tipo y la regional aplican a los tres instrumentos.
-  const dAreas = contarPor(regDocentes, 'area_acompanada');
-  const dTipos = contarPor(todosRegistros, 'tipo_acompanamiento');
-  const dGrados = contarPor(regDocentes, 'grado');
-  const dModal = contarPor(regDocentes, 'modalidad');
+  const dAreas  = contarPor(grafDocentes, 'area_acompanada');
+  const dTipos  = contarPor(regGraf,      'tipo_acompanamiento');
+  const dGrados = contarPor(grafDocentes, 'grado');
+  const dModal  = contarPor(grafDocentes, 'modalidad');
 
   renderBarras('graficaAreas',     dAreas);
   renderBarras('graficaTipos',     dTipos);
   renderBarras('graficaGrados',    dGrados, true);
   renderBarras('graficaModalidad', dModal);
 
-  const nDoc = regDocentes.length, nTodos = todosRegistros.length;
-  const bDoc   = regDocentes.filter(r => r.estado !== 'Enviado').length;
-  const bTodos = todosRegistros.filter(r => r.estado !== 'Enviado').length;
-  pieGrafica('pieAreas',     dAreas, nDoc,   'acompañamientos a docentes', bDoc);
-  pieGrafica('pieTipos',     dTipos, nTodos, 'acompañamientos',            bTodos);
-  pieGrafica('pieGrados',    dGrados, nDoc,  'acompañamientos a docentes', bDoc);
-  pieGrafica('pieModalidad', dModal, nDoc,   'acompañamientos a docentes', bDoc);
+  const nDoc   = grafDocentes.length, nTodos = regGraf.length;
+  const fDoc   = regDocentes.length - grafDocentes.length;
+  const fTodos = fueraDeGrafico;
+  pieGrafica('pieAreas',     dAreas,  nDoc,   'acompañamientos a docentes', fDoc);
+  pieGrafica('pieTipos',     dTipos,  nTodos, 'acompañamientos',            fTodos);
+  pieGrafica('pieGrados',    dGrados, nDoc,   'acompañamientos a docentes', fDoc);
+  pieGrafica('pieModalidad', dModal,  nDoc,   'acompañamientos a docentes', fDoc);
 
   // Tabla de regionales. Se agrupa por el nombre del catálogo para que
   // "01 – BARAHONA" y "01 - Barahona" no salgan como dos regionales.
-  renderRegionales(contarPor(todosRegistros, null,
+  renderRegionales(contarPor(regGraf, null,
     r => regionalCanonica((String(r.regional || '').trim().match(/^\d+/) || [''])[0]) || r.regional));
 
   // Últimos registros (todos los tipos, mostrando nombre según instrumento)
@@ -3396,8 +3399,8 @@ function pieGrafica(id, datos, base, aclaracion, borradores) {
   el.innerHTML = 'Calculado sobre ' + suma + ' de ' + base +
     (aclaracion ? ' ' + aclaracion : ' registros') +
     (sinDato ? '. ' + sinDato + ' sin el dato' : '') +
-    (borradores ? '. Incluye ' + borradores + ' borrador' + (borradores === 1 ? '' : 'es') +
-                  ', que el mapa no cuenta' : '') + '.';
+    (borradores ? '. Solo acompañamientos enviados: ' + borradores + ' sin enviar ' +
+                  (borradores === 1 ? 'quedó' : 'quedaron') + ' fuera' : '') + '.';
 }
 
 function renderBarras(contenedorId, datos, ordenarEtiqueta=false) {
@@ -3497,7 +3500,7 @@ function renderBarrasIndicadores(contenedorId, datos, colorClase) {
 function renderResumenFortalezasMejoras() {
   const top = (arr, key) => [...arr].sort((a,b) => b[key]-a[key]).slice(0,5).map(s => ({ codigo: s.codigo, texto: s.texto, pct: s[key] }));
 
-  const resumenDocente = calcularResumenIndicadoresDocente(todosRegistros);
+  const resumenDocente = calcularResumenIndicadoresDocente(_grafDocentesActual);
   renderBarrasIndicadores('graficaFortalezasDocente', top(resumenDocente,'pctEvid'),   'color-fortaleza');
   renderBarrasIndicadores('graficaMejorasDocente',    top(resumenDocente,'pctMejora'), 'color-mejora');
 
@@ -3506,19 +3509,11 @@ function renderResumenFortalezasMejoras() {
   renderBarrasIndicadores('graficaMejorasCoord',    top(resumenCoord,'pctMejora'), 'color-mejora');
 }
 
-function poblarDistritosDashboard(registros) {
-  // Populate distrito filter dynamically based on selected regional
-  const selReg  = document.getElementById('filtroRegional');
-  const selDist = document.getElementById('filtroDistrito');
-  const reg = selReg?.value;
-  const currentDist = selDist?.value;
-  if (selDist) {
-    selDist.innerHTML = '<option value="">Todos los distritos</option>';
-    const fuente = reg && DISTRITOS_POR_REGIONAL[reg]
-      ? DISTRITOS_POR_REGIONAL[reg]
-      : [...new Set(registros.map(r => r.distrito).filter(Boolean))].sort();
-    fuente.forEach(d => { const o = new Option(d,d); if(d===currentDist) o.selected=true; selDist.appendChild(o); });
-  }
+function poblarDistritosDashboard() {
+  // Las dos listas salen del catálogo compartido, acotadas a la demarcación
+  // del perfil. Antes el distrito se armaba con lo que hubiera en los datos.
+  poblarRegionalDistrito('filtroRegional', 'filtroDistrito',
+                         { regional: 'Todas las regionales', distrito: 'Todos los distritos' });
 }
 
 // Puebla el filtro de Centro Educativo.
@@ -3551,114 +3546,39 @@ async function poblarCentrosDashboard(registrosCombinados) {
 
 // When regional filter changes, reload distritos then dashboard
 document.addEventListener('DOMContentLoaded', () => {
-  const selReg = document.getElementById('filtroRegional');
-  if (selReg) {
-    selReg.addEventListener('change', () => {
-      poblarDistritosDashboard([]);
-      cargarDashboard();
-    });
-  }
+  poblarDistritosDashboard();
 });
 
 // ─── MAPA DE COBERTURA ───────────────────────────────────────────────
 let _mapaLeaflet = null;
-let _mapaRegionalesCache = null; // cache de regionales para el selector
+
 
 // Carga las regionales en el selector del mapa (se llama una sola vez)
 async function poblarRegionalesMapa() {
   const sel = document.getElementById('mapaFiltroRegional');
-  if (!sel || _mapaRegionalesCache) return;
-
-  // Paginar para obtener todos los registros (Supabase limita a 1000 por defecto)
-  let todos = [];
-  let pg = 0;
-  const PG = 1000;
-  while (true) {
-    const { data: chunk } = await sb.from('centros')
-      .select('regional_codigo,regional_nombre')
-      .ilike('niveles','%Primario%')
-      .not('niveles','ilike','%Adultos%')
-      .not('regional_codigo','is','null')
-      .order('regional_codigo')
-      .range(pg * PG, (pg + 1) * PG - 1);
-    if (!chunk || chunk.length === 0) break;
-    todos = todos.concat(chunk);
-    if (chunk.length < PG) break;
-    pg++;
-  }
-
-  // Deduplicar por código
-  const vistas = new Set();
-  _mapaRegionalesCache = todos.filter(r => {
-    if (vistas.has(r.regional_codigo)) return false;
-    vistas.add(r.regional_codigo); return true;
-  });
-
+  if (!sel) return;
+  const previo = sel.value;
   const soloPiloto = document.getElementById('mapaSoloPiloto')?.checked;
   const lista = soloPiloto
-    ? _mapaRegionalesCache.filter(r => REGIONALES_PILOTO.includes(String(r.regional_codigo)))
-    : _mapaRegionalesCache;
+    ? _regionalesPermitidas().filter(r => REGIONALES_PILOTO.includes(r.slice(0, 2)))
+    : _regionalesPermitidas();
   sel.innerHTML = '<option value="">' +
-    (soloPiloto ? 'Todas las del piloto (9)' : 'Todas (18)') + '</option>';
-  lista.forEach(r => {
-    sel.appendChild(new Option(`${r.regional_codigo} - ${r.regional_nombre}`, r.regional_codigo));
-  });
+    (soloPiloto ? 'Todas las del piloto (' + lista.length + ')'
+                : 'Todas (' + lista.length + ')') + '</option>' +
+    lista.map(r => `<option value="${r.slice(0, 2)}">${_esc(r)}</option>`).join('');
+  sel.value = [...sel.options].some(o => o.value === previo) ? previo : '';
 }
 
 // El interruptor del piloto también acota el selector de regional: si no,
 // elegir una regional fuera del piloto anulaba el alcance sin avisar y el
 // interruptor parecía no hacer nada.
 function alternarAlcancePiloto() {
-  const soloPiloto = document.getElementById('mapaSoloPiloto')?.checked;
-  const sel = document.getElementById('mapaFiltroRegional');
-  if (sel && _mapaRegionalesCache) {
-    const previo = sel.value;
-    const lista = soloPiloto
-      ? _mapaRegionalesCache.filter(r => REGIONALES_PILOTO.includes(String(r.regional_codigo)))
-      : _mapaRegionalesCache;
-    sel.innerHTML = '<option value="">' +
-      (soloPiloto ? 'Todas las del piloto (9)' : 'Todas (18)') + '</option>';
-    lista.forEach(r => sel.appendChild(
-      new Option(`${r.regional_codigo} - ${r.regional_nombre}`, r.regional_codigo)));
-    sel.value = [...sel.options].some(o => o.value === previo) ? previo : '';
-  }
-  poblarDistritosMapa().then(() => cargarMapaCobertura());
+  poblarRegionalesMapa().then(() => poblarDistritosMapa()).then(() => cargarMapaCobertura());
 }
 
 // Cuando cambia la regional, carga los distritos correspondientes
 async function poblarDistritosMapa() {
-  const regCod = document.getElementById('mapaFiltroRegional')?.value;
-  const sel = document.getElementById('mapaFiltroDistrito');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">Todos</option>';
-  if (!regCod) return;
-
-  // Paginar por si una regional tiene muchos distritos
-  let todos = [];
-  let pg = 0;
-  const PG = 1000;
-  while (true) {
-    const { data: chunk } = await sb.from('centros')
-      .select('distrito_codigo,distrito_nombre')
-      .ilike('niveles','%Primario%')
-      .not('niveles','ilike','%Adultos%')
-      .eq('regional_codigo', regCod)
-      .not('distrito_codigo','is','null')
-      .order('distrito_codigo')
-      .range(pg * PG, (pg + 1) * PG - 1);
-    if (!chunk || chunk.length === 0) break;
-    todos = todos.concat(chunk);
-    if (chunk.length < PG) break;
-    pg++;
-  }
-
-  const vistas = new Set();
-  todos.filter(d => {
-    if (vistas.has(d.distrito_codigo)) return false;
-    vistas.add(d.distrito_codigo); return true;
-  }).forEach(d => {
-    sel.appendChild(new Option(`${d.distrito_codigo} - ${d.distrito_nombre}`, d.distrito_codigo));
-  });
+  poblarDistritosDe('mapaFiltroRegional', 'mapaFiltroDistrito', 'Todos los distritos');
 }
 
 function limpiarFiltrosMapa() {
@@ -3668,11 +3588,7 @@ function limpiarFiltrosMapa() {
     if (el) el.value = '';
   });
   // Limpiar distritos y forzar recarga de regionales la próxima vez
-  const selD = document.getElementById('mapaFiltroDistrito');
-  if (selD) selD.innerHTML = '<option value="">Todos</option>';
-  const selR = document.getElementById('mapaFiltroRegional');
-  if (selR) { selR.innerHTML = '<option value="">Todas</option>'; }
-  _mapaRegionalesCache = null; // invalidar caché para forzar recarga
+  poblarRegionalesMapa().then(() => poblarDistritosMapa());
   _mapaAutoActualizar(0);      // recargar el mapa sin filtros
 }
 
@@ -4152,6 +4068,7 @@ function limpiarFiltros() {
   if (areaSelect) { areaSelect.disabled = false; areaSelect.style.opacity = ''; }
   const areaNote = document.getElementById('filtroAreaNote');
   if (areaNote) areaNote.textContent = '';
+  poblarDistritosDe('filtroRegional', 'filtroDistrito', 'Todos los distritos');
   cargarDashboard();
 }
 
@@ -4369,13 +4286,20 @@ function _renderFilasMisReg(lista) {
 // visibles, no con catálogos completos: así un técnico distrital no ve 18
 // regionales de las que solo una le aplica.
 function _poblarFiltrosMisReg(lista) {
-  const _reg = r => regionalCanonica((String(r.regional || '').trim().match(/^\d+/) || [''])[0]) || r.regional || '';
-  const _dis = r => distritoCanonico((String(r.distrito || '').trim().match(/^\d+/) || [''])[0]) || r.distrito || '';
+  // Regional y distrito salen del catálogo compartido, como en el resto de la
+  // aplicación. Los demás filtros sí se arman con lo que hay en los registros.
+  const cuantos = poblarRegionalDistrito('misRegFiltroRegional', 'misRegFiltroDistrito',
+                        { regional: 'Todas las regionales', distrito: 'Todos los distritos' });
+  const ocultar = (wrapId, n) => {
+    const w = document.getElementById(wrapId);
+    if (w) w.style.display = n > 1 ? '' : 'none';
+  };
+  ocultar('misRegWrapRegional', cuantos.regionales);
+  ocultar('misRegWrapDistrito', cuantos.distritos);
+
   const _cen = r => r.centro_educativo || '';
   const campos = [
     ['misRegFiltroAcompanante', 'misRegWrapAcompanante', r => r.nombre_acompanante || '', 'Todos'],
-    ['misRegFiltroRegional',    'misRegWrapRegional',    _reg, 'Todas'],
-    ['misRegFiltroDistrito',    'misRegWrapDistrito',    _dis, 'Todos'],
     ['misRegFiltroCentro',      'misRegWrapCentro',      _cen, 'Todos'],
     ['misRegFiltroArea',        'misRegWrapArea',        r => r.area_acompanada || '', 'Todas'],
   ];
@@ -4441,6 +4365,7 @@ function limpiarFiltrosMisReg() {
    'misRegFiltroAcompanante','misRegFiltroRegional','misRegFiltroDistrito',
    'misRegFiltroCentro','misRegFiltroArea','misRegBuscar']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  poblarDistritosDe('misRegFiltroRegional', 'misRegFiltroDistrito', 'Todos los distritos');
   aplicarFiltrosMisReg();
 }
 
@@ -5607,8 +5532,8 @@ function _poblarFiltrosSeguimiento() {
     if (lista.includes(previo)) sel.value = previo;
   };
   llenar('segAcompanante', todos.map(x => x.nombre_acompanante), 'Todos');
-  llenar('segRegional',    todos.map(_segRegionalDe),            'Todas');
-  llenar('segDistrito',    todos.map(_segDistritoDe),            'Todos');
+  poblarRegionalDistrito('segRegional', 'segDistrito',
+                         { regional: 'Todas las regionales', distrito: 'Todos los distritos' });
   llenar('segCentro',      todos.map(_segCentroDe),              'Todos');
 }
 
@@ -5616,6 +5541,7 @@ function limpiarFiltrosSeguimiento() {
   ['segAcompanante','segInstrumento','segCumplimiento','segRegional','segDistrito','segCentro','segBuscar'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
+  poblarDistritosDe('segRegional', 'segDistrito', 'Todos los distritos');
   filtrarSeguimiento();
 }
 
@@ -5637,8 +5563,10 @@ function filtrarSeguimiento() {
   };
   const porAcomp  = x => !acomp || (x.nombre_acompanante || '').trim() === acomp;
   const porInstr  = x => !instr || (x.tipo_instrumento || 'docente') === instr;
-  const porZona   = x => (!regF || _segRegionalDe(x).trim() === regF)
-                      && (!disF || _segDistritoDe(x).trim() === disF)
+  // Se compara por código: el valor de la lista es "07" y el registro puede
+  // traer "07 – SAN FRANCISCO" o "07 - San Francisco de Macoris"
+  const porZona   = x => (!regF || _codReg(_segRegionalDe(x)) === regF)
+                      && (!disF || _codDist(_segDistritoDe(x)) === disF)
                       && (!cenF || _segCentroDe(x).trim()   === cenF);
 
   const plan = _segPlan.filter(p => porAcomp(p) && porInstr(p) && porZona(p) &&
@@ -5747,7 +5675,6 @@ const _stAcompanado = r => r.tipo_instrumento === 'coordinador'
 
 function _poblarFiltrosTecnicos() {
   const selT = document.getElementById('stTecnico');
-  const selD = document.getElementById('stDistrito');
   if (selT) {
     const previo = selT.value;
     const nombres = [...new Set(_stDatos.map(_stNombre).map(x => x.trim()).filter(Boolean))].sort();
@@ -5755,21 +5682,8 @@ function _poblarFiltrosTecnicos() {
       nombres.map(n => `<option value="${n}">${n}</option>`).join('');
     if (nombres.includes(previo)) selT.value = previo;
   }
-  if (selD) {
-    const previo = selD.value;
-    const dis = [...new Set(_stDatos.map(_stDistrito).map(x => x.trim()).filter(Boolean))].sort();
-    selD.innerHTML = '<option value="">Todos</option>' +
-      dis.map(d => `<option value="${d}">${d}</option>`).join('');
-    if (dis.includes(previo)) selD.value = previo;
-  }
-  const selR = document.getElementById('stRegional');
-  if (selR) {
-    const previo = selR.value;
-    const regs = [...new Set(_stDatos.map(_stRegional).map(x => x.trim()).filter(Boolean))].sort();
-    selR.innerHTML = '<option value="">Todas</option>' +
-      regs.map(r => `<option value="${r}">${r}</option>`).join('');
-    if (regs.includes(previo)) selR.value = previo;
-  }
+  poblarRegionalDistrito('stRegional', 'stDistrito',
+                         { regional: 'Todas las regionales', distrito: 'Todos los distritos' });
   const selRol = document.getElementById('stRol');
   if (selRol) {
     const previo = selRol.value;
@@ -5792,6 +5706,7 @@ function limpiarFiltrosTecnicos() {
   ['stTecnico','stRol','stDistrito','stRegional','stAcompanado','stBuscar'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
+  poblarDistritosDe('stRegional', 'stDistrito', 'Todos los distritos');
   filtrarSeguimientoTecnicos();
 }
 
@@ -5808,8 +5723,8 @@ function filtrarSeguimientoTecnicos() {
 
   const filtrados = _stDatos.filter(r => {
     if (tec  && _stNombre(r).trim()   !== tec)  return false;
-    if (disF && _stDistrito(r).trim() !== disF) return false;
-    if (regF && _stRegional(r).trim() !== regF) return false;
+    if (disF && _codDist(_stDistrito(r)) !== disF) return false;
+    if (regF && _codReg(_stRegional(r))  !== regF) return false;
     if (acoF && _stAcompanado(r).trim() !== acoF) return false;
     if (rolF && !_norm(_stRol(r)).includes(_norm(rolF))) return false;
     if (!palabras.length) return true;
@@ -7160,6 +7075,76 @@ function distritoCanonico(codigo) {
   return '';
 }
 
+// ── Un solo motor para las listas de regional y distrito ───────────────────
+// Antes cada pantalla armaba su lista a su manera: el panel principal con las
+// 18 regionales escritas a mano, el mapa desde la tabla de centros, Seguimiento
+// y Usuarios con lo que encontraran en los datos, y el panel de Registros con
+// dos cajas de texto. Resultado: la misma regional aparecía escrita de tres
+// formas y un filtro no coincidía con el otro.
+//
+// Desde aquí todas salen del mismo catálogo y guardan el CÓDIGO como valor, no
+// el nombre. Así da igual que un registro traiga "07 – SAN FRANCISCO",
+// "07 - San Francisco de Macoris" o "07": se compara por código y coincide.
+
+const _codReg  = v => { const d = String(v || '').replace(/\D/g, '');
+                        return d ? d.slice(0, 2).padStart(2, '0') : ''; };
+const _codDist = v => { const d = String(v || '').replace(/\D/g, '');
+                        return d.length >= 4 ? d.slice(0, 4) : ''; };
+
+// Las regionales que esta persona puede elegir. Un técnico regional no tiene
+// nada que buscar en las otras diecisiete.
+function _regionalesPermitidas() {
+  const todas = Object.keys(DISTRITOS_POR_REGIONAL);
+  const rol = perfilActual?.rol || '';
+  if (perfilActual?.nivel === 'admin' || rol === 'Técnico/a Nacional') return todas;
+  const cod = _codReg(perfilActual?.regional);
+  return cod ? todas.filter(r => r.slice(0, 2) === cod) : todas;
+}
+
+// Los distritos que puede elegir, acotados a la regional ya elegida si la hay.
+function _distritosPermitidos(codRegional) {
+  const rol = perfilActual?.rol || '';
+  const amplio = perfilActual?.nivel === 'admin'
+              || rol === 'Técnico/a Nacional'
+              || /Regional/i.test(rol);
+  const propio = _codDist(perfilActual?.distrito);
+  // Distrital, coordinador o director: su distrito y nada más
+  if (!amplio && propio) return [distritoCanonico(propio)].filter(Boolean);
+  const regs = codRegional
+    ? Object.keys(DISTRITOS_POR_REGIONAL).filter(r => r.slice(0, 2) === codRegional)
+    : _regionalesPermitidas();
+  return regs.flatMap(r => DISTRITOS_POR_REGIONAL[r] || []);
+}
+
+// Llena la lista de distritos a partir de lo elegido en la de regional.
+function poblarDistritosDe(idReg, idDist, etiqueta) {
+  const sel = document.getElementById(idDist);
+  if (!sel) return [];
+  const previo = sel.value;
+  const lista = _distritosPermitidos(_codReg(document.getElementById(idReg)?.value));
+  sel.innerHTML = `<option value="">${etiqueta || 'Todos los distritos'}</option>` +
+    lista.map(d => `<option value="${d.slice(0, 4)}">${_esc(d)}</option>`).join('');
+  sel.value = [...sel.options].some(o => o.value === previo) ? previo : '';
+  return lista;
+}
+
+// Llena el par regional → distrito. Devuelve cuántas opciones quedaron en cada
+// uno, para que la pantalla pueda esconder un filtro que no da nada que elegir.
+function poblarRegionalDistrito(idReg, idDist, etiquetas) {
+  const et = etiquetas || {};
+  const selR = document.getElementById(idReg);
+  let regs = [];
+  if (selR) {
+    const previo = selR.value;
+    regs = _regionalesPermitidas();
+    selR.innerHTML = `<option value="">${et.regional || 'Todas las regionales'}</option>` +
+      regs.map(r => `<option value="${r.slice(0, 2)}">${_esc(r)}</option>`).join('');
+    selR.value = [...selR.options].some(o => o.value === previo) ? previo : '';
+  }
+  const dists = poblarDistritosDe(idReg, idDist, et.distrito);
+  return { regionales: regs.length, distritos: dists.length };
+}
+
 function cargarDistritosUsuario() {
   const reg = document.getElementById('nuRegional').value;
   const sel = document.getElementById('nuDistrito');
@@ -7359,8 +7344,8 @@ function aplicarFiltrosAdmin() {
   const hasta  = document.getElementById('adminFiltroHasta')?.value || '';
   const tipo   = document.getElementById('adminFiltroTipo')?.value || '';
   const estado = document.getElementById('adminFiltroEstado')?.value || '';
-  const reg    = (document.getElementById('adminFiltroRegional')?.value || '').trim().toLowerCase();
-  const dist   = (document.getElementById('adminFiltroDistrito')?.value || '').trim().toLowerCase();
+  const reg    = document.getElementById('adminFiltroRegional')?.value || '';
+  const dist   = document.getElementById('adminFiltroDistrito')?.value || '';
 
   const filtrados = lista.filter(r => {
     if (desde && r.fecha < desde) return false;
@@ -7368,8 +7353,8 @@ function aplicarFiltrosAdmin() {
     const tipoR = r.tipo_instrumento || 'docente';
     if (tipo && tipoR !== tipo) return false;
     if (estado && r.estado !== estado) return false;
-    if (reg  && !(r.regional||'').toLowerCase().includes(reg))  return false;
-    if (dist && !(r.distrito||'').toLowerCase().includes(dist)) return false;
+    if (reg  && _codReg(r.regional)  !== reg)  return false;
+    if (dist && _codDist(r.distrito) !== dist) return false;
     return true;
   });
 
@@ -7410,6 +7395,7 @@ function limpiarFiltrosAdmin() {
   ['adminFiltroDesde','adminFiltroHasta','adminFiltroRegional','adminFiltroDistrito'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
+  poblarDistritosDe('adminFiltroRegional', 'adminFiltroDistrito', 'Todos los distritos');
   ['adminFiltroTipo','adminFiltroEstado'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
@@ -7472,24 +7458,11 @@ async function cargarUsuarios() {
   filtrarUsuarios();
 }
 
-// Las opciones de regional y distrito salen de los propios usuarios:
-// así solo aparecen demarcaciones que realmente tienen gente asignada.
+// Las dos listas salen del catálogo compartido, acotadas a la demarcación de
+// quien consulta, igual que en el resto de la aplicación.
 function poblarFiltrosUsuarios() {
-  const selR = document.getElementById('filtroUsuRegional');
-  const selD = document.getElementById('filtroUsuDistrito');
-  if (!selR || !selD) return;
-  const antesR = selR.value, antesD = selD.value;
-
-  const regs = [...new Set(_usuariosCargados.map(u => (u.regional || '').trim()).filter(Boolean))].sort();
-  const dis  = [...new Set(_usuariosCargados.map(u => (u.distrito || '').trim()).filter(Boolean))].sort();
-
-  selR.innerHTML = '<option value="">Todas</option>' +
-    regs.map(r => `<option value="${r}">${r}</option>`).join('');
-  selD.innerHTML = '<option value="">Todos</option>' +
-    dis.map(d => `<option value="${d}">${d}</option>`).join('');
-
-  if (regs.includes(antesR)) selR.value = antesR;
-  if (dis.includes(antesD))  selD.value = antesD;
+  poblarRegionalDistrito('filtroUsuRegional', 'filtroUsuDistrito',
+                         { regional: 'Todas las regionales', distrito: 'Todos los distritos' });
 }
 
 // Normaliza para que la búsqueda ignore acentos y mayúsculas
@@ -7508,8 +7481,8 @@ function filtrarUsuarios() {
   const palabras = texto ? texto.split(/\s+/) : [];
 
   const filtrados = _usuariosCargados.filter(u => {
-    if (regional && (u.regional || '').trim() !== regional) return false;
-    if (distrito && (u.distrito || '').trim() !== distrito) return false;
+    if (regional && _codReg(u.regional) !== regional) return false;
+    if (distrito && _codDist(u.distrito) !== distrito) return false;
     if (estado === 'activo'   && u.activo === false) return false;
     if (estado === 'inactivo' && u.activo !== false)  return false;
     if (!palabras.length) return true;
@@ -7566,6 +7539,7 @@ function limpiarFiltrosUsuarios() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  poblarDistritosDe('filtroUsuRegional', 'filtroUsuDistrito', 'Todos los distritos');
   filtrarUsuarios();
 }
 
@@ -7580,6 +7554,9 @@ async function cargarTodosRegistros() {
   // Todos los registros: admin ve todos, usuario ve solo los suyos
   const esAdmin = perfilActual?.nivel === 'admin';
   let query = filtrarDemarcacion(sb.from('acompañamientos').select('*')).order('created_at', { ascending: false });
+
+  poblarRegionalDistrito('adminFiltroRegional', 'adminFiltroDistrito',
+                         { regional: 'Todas las regionales', distrito: 'Todos los distritos' });
 
   const { data, error } = await traerTodo(query);
   const cuerpo = document.getElementById('cuerpoAdminRegistros');
