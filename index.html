@@ -4772,6 +4772,18 @@ async function iniciarAcompanamientoDesdePlan(id) {
     poner('foco', p.foco); poner('areaAcompanada', p.area_curricular);
   }
 
+  // La cédula se escribió desde aquí, no la tecleó nadie, así que el padrón no
+  // se consultó solo. Se le pregunta para que el nombre quede con el oficial y
+  // bloqueado, igual que si se hubiera escrito la cédula a mano.
+  if (p.cedula_acompanado) {
+    const campos = tipo === 'coordinador'
+      ? ['cNombreCoord', 'cAniosExpCoord', 'cFechaCoord']
+      : tipo === 'tecnico_distrital'
+        ? ['dNombreTecnico', 'dAniosExpDist', 'dFechaDist']
+        : ['nombreDocente', 'aniosExp', 'fecha'];
+    await completarDesdePadron(p.cedula_acompanado, campos[0], campos[1], campos[2]);
+  }
+
   _planEnCurso = { id: p.id, tipo };
   mostrarNotif('Instrumento abierto con los datos de la planificación. Complete y envíe.');
 }
@@ -4975,7 +4987,7 @@ function buscarNombrePorCedulaPlan(cedula) {
   const estado = document.getElementById('planCedulaEstado');
   const cedLimpia = String(cedula || '').replace(/\D/g, '');
   if (!estado) return;
-  if (cedLimpia.length < 11) { estado.textContent = ''; return; }
+  if (cedLimpia.length < 11) { estado.textContent = ''; _liberarCamposPadron('planDocente'); return; }
 
   clearTimeout(_planCedulaTimeout);
   _planCedulaTimeout = setTimeout(async () => {
@@ -4995,14 +5007,16 @@ function buscarNombrePorCedulaPlan(cedula) {
     // El padrón manda sobre el historial: es la fuente oficial del nombre
     const fila = await buscarEnPadron(cedula);
     if (fila) {
-      if (nomInput) nomInput.value = _tituloNombre(fila.nombre);
-      estado.textContent = '✅ ' + _tituloNombre(fila.nombre) + ' (padrón docente)';
+      _fijarDelPadron(nomInput, _tituloNombre(fila.nombre));
+      estado.textContent = '✅ ' + _tituloNombre(fila.nombre) + ' (padrón docente, no se edita)';
       estado.style.color = '#2a6b1a';
     } else if (data?.nombre_docente) {
+      _liberarDelPadron(nomInput, true);
       if (nomInput && !nomInput.value.trim()) nomInput.value = data.nombre_docente;
       estado.textContent = '✅ ' + data.nombre_docente + ' (acompañamiento anterior)';
       estado.style.color = '#2a6b1a';
     } else {
+      _liberarDelPadron(nomInput, true);
       estado.textContent = 'No está en el padrón docente. Escriba el nombre.';
       estado.style.color = '#8a5d00';
     }
@@ -5015,6 +5029,7 @@ function cancelarItemPlan() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  _liberarCamposPadron('planDocente');
   document.getElementById('planArea').value = '';
   document.getElementById('estadoCentroPlan').textContent = '';
   const cedEstado = document.getElementById('planCedulaEstado');
@@ -6208,6 +6223,7 @@ async function guardarRegistro(estado) {
 function limpiarFormulario() {
   cerrarBorrador('docente');        // el siguiente guardado abre una fila nueva
   document.getElementById('formAcompDocente').reset();
+  _liberarCamposPadron('nombreDocente','aniosExp');
   document.getElementById('nombreAcompanante').value = perfilActual?.nombre || '';
   document.getElementById('rolAcompanante').value = perfilActual?.rol || '';
   crearTablaIndicadores();
@@ -6319,30 +6335,82 @@ async function buscarEnPadron(cedula) {
   return fila;
 }
 
+// Un dato que viene del padrón no se teclea: el nombre oficial de la persona
+// acompañada es el que tiene el MINERD, y dejarlo editable es justo lo que
+// produce los nombres escritos de diez maneras distintas. Queda bloqueado, con
+// un botón para corregirlo solo si el padrón trae el error.
+function _fijarDelPadron(el, valor) {
+  if (!el) return;
+  el.value = valor;
+  el.readOnly = true;
+  el.dataset.delPadron = '1';
+  el.title = 'Tomado del padrón docente del MINERD. Si el padrón trae el dato equivocado, pulse "Corregir".';
+  el.style.background  = '#eef4fb';
+  el.style.color       = '#1a3a52';
+  el.style.fontWeight  = '600';
+  el.style.borderStyle = 'dashed';
+  const idBoton = 'corregir_' + el.id;
+  if (!document.getElementById(idBoton)) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.id = idBoton; b.className = 'btn-secundario btn-sm';
+    b.style.cssText = 'margin-top:4px;font-size:11px;padding:2px 8px;';
+    b.textContent = '✏️ Corregir';
+    b.title = 'Úselo solo si el padrón docente trae el dato equivocado';
+    b.onclick = () => { _liberarDelPadron(el); el.focus(); };
+    el.insertAdjacentElement('afterend', b);
+  }
+}
+
+// Devuelve el campo a escritura a mano. Con borrar=true se vacía, que es lo que
+// toca cuando la cédula cambió y el dato de antes ya no corresponde a nadie.
+function _liberarDelPadron(el, borrar) {
+  if (!el) return;
+  const venia = el.dataset.delPadron === '1';
+  delete el.dataset.delPadron;
+  el.readOnly = false;
+  el.title = '';
+  el.style.background = '';
+  el.style.color = '';
+  el.style.fontWeight = '';
+  el.style.borderStyle = '';
+  document.getElementById('corregir_' + el.id)?.remove();
+  if (borrar && venia) el.value = '';
+}
+
+function _liberarCamposPadron(...ids) {
+  ids.forEach(id => _liberarDelPadron(document.getElementById(id), true));
+}
+
 // Completa nombre y años de servicio desde el padrón.
 //   idNombre  campo del nombre de la persona acompañada
 //   idAnios   campo de años de experiencia, o null si el instrumento no lo tiene
 //   idFecha   campo de la fecha del acompañamiento, para calcular los años
 // Devuelve el texto de estado que corresponde mostrar.
 async function completarDesdePadron(cedula, idNombre, idAnios, idFecha) {
-  const fila = await buscarEnPadron(cedula);
-  if (!fila) return '';
+  const fila     = await buscarEnPadron(cedula);
   const elNombre = document.getElementById(idNombre);
-  if (elNombre) {
-    elNombre.value = _tituloNombre(fila.nombre);
-    elNombre.dataset.delPadron = '1';
+  const elAnios  = idAnios ? document.getElementById(idAnios) : null;
+
+  // Cédula que no está en el padrón: el nombre vuelve a escribirse a mano, y si
+  // el campo traía el nombre de otra cédula se vacía para no firmar a un ajeno.
+  if (!fila) {
+    _liberarDelPadron(elNombre, true);
+    _liberarDelPadron(elAnios, true);
+    return '';
   }
-  let msg = 'Tomado del padrón docente.';
-  if (idAnios && fila.fecha_ingreso) {
-    const ref = idFecha ? (document.getElementById(idFecha)?.value || '') : '';
-    const n = _aniosDeServicio(fila.fecha_ingreso, ref);
-    const elAnios = document.getElementById(idAnios);
-    if (elAnios && n != null) {
-      elAnios.value = n;
-      elAnios.dataset.delPadron = '1';
-      const ingreso = fila.fecha_ingreso.split('-').reverse().join('/');
-      msg += ' Ingresó el ' + ingreso + ', ' + n + ' año' + (n === 1 ? '' : 's') + ' en servicio.';
-    }
+
+  _fijarDelPadron(elNombre, _tituloNombre(fila.nombre));
+  let msg = 'Tomado del padrón docente, no se edita.';
+
+  const ref = idFecha ? (document.getElementById(idFecha)?.value || '') : '';
+  const n = fila.fecha_ingreso ? _aniosDeServicio(fila.fecha_ingreso, ref) : null;
+  if (elAnios && n != null) {
+    _fijarDelPadron(elAnios, String(n));
+    const ingreso = fila.fecha_ingreso.split('-').reverse().join('/');
+    msg += ' Ingresó el ' + ingreso + ', ' + n + ' año' + (n === 1 ? '' : 's') + ' en servicio.';
+  } else {
+    // El padrón no trae la fecha de ingreso: los años sí se escriben a mano
+    _liberarDelPadron(elAnios, true);
   }
   return msg;
 }
@@ -6350,7 +6418,7 @@ async function completarDesdePadron(cedula, idNombre, idAnios, idFecha) {
 async function buscarPorCedulaDocente(cedula) {
   const estado = document.getElementById('estadoBusquedaCedulaDocente');
   const cedLimpia = cedula.replace(/\D/g, '');
-  if (cedLimpia.length < 11) { estado.textContent = ''; return; }
+  if (cedLimpia.length < 11) { estado.textContent = ''; _liberarCamposPadron('nombreDocente','aniosExp'); return; }
   clearTimeout(buscarCedulaDocTimeout);
   buscarCedulaDocTimeout = setTimeout(async () => {
     estado.textContent = 'Buscando…'; estado.style.color = '#617384';
@@ -6398,7 +6466,7 @@ let buscarCedulaCoordTimeout = null;
 async function buscarPorCedulaCoord(cedula) {
   const estado = document.getElementById('estadoBusquedaCedulaCoord');
   const cedLimpia = cedula.replace(/\D/g, '');
-  if (cedLimpia.length < 11) { estado.textContent = ''; return; }
+  if (cedLimpia.length < 11) { estado.textContent = ''; _liberarCamposPadron('cNombreCoord','cAniosExpCoord'); return; }
   clearTimeout(buscarCedulaCoordTimeout);
   buscarCedulaCoordTimeout = setTimeout(async () => {
     estado.textContent = 'Buscando…'; estado.style.color = '#617384';
@@ -6435,7 +6503,7 @@ let buscarCedulaDistTimeout = null;
 async function buscarPorCedulaDist(cedula) {
   const estado = document.getElementById('estadoBusquedaCedulaDist');
   const cedLimpia = cedula.replace(/\D/g, '');
-  if (cedLimpia.length < 11) { estado.textContent = ''; return; }
+  if (cedLimpia.length < 11) { estado.textContent = ''; _liberarCamposPadron('dNombreTecnico','dAniosExpDist'); return; }
   clearTimeout(buscarCedulaDistTimeout);
   buscarCedulaDistTimeout = setTimeout(async () => {
     estado.textContent = 'Buscando…'; estado.style.color = '#617384';
@@ -6848,6 +6916,7 @@ function limpiarFormularioDist(trasEnviar) {
   if (!trasEnviar && !confirm('¿Limpiar todo el formulario del técnico distrital?')) return;
   cerrarBorrador('tecnico_distrital');
   document.getElementById('formAcompDist').reset();
+  _liberarCamposPadron('dNombreTecnico','dAniosExpDist');
   document.getElementById('dNombreAcompanante').value = perfilActual?.nombre || '';
   document.getElementById('dRolAcompanante').value = perfilActual?.rol || '';
   crearTablaIndicadoresDist();
@@ -7003,6 +7072,7 @@ async function buscarCentroCoord(codigo) {
 function limpiarFormularioCoord() {
   cerrarBorrador('coordinador');
   document.getElementById('formAcompCoord').reset();
+  _liberarCamposPadron('cNombreCoord','cAniosExpCoord');
   document.getElementById('cNombreAcompanante').value = perfilActual?.nombre || '';
   document.getElementById('cRolAcompanante').value = perfilActual?.rol || '';
   crearTablaIndicadoresCoord();
