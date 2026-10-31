@@ -265,13 +265,26 @@
     .grafica-titulo{font-size:14px;font-weight:800;color:var(--azul-osc);margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #edf3f8;}
     .barras-wrap{display:flex;flex-direction:column;gap:8px;}
     .barra-fila{display:flex;align-items:center;gap:10px;font-size:13px;}
-    .barra-etiqueta{width:180px;flex-shrink:0;color:#2d4a63;font-weight:600;font-size:12px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .barra-etiqueta{width:180px;flex-shrink:0;color:#2d4a63;font-weight:600;font-size:12px;text-align:right;line-height:1.3;overflow-wrap:break-word;}
     .barra-contenedor{flex:1;background:#edf3f8;border-radius:999px;height:22px;overflow:hidden;}
     .barra-relleno{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--azul),#2a8ad4);transition:width .4s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;}
     .barra-relleno.color-fortaleza{background:linear-gradient(90deg,#2a6b1a,#5fae3d);}
     .barra-relleno.color-mejora{background:linear-gradient(90deg,#b45309,#e2954a);}
     .barra-valor{font-size:11px;font-weight:800;color:#fff;white-space:nowrap;}
     .barra-vacia{font-size:13px;color:#8fa5bb;padding:8px 0;}
+
+    /* Indicadores: un indicador es una oración entera y no cabe en una
+       etiqueta de 180 píxeles. El texto va completo arriba y la barra debajo. */
+    .ind-fila{padding:11px 0;border-bottom:1px solid #f0f5fa;}
+    .ind-fila:last-child{border-bottom:none;}
+    .ind-texto{display:flex;gap:8px;align-items:baseline;font-size:12.5px;
+               color:#2d4a63;line-height:1.45;margin-bottom:7px;}
+    .ind-codigo{flex-shrink:0;font-weight:800;color:var(--azul-osc);
+                background:var(--azul-claro);border-radius:5px;padding:1px 7px;font-size:11px;}
+    .ind-barra{display:flex;align-items:center;gap:10px;}
+    .ind-obs{flex-shrink:0;font-size:10.5px;color:#8fa5bb;white-space:nowrap;}
+    .ind-pie{font-size:11.5px;color:#8fa5bb;padding-top:10px;}
+    .btn-ver-todos{margin-top:10px;font-size:12px;}
 
     /* TABLA REGIONALES */
     .regional-fila{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #edf3f8;font-size:13px;}
@@ -3482,31 +3495,84 @@ function calcularResumenCriteriosCoord(registros) {
       pctEvid: (s.evid/s.total)*100, pctMejora: ((s.noEvid+s.medio)/s.total)*100 }));
 }
 
-function renderBarrasIndicadores(contenedorId, datos, colorClase) {
+// Qué tarjetas de indicadores están desplegadas
+const _indExpandido = {
+  graficaFortalezasDocente: false, graficaMejorasDocente: false,
+  graficaFortalezasCoord:   false, graficaMejorasCoord:   false,
+};
+
+function alternarIndicadores(id) {
+  _indExpandido[id] = !_indExpandido[id];
+  renderResumenFortalezasMejoras();
+}
+
+function renderBarrasIndicadores(contenedorId, datos, colorClase, extra) {
   const el = document.getElementById(contenedorId);
   if (!el) return;
-  if (!datos.length) { el.innerHTML = '<div class="barra-vacia">Aún no hay suficientes registros para calcular esta vista.</div>'; return; }
-  el.innerHTML = datos.map(d => `
-    <div class="barra-fila">
-      <div class="barra-etiqueta" title="${d.codigo}. ${d.texto}">${d.codigo}. ${d.texto}</div>
-      <div class="barra-contenedor">
-        <div class="barra-relleno ${colorClase}" style="width:${Math.max(Math.round(d.pct),4)}%">
-          <span class="barra-valor">${d.pct.toFixed(0)}%</span>
+  if (!datos.length) {
+    el.innerHTML = '<div class="barra-vacia">Aún no hay suficientes registros para calcular esta vista.</div>';
+    return;
+  }
+  const o = extra || {};
+  const filas = datos.map(d => `
+    <div class="ind-fila">
+      <div class="ind-texto">
+        <span class="ind-codigo">${_esc(d.codigo)}</span>
+        <span>${_esc(d.texto)}</span>
+      </div>
+      <div class="ind-barra">
+        <div class="barra-contenedor">
+          <div class="barra-relleno ${colorClase}" style="width:${Math.max(Math.round(d.pct), 4)}%">
+            <span class="barra-valor">${d.pct.toFixed(0)}%</span>
+          </div>
         </div>
+        ${d.total != null
+          ? `<span class="ind-obs">${d.total} observación${d.total === 1 ? '' : 'es'}</span>` : ''}
       </div>
     </div>`).join('');
+
+  let pie = '';
+  if (o.total > datos.length) {
+    pie = `<button type="button" class="btn-secundario btn-sm btn-ver-todos"
+             onclick="alternarIndicadores('${contenedorId}')">▾ Ver los ${o.total} indicadores</button>`;
+  } else if (o.total > 5) {
+    pie = `<button type="button" class="btn-secundario btn-sm btn-ver-todos"
+             onclick="alternarIndicadores('${contenedorId}')">▴ Ver solo los 5 principales</button>`;
+  }
+  // Un indicador con muy pocas observaciones da un porcentaje que no dice
+  // nada, así que queda fuera. Pero hay que decir cuántos y por qué.
+  if (o.sinDatos > 0) {
+    pie += `<div class="ind-pie">${o.sinDatos} indicador${o.sinDatos === 1 ? '' : 'es'} `
+         + `todavía sin suficientes observaciones para calcular un porcentaje.</div>`;
+  }
+  el.innerHTML = filas + pie;
 }
 
 function renderResumenFortalezasMejoras() {
-  const top = (arr, key) => [...arr].sort((a,b) => b[key]-a[key]).slice(0,5).map(s => ({ codigo: s.codigo, texto: s.texto, pct: s[key] }));
+  const ordenar = (arr, clave) => [...arr].sort((a, b) => b[clave] - a[clave])
+    .map(s => ({ codigo: s.codigo, texto: s.texto, total: s.total, pct: s[clave] }));
+
+  // Se muestran los cinco primeros y el botón abre la lista completa, porque
+  // el jefe de un distrito necesita ver también los del medio de la tabla.
+  const pintar = (id, resumen, clave, color, posibles) => {
+    const todos = ordenar(resumen, clave);
+    const vista = _indExpandido[id] ? todos : todos.slice(0, 5);
+    renderBarrasIndicadores(id, vista, color, {
+      total: todos.length,
+      sinDatos: _indExpandido[id] ? Math.max(posibles - todos.length, 0) : 0,
+    });
+  };
+
+  const posiblesDoc   = INDICADORES.filter(i => i.codigo).length;
+  const posiblesCoord = INDICADORES_COORD.filter(i => i.codigo).length;
 
   const resumenDocente = calcularResumenIndicadoresDocente(_grafDocentesActual);
-  renderBarrasIndicadores('graficaFortalezasDocente', top(resumenDocente,'pctEvid'),   'color-fortaleza');
-  renderBarrasIndicadores('graficaMejorasDocente',    top(resumenDocente,'pctMejora'), 'color-mejora');
+  pintar('graficaFortalezasDocente', resumenDocente, 'pctEvid',   'color-fortaleza', posiblesDoc);
+  pintar('graficaMejorasDocente',    resumenDocente, 'pctMejora', 'color-mejora',    posiblesDoc);
 
   const resumenCoord = calcularResumenCriteriosCoord(todosRegistrosCoord);
-  renderBarrasIndicadores('graficaFortalezasCoord', top(resumenCoord,'pctEvid'),   'color-fortaleza');
-  renderBarrasIndicadores('graficaMejorasCoord',    top(resumenCoord,'pctMejora'), 'color-mejora');
+  pintar('graficaFortalezasCoord', resumenCoord, 'pctEvid',   'color-fortaleza', posiblesCoord);
+  pintar('graficaMejorasCoord',    resumenCoord, 'pctMejora', 'color-mejora',    posiblesCoord);
 }
 
 function poblarDistritosDashboard() {
